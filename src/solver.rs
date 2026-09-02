@@ -12,6 +12,7 @@
 
 use std::collections::BTreeMap;
 
+#[cfg(feature = "step9")]
 use rayon::prelude::*;
 
 use crate::error::SolverError;
@@ -122,19 +123,7 @@ impl<'m, F: FluxScheme> Solver<'m, F> {
         scheme: F,
         config: Config,
     ) -> Result<Self, SolverError> {
-        let vertices = mesh.vertices();
-        // TODO-STEP:9 Paralléliser ce calcul avec rayon. C'est un `map` sur les faces,
-        // chacune indépendante des autres : `.iter()` → `.par_iter()` suffit.
-        let face_flux: Vec<f64> = {
-            // SOLUTION-BEGIN
-            mesh.faces()
-                .par_iter()
-                .map(|f| {
-                    velocity.stream(vertices[f.b.index()]) - velocity.stream(vertices[f.a.index()])
-                })
-                .collect()
-            // SOLUTION-END
-        };
+        let face_flux = compute_face_flux(mesh, velocity);
         let dt_max = max_stable_dt(mesh, &face_flux, config.diffusivity);
         let dt = config.dt.unwrap_or(config.cfl * dt_max);
         if dt > dt_max * (1.0 + 1e-12) {
@@ -197,6 +186,7 @@ impl<'m, F: FluxScheme> Solver<'m, F> {
     /// `face_flux` qui ne dépend que du maillage. `work`, lui, reste réutilisé d'un pas
     /// à l'autre par [`Solver::run`] : faire de même pour les gradients est une bonne
     /// extension (voir `docs/etapes/etape-07.md`).
+    #[cfg(feature = "step9")]
     pub fn residual(&self, c: &Field, out: &mut Field) {
         let mut gradients = vec![Vec2::ZERO; c.len()];
         gradient::limited_gradients(self.mesh, c, &mut gradients);
@@ -260,6 +250,67 @@ impl<'m, F: FluxScheme> Solver<'m, F> {
                 *out_value = -sum / cell.area;
             });
         // SOLUTION-END
+    }
+
+    /// Calcule `dc/dt` dans `out` — version séquentielle, avant l'étape 9.
+    ///
+    /// `c` est emprunté en lecture, `out` en écriture exclusive : le compilateur refuse
+    /// qu'on lui passe deux fois le même champ. En C, le même appel avec le même
+    /// pointeur des deux côtés compile, tourne, et donne un résultat faux ; `restrict`
+    /// ne fait que promettre le contraire.
+    #[cfg(not(feature = "step9"))]
+    pub fn residual(&self, c: &Field, out: &mut Field) {
+        let mut gradients = vec![Vec2::ZERO; c.len()];
+        gradient::limited_gradients(self.mesh, c, &mut gradients);
+
+        for (i, cell) in self.mesh.cells().iter().enumerate() {
+            let id = CellId(i as u32);
+            let ci = c[id];
+            let mut sum = 0.0;
+
+            for &fid in self.mesh.cell_faces(id) {
+                let face = self.mesh.face(fid);
+                // Le débit stocké est sortant de `face.left` : on le retourne si la
+                // cellule courante se trouve de l'autre côté.
+                let outward = if face.left == id { 1.0 } else { -1.0 };
+                let flux = self.face_flux[fid.index()] * outward;
+                let un = flux / face.length;
+                let to_face_left = face.midpoint - cell.centroid;
+
+                let (c_other, grad_right, to_face_right) = match face.right {
+                    Side::Inner(other) => {
+                        let neighbour = if face.left == id { other } else { face.left };
+                        let n_centroid = self.mesh.cell(neighbour).centroid;
+                        (
+                            c[neighbour],
+                            Some(gradients[neighbour.index()]),
+                            face.midpoint - n_centroid,
+                        )
+                    }
+                    Side::Boundary(kind) => match self.bc(kind) {
+                        Bc::NoFlux => continue,
+                        Bc::Fixed(value) => (value, None, Vec2::ZERO),
+                        Bc::ZeroGradient => (ci, None, Vec2::ZERO),
+                    },
+                };
+
+                let c_face = self.scheme.interface_value(&FaceState {
+                    c_left: ci,
+                    c_right: c_other,
+                    un,
+                    grad_left: gradients[id.index()],
+                    to_face_left,
+                    grad_right,
+                    to_face_right,
+                });
+                // Le terme convectif utilise le débit tel quel : c'est lui qui se
+                // télescope exactement sur le contour de la cellule.
+                sum += flux * c_face
+                    - self.config.diffusivity * (c_other - ci) / face.distance * face.length;
+            }
+
+            out[id] = -sum / cell.area;
+        }
     }
 
     /// Avance d'un pas de temps, selon le schéma d'intégration choisi.
@@ -338,6 +389,32 @@ impl<'m, F: FluxScheme> Solver<'m, F> {
         }
         Ok(())
     }
+}
+
+/// Débit volumique de chaque face, par différence de fonction de courant (voir le champ
+/// `face_flux` de [`Solver`]).
+#[cfg(feature = "step9")]
+fn compute_face_flux(mesh: &Mesh, velocity: &dyn VelocityField) -> Vec<f64> {
+    let vertices = mesh.vertices();
+    // TODO-STEP:9 Paralléliser ce calcul avec rayon. C'est un `map` sur les faces,
+    // chacune indépendante des autres : `.iter()` → `.par_iter()` suffit.
+    // SOLUTION-BEGIN
+    mesh.faces()
+        .par_iter()
+        .map(|f| velocity.stream(vertices[f.b.index()]) - velocity.stream(vertices[f.a.index()]))
+        .collect()
+    // SOLUTION-END
+}
+
+/// Débit volumique de chaque face, par différence de fonction de courant (voir le champ
+/// `face_flux` de [`Solver`]).
+#[cfg(not(feature = "step9"))]
+fn compute_face_flux(mesh: &Mesh, velocity: &dyn VelocityField) -> Vec<f64> {
+    let vertices = mesh.vertices();
+    mesh.faces()
+        .iter()
+        .map(|f| velocity.stream(vertices[f.b.index()]) - velocity.stream(vertices[f.a.index()]))
+        .collect()
 }
 
 /// Pas de temps maximal admissible : `min_i |Ωi| / Σ_f (|débit| + 2D L_f/d_f)`.
