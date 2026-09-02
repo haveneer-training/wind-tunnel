@@ -99,3 +99,43 @@ sortie —, et la masse décroît régulièrement à mesure que la fumée sort p
   la même image. Seul le masque décide de la résolution.
 - `--bands 9` densifie le rideau de fumée. Avec un nombre pair, une bande passe
   frontalement sur l'obstacle au lieu de l'encadrer.
+
+### D'où vient exactement l'étalement ?
+
+La diffusivité vaut zéro par défaut : dans la solution exacte, un champ valant 0 ou 1
+transporté par un écoulement à divergence nulle **reste** exactement 0 ou 1, seule la
+forme de l'interface change. Toute valeur intermédiaire à l'écran est donc de l'erreur
+numérique, et rien d'autre.
+
+Le masque `domains/tunnel-empty.dom` — une veine vide, sans obstacle — permet de
+l'isoler, parce qu'il rend l'inclinaison de l'écoulement réglable par `--angle` :
+
+```shell
+cargo run --release -- domains/tunnel-empty.dom --refine 4 --bands 9 --angle 0
+cargo run --release -- domains/tunnel-empty.dom --refine 4 --bands 9 --angle 45
+```
+
+À 0°, l'écoulement suit les axes du maillage et longe les bandes : le schéma est
+**exact**, les interfaces restent parfaitement nettes d'un bout à l'autre du domaine.
+Après 480 pas, seules 3 % des cellules portent une valeur intermédiaire — et ce sont
+celles du front d'air pur qui entre par l'amont, la seule interface perpendiculaire à
+l'écoulement.
+
+À 45°, sans le moindre obstacle, 70 % des cellules sont floutées et les bandes ont
+fondu. C'est la « fausse diffusion » des schémas d'ordre 1, d'amplitude proportionnelle
+à `|u|·Δx·sin 2θ` : elle est nulle quand l'écoulement est aligné avec la grille, et
+maximale à 45°.
+
+D'où la conclusion qui justifie l'étape 7 : sur un maillage non structuré, l'écoulement
+n'est *jamais* aligné avec les faces. Un schéma d'ordre 1 y est structurellement
+condamné à cette erreur. Et sur le cas avec obstacle, ce n'est pas l'obstacle qui
+diffuse — c'est lui qui rend l'écoulement oblique, ce qui déclenche la fausse diffusion.
+
+Deux détails que ces essais révèlent, et qui valent d'être regardés :
+
+- à 45°, la masse **augmente** de 10 % : la paroi basse est devenue une frontière
+  d'entrée, et une condition de gradient nul y réinjecte du traceur. Un gradient nul sur
+  une frontière d'entrée est un problème mal posé — le code ne s'en plaint pas, c'est à
+  vous de le voir ;
+- `--angle` est refusé sur un masque avec obstacle : l'écoulement y est celui du
+  cylindre, dont la direction amont est imposée.

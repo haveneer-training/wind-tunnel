@@ -65,6 +65,10 @@ nombre de cellules. `--h` ne règle que la *taille* d'une cellule, donc la taill
 du domaine — le diviser par deux redonne exactement la même image, sur un domaine deux
 fois plus petit.
 
+Et un second masque, `domains/tunnel-empty.dom`, une veine vide : combiné à `--angle`,
+il sert à isoler la diffusion numérique du schéma, sans obstacle pour brouiller la
+lecture (voir la fin de l'énoncé de l'étape 5).
+
 `--help` liste le reste.
 
 ## Prérequis
