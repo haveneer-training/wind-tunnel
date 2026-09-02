@@ -45,6 +45,8 @@ cargo clippy --all-targets --all-features -- -D warnings
 cargo fmt --all --check
 cargo xtask starter --force && cd travail && cargo test   # 4 red tests expected: step 0
 cargo xtask goto 5 && cargo xtask solve 5                  # ... and back to green
+
+scripts/check-steps.sh   # same round-trip, automated, step by step from 0 to LAST_STEP
 ```
 
 ## Architecture
