@@ -57,6 +57,17 @@ boucles en *gather* du solveur (étape 9). Le code tourne et produit l'animation
   toutes lettres). `tests/parallel.rs` verrouille le résultat : un run forcé à un thread
   et un run à plusieurs threads doivent produire des champs identiques au bit près —
   aucune réduction flottante dont l'ordre dépendrait du nombre de threads
+- **Correction : `cargo run` était cassé de l'étape 5 à l'étape 8.** Le bloc
+  `TODO-STEP:9` de `face_flux`/`residual`/`limited_gradients` remplaçait *tout* le calcul
+  (version séquentielle comprise) par sa version `rayon` : dans `travail/`, tant que
+  l'étape 9 n'était pas atteinte, ce bloc restait un `todo!()`, et `cargo run` paniquait
+  dès l'étape 5 malgré ce que dit plus haut « à la fin de l'étape 5, le code tourne ».
+  Corrigé en donnant à chaque calcul concerné deux définitions, choisies par les
+  features `stepN` déjà présentes (`#[cfg(feature = "step9")]` pour la version `rayon`
+  — avec son trou — et `#[cfg(not(feature = "step9"))]` pour la version séquentielle
+  d'avant, toujours complète, jamais un trou). Vérifié par un tour complet
+  `starter --force` → `goto 3/5/7/8/9` → `cargo run` à chaque étape intermédiaire.
+  Cette convention est ajoutée à la liste ci-dessous.
 
 ## Ce qui reste
 
@@ -77,6 +88,13 @@ explicite là-dessus.
    d'un commentaire `// TODO-STEP:<n>` qui porte la consigne. Le bloc doit couvrir un
    corps de fonction entier ou une expression complète : son remplacement par `todo!()`
    doit typecheck.
+   **Si l'étape remplace un calcul déjà fonctionnel** (comme l'étape 9 sur `face_flux`)
+   plutôt que de combler un trou resté vide depuis le début, donnez-lui deux
+   définitions choisies par `#[cfg(feature = "stepN")]` / `#[cfg(not(feature =
+   "stepN"))]` : la version avec le trou d'un côté, l'ancienne version séquentielle
+   (complète, sans `todo!()`) de l'autre. Sinon, dans `travail/`, ce calcul reste un
+   `todo!()` — et donc `cargo run` cassé — de l'étape précédente jusqu'à celle-ci, pas
+   seulement pendant celle-ci.
 2. **Les tests de l'étape n** vont sous `#[cfg(all(test, feature = "stepN"))]`, ou
    `#![cfg(feature = "stepN")]` en tête d'un fichier de `tests/`. Les features sont
    chaînées dans `Cargo.toml` (`stepN = ["stepN-1"]`), ce qui fait que `cargo test` ne
