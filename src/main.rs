@@ -29,6 +29,8 @@ Options :
   --refine <k>         subdivise chaque case en k×k    (défaut : 1)
   --bands <n>          nombre de bandes de fumée       (défaut : 4)
   --speed <m/s>        vitesse à l'infini              (défaut : 1)
+  --angle <deg>        incline l'écoulement uniforme   (défaut : 0 ; sans effet
+                       si le masque contient un obstacle)
   --circulation <m2/s> circulation autour du cylindre  (défaut : 0)
   --diffusivity <m2/s> diffusivité du traceur          (défaut : 0)
   --dt <s>             pas de temps imposé             (défaut : déduit de la CFL)
@@ -45,6 +47,7 @@ struct Args {
     refine: usize,
     bands: usize,
     speed: f64,
+    angle: f64,
     circulation: f64,
     diffusivity: f64,
     dt: Option<f64>,
@@ -63,6 +66,7 @@ impl Default for Args {
             refine: 1,
             bands: 4,
             speed: 1.0,
+            angle: 0.0,
             circulation: 0.0,
             diffusivity: 0.0,
             dt: None,
@@ -91,6 +95,7 @@ fn parse_args() -> Result<Option<Args>, String> {
             "--refine" => args.refine = value()?.parse().map_err(|e| format!("--refine : {e}"))?,
             "--bands" => args.bands = value()?.parse().map_err(|e| format!("--bands : {e}"))?,
             "--speed" => args.speed = value()?.parse().map_err(|e| format!("--speed : {e}"))?,
+            "--angle" => args.angle = value()?.parse().map_err(|e| format!("--angle : {e}"))?,
             "--circulation" => {
                 args.circulation = value()?
                     .parse()
@@ -154,15 +159,30 @@ fn run() -> Result<(), Box<dyn Error>> {
     let (xmin, ymin, xmax, ymax) = mesh.bounds();
 
     let velocity: Box<dyn VelocityField> = match obstacle(&mask, h) {
+        Some(_) if args.angle != 0.0 => {
+            return Err(format!(
+                "--angle {} n'a de sens que sur un masque sans obstacle : avec un \
+                 obstacle, l'écoulement est celui du cylindre.\nEssayez \
+                 domains/tunnel-empty.dom.",
+                args.angle
+            )
+            .into());
+        }
         Some((center, radius)) => Box::new(PotentialCylinder {
             center,
             radius,
             speed: args.speed,
             circulation: args.circulation,
         }),
-        None => Box::new(Uniform {
-            value: Vec2::new(args.speed, 0.0),
-        }),
+        None => {
+            // Sans obstacle, l'écoulement est uniforme et son inclinaison devient
+            // réglable : c'est ce qui permet d'isoler la fausse diffusion du schéma,
+            // qui ne dépend que de l'angle entre l'écoulement et les axes du maillage.
+            let theta = args.angle.to_radians();
+            Box::new(Uniform {
+                value: Vec2::new(args.speed * theta.cos(), args.speed * theta.sin()),
+            })
+        }
     };
 
     let config = Config {
@@ -239,9 +259,14 @@ fn run() -> Result<(), Box<dyn Error>> {
         Ok(())
     })?;
 
+    // On rapporte la variation sans l'interpréter : selon les conditions aux limites
+    // et l'inclinaison de l'écoulement, le domaine peut aussi bien se vider que se
+    // remplir — une paroi en gradient nul devenue frontière d'entrée réinjecte du
+    // traceur, ce qui est un cas mal posé et se voit ici en clair.
+    let final_mass = c.total_mass(&mesh);
     println!(
-        "masse initiale {initial_mass:.6}, finale {:.6} (la fumée sort par l'aval)",
-        c.total_mass(&mesh)
+        "masse : {initial_mass:.6} → {final_mass:.6} ({:+.1} %)",
+        100.0 * (final_mass - initial_mass) / initial_mass
     );
     Ok(())
 }
