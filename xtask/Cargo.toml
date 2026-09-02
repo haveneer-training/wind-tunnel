@@ -1,0 +1,9 @@
+[package]
+name = "xtask"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.90"
+publish = false
+description = "Outillage du fil rouge : génération du dépôt de travail et pilotage des étapes"
+
+[dependencies]

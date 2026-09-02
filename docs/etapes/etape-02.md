@@ -1,6 +1,6 @@
 # Étape 2 — Maillage et connectivité
 
-**Fichier :** `src/mesh.rs` · **Vérification :** `cargo test mesh` puis `cargo test --test mesh` · **≈ 40 min**
+**Fichier :** `src/mesh.rs` · **Vérification :** `cargo xtask goto 2` puis `cargo test` · **≈ 40 min**
 
 C'est le cœur de la structure de données. Une cellule ne connaîtra pas ses voisins par
 arithmétique d'indices, mais par ses faces : tout ce qui sera écrit au-dessus
@@ -61,7 +61,7 @@ le cache.
 
 ## Pour aller plus loin
 
-- `cargo test --test mesh` vérifie une identité géométrique : la somme des normales
+- `cargo test` vérifie une identité géométrique : la somme des normales
   orientées d'une cellule, pondérées par les longueurs, est nulle. Pourquoi est-ce vrai
   pour *tout* polygone fermé ?
 - Combien de triangles produit `domains/tunnel.dom` ? Changez le rayon du cylindre et

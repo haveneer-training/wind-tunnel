@@ -1,3 +1,5 @@
+#![cfg(feature = "step2")]
+
 //! Invariants du maillage, vérifiés sur le domaine réellement livré.
 //!
 //! Ce sont des propriétés géométriques exactes : elles ne dépendent ni du schéma, ni du

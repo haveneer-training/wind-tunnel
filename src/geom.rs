@@ -206,7 +206,7 @@ pub fn polygon_centroid(points: &[Point]) -> Point {
     // SOLUTION-END
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "step0"))]
 mod tests {
     use super::*;
 

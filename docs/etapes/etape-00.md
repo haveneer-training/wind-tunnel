@@ -1,6 +1,6 @@
 # Étape 0 — Géométrie de base
 
-**Fichier :** `src/geom.rs` · **Vérification :** `cargo test geom` · **≈ 20 min**
+**Fichier :** `src/geom.rs` · **Vérification :** `cargo xtask goto 0` puis `cargo test` · **≈ 20 min**
 
 Avant le maillage, les briques : un point, un vecteur, l'aire et le centre de gravité
 d'un polygone. Ce sera la fondation de tout le reste, et l'occasion de voir à quoi

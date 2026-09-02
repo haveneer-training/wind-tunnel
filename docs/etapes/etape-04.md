@@ -1,6 +1,6 @@
 # Étape 4 — L'écoulement porteur
 
-**Fichier :** `src/velocity.rs` · **Vérification :** `cargo test velocity` · **≈ 25 min**
+**Fichier :** `src/velocity.rs` · **Vérification :** `cargo xtask goto 4` puis `cargo test` · **≈ 25 min**
 
 Le traceur ne se déplace pas tout seul : il est transporté. Il nous faut donc un champ de
 vitesse — et, cette fois, un trait pour ne pas dépendre de la façon dont il est obtenu.

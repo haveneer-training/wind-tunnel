@@ -1,6 +1,6 @@
 # Étape 5 — Le solveur
 
-**Fichiers :** `src/flux.rs`, `src/solver.rs` · **Vérification :** `cargo test` puis `cargo run --release -- domains/tunnel.dom` · **≈ 45 min**
+**Fichiers :** `src/flux.rs`, `src/solver.rs` · **Vérification :** `cargo xtask goto 5`, `cargo test`, puis `cargo run --release -- domains/tunnel.dom` · **≈ 45 min**
 
 Tout est en place : un maillage, un écoulement, des sorties. Il reste à faire avancer le
 traceur — et, à la fin de cette étape, à regarder l'image.

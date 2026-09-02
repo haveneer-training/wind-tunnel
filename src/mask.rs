@@ -181,7 +181,7 @@ impl Mask {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "step1"))]
 mod tests {
     use super::*;
 

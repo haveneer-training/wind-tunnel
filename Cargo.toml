@@ -6,6 +6,22 @@ rust-version = "1.90"
 description = "Soufflerie numérique — projet fil rouge de la formation « Rust pour le calcul scientifique »"
 license = "CC-BY-NC-SA-4.0"
 
+# Une « feature » par étape, chaînée à la précédente : activer `step3` active
+# step0 à step3. Les tests de chaque étape sont conditionnés à la sienne, si bien
+# que `cargo test` ne montre que ce qui est déjà au programme du stagiaire.
+# `cargo xtask goto <n>` ne fait rien d'autre que réécrire la ligne `default`.
+[features]
+default = ["step5"]
+step0 = []
+step1 = ["step0"]
+step2 = ["step1"]
+step3 = ["step2"]
+step4 = ["step3"]
+step5 = ["step4"]
+
+[workspace]
+members = ["xtask"]
+
 [dependencies]
 image = { version = "0.25", default-features = false, features = ["png"] }
 

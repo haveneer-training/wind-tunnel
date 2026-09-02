@@ -489,7 +489,7 @@ fn build_faces(cells: &[Cell], vertices: &[Point]) -> Result<Vec<Face>, MeshErro
     // SOLUTION-END
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "step2"))]
 mod tests {
     use super::*;
 

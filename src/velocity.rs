@@ -103,7 +103,7 @@ impl VelocityField for PotentialCylinder {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "step4"))]
 mod tests {
     use super::*;
 
