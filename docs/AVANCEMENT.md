@@ -17,22 +17,24 @@ dépôt : `~/.claude/plans/pour-la-formation-rust-happy-seahorse.md`.
 
 ## Ce qui est fait
 
-**Étapes 0 à 5**, soit le noyau complet : géométrie, masque, maillage non structuré et
-connectivité, sorties VTK/PNG et erreurs typées, écoulement porteur, solveur explicite.
-Le code tourne et produit l'animation.
+**Étapes 0 à 6** : géométrie, masque, maillage non structuré et connectivité, sorties
+VTK/PNG et erreurs typées, écoulement porteur, solveur explicite (le noyau, étapes 0 à 5),
+puis conservation et ordre de convergence mesurés (étape 6). Le code tourne et produit
+l'animation.
 
-- 45 tests verts, `cargo clippy --all-targets --all-features -- -D warnings` propre,
+- 48 tests verts, `cargo clippy --all-targets --all-features -- -D warnings` propre,
   `cargo fmt` appliqué
-- 14 trous répartis : 4 en étape 0, 2 en 1, 2 en 2, 2 en 3, 1 en 4, 3 en 5
-- ~3 100 lignes de Rust, 35 fichiers versionnés
+- 15 trous répartis : 4 en étape 0, 2 en 1, 2 en 2, 2 en 3, 1 en 4, 3 en 5, 1 en 6
+- l'ordre mesuré à l'étape 6 est **≈ 1** (décentrement amont + Euler explicite, CFL fixe
+  donc `dt ∝ h`) — c'est voulu, et ça n'est pas censé bouger avant l'étape 8
 - le dispositif de travail (`cargo xtask starter` puis `goto` / `solve` / `reset` /
-  `status`) est en place et vérifié depuis un clone neuf
+  `status`) est en place et vérifié depuis un clone neuf, `LAST_STEP` à jour dans
+  `xtask/src/main.rs`
 
 ## Ce qui reste
 
 | # | Étape | État de préparation |
 |---|---|---|
-| 6 | Qualité : conservation, ordre de convergence mesuré, doc, clippy | Les tests de conservation existent déjà (`src/solver.rs`, `tests/`). Reste le test d'ordre par solutions manufacturées. Doit mesurer **≈ 1** : c'est voulu. |
 | 7 | Ordre 2 en espace : moindres carrés 2×2 + limiteur | `src/gradient.rs` à créer. `FaceState` devra porter les gradients. La justification est déjà écrite à la fin de `etapes/etape-05.md`. |
 | 8 | RK2 | L'ordre mesuré **reste à 1** après l'étape 7 — c'est l'énigme, et RK2 la résout. Ne pas divulguer à l'étape 7. |
 | 9 | `rayon` | La boucle est déjà écrite en *gather*, donc parallélisable telle quelle. `--refine 13` donne le million de cellules pour les bancs d'essai. Modèles : `code/rs/benches/sort.rs` et `dispatch.rs` du dépôt de slides. |
@@ -99,12 +101,12 @@ sans réécriture, et c'est le piège C/OpenMP qu'on exhibe.
 ## Vérifier que tout va bien
 
 ```shell
-cargo test                                   # 45 tests
+cargo test                                   # 48 tests
 cargo clippy --all-targets --all-features -- -D warnings
 cargo fmt --all --check
 cargo run --release -- domains/tunnel.dom --refine 4 --bands 9 --steps 960
 
 cargo xtask starter --force                  # régénère travail/
 cd travail && cargo test                     # 4 tests rouges : étape 0
-cargo xtask goto 5 && cargo xtask solve 5    # ... et tout doit redevenir vert
+cargo xtask goto 6 && cargo xtask solve 6    # ... et tout doit redevenir vert
 ```
