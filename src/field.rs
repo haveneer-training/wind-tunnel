@@ -92,6 +92,48 @@ impl Field {
             .map(|(c, cell)| c * cell.area)
             .sum()
     }
+
+    /// Écart moyen, pondéré par l'aire, entre ce champ et un autre :
+    /// `Σ |cᵢ − dᵢ| · |Ωᵢ| / Σ |Ωᵢ|`.
+    ///
+    /// Sert à comparer un champ numérique à une solution de référence, par exemple pour
+    /// mesurer l'ordre de convergence d'un schéma.
+    pub fn mean_abs_error(&self, other: &Field, mesh: &Mesh) -> f64 {
+        // TODO-STEP:6 Écart moyen pondéré par l'aire entre les deux champs
+        // SOLUTION-BEGIN
+        let (num, den) = self
+            .data
+            .iter()
+            .zip(&other.data)
+            .zip(mesh.cells())
+            .fold((0.0, 0.0), |(num, den), ((&a, &b), cell)| {
+                (num + (a - b).abs() * cell.area, den + cell.area)
+            });
+        num / den
+        // SOLUTION-END
+    }
+}
+
+#[cfg(all(test, feature = "step6"))]
+mod tests {
+    use super::*;
+    use crate::mask::Mask;
+
+    #[test]
+    fn mean_abs_error_of_identical_fields_is_zero() {
+        let mesh = Mesh::from_mask(&Mask::parse("...\n...\n").unwrap(), 1.0).unwrap();
+        let a = Field::filled(mesh.n_cells(), 2.0);
+        assert_eq!(a.mean_abs_error(&a, &mesh), 0.0);
+    }
+
+    #[test]
+    fn mean_abs_error_weighs_by_area() {
+        let mesh = Mesh::from_mask(&Mask::parse("..\n..\n").unwrap(), 1.0).unwrap();
+        let a = Field::zeros(mesh.n_cells());
+        let mut b = Field::zeros(mesh.n_cells());
+        b[CellId(0)] = 4.0; // une cellule sur quatre, toutes de même aire
+        assert!((a.mean_abs_error(&b, &mesh) - 1.0).abs() < 1e-12);
+    }
 }
 
 impl Index<CellId> for Field {
