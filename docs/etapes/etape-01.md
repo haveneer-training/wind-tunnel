@@ -1,6 +1,6 @@
 # Étape 1 — Le masque du domaine
 
-**Fichier :** `src/mask.rs` · **Vérification :** `cargo test mask` puis `cargo test --test erreurs` · **≈ 30 min**
+**Fichier :** `src/mask.rs` · **Vérification :** `cargo test mask` puis `cargo test --test errors` · **≈ 30 min**
 
 Le domaine de calcul est dessiné à la main dans un fichier texte : `.` pour du fluide,
 `#` pour du solide. C'est confortable pour l'utilisateur, et c'est donc l'endroit exact

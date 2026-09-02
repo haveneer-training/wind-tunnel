@@ -107,7 +107,7 @@ impl VelocityField for PotentialCylinder {
 mod tests {
     use super::*;
 
-    fn cylindre() -> PotentialCylinder {
+    fn cylinder() -> PotentialCylinder {
         PotentialCylinder {
             center: Point::new(0.0, 0.0),
             radius: 1.0,
@@ -117,17 +117,17 @@ mod tests {
     }
 
     #[test]
-    fn vitesse_uniforme_loin_de_l_obstacle() {
-        let c = cylindre();
+    fn uniform_velocity_far_from_the_obstacle() {
+        let c = cylinder();
         let far = c.at(Point::new(1000.0, 0.0));
         assert!((far.x - c.speed).abs() < 1e-4);
         assert!(far.y.abs() < 1e-4);
     }
 
     #[test]
-    fn glissement_sur_la_paroi_du_cylindre() {
+    fn flow_slips_along_the_cylinder_wall() {
         // sans circulation, la composante normale doit être nulle sur r = R
-        let c = cylindre();
+        let c = cylinder();
         for k in 0..16 {
             let theta = k as f64 * std::f64::consts::TAU / 16.0;
             let p = Point::new(c.radius * theta.cos(), c.radius * theta.sin());
@@ -140,8 +140,8 @@ mod tests {
     }
 
     #[test]
-    fn la_fonction_de_courant_redonne_la_vitesse() {
-        let mut c = cylindre();
+    fn stream_function_matches_the_velocity() {
+        let mut c = cylinder();
         c.circulation = 3.0;
         let h = 1e-6;
         for p in [
@@ -160,13 +160,16 @@ mod tests {
     }
 
     #[test]
-    fn la_circulation_casse_la_symetrie() {
-        let mut c = cylindre();
+    fn circulation_breaks_the_symmetry() {
+        let mut c = cylinder();
         c.circulation = 4.0;
-        let haut = c.at(Point::new(0.0, 1.5));
-        let bas = c.at(Point::new(0.0, -1.5));
+        let above = c.at(Point::new(0.0, 1.5));
+        let below = c.at(Point::new(0.0, -1.5));
         // circulation positive (sens direct) : l'écoulement est freiné au-dessus,
         // accéléré en dessous — la portance change de côté avec le signe de Γ
-        assert!(bas.x > haut.x + 0.1, "haut = {haut:?}, bas = {bas:?}");
+        assert!(
+            below.x > above.x + 0.1,
+            "above = {above:?}, below = {below:?}"
+        );
     }
 }

@@ -155,13 +155,13 @@ impl Mask {
             queue.push(start);
             while let Some(k) = queue.pop() {
                 let (row, col) = (k / self.cols, k % self.cols);
-                let neighbours = [
+                let neighbors = [
                     (row.wrapping_sub(1), col),
                     (row + 1, col),
                     (row, col.wrapping_sub(1)),
                     (row, col + 1),
                 ];
-                for (r, c) in neighbours {
+                for (r, c) in neighbors {
                     if r < self.rows && c < self.cols && self.is_fluid(r, c) {
                         let n = r * self.cols + c;
                         if !seen[n] {
@@ -186,7 +186,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn masque_minimal() {
+    fn minimal_mask() {
         let m = Mask::parse("..\n.#\n").unwrap();
         assert_eq!((m.rows(), m.cols()), (2, 2));
         assert_eq!(m.fluid_count(), 3);
@@ -195,13 +195,13 @@ mod tests {
     }
 
     #[test]
-    fn commentaires_et_lignes_vides_ignores() {
+    fn comments_and_blank_lines_are_ignored() {
         let m = Mask::parse("% titre\n\n..\n..\n").unwrap();
         assert_eq!((m.rows(), m.cols()), (2, 2));
     }
 
     #[test]
-    fn hors_grille_n_est_pas_un_obstacle() {
+    fn outside_the_grid_is_not_an_obstacle() {
         let m = Mask::parse(".#\n..\n").unwrap();
         assert!(!m.is_obstacle(-1, 0), "l'extérieur est le bord de la veine");
         assert!(!m.is_obstacle(0, 5));

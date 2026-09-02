@@ -10,8 +10,8 @@ use wind_tunnel::velocity::PotentialCylinder;
 
 const H: f64 = 0.5;
 
-fn cas() -> (Mesh, PotentialCylinder) {
-    let mask = Mask::from_file("domains/veine.dom").expect("domains/veine.dom illisible");
+fn case() -> (Mesh, PotentialCylinder) {
+    let mask = Mask::from_file("domains/tunnel.dom").expect("domains/tunnel.dom illisible");
     let mesh = Mesh::from_mask(&mask, H).expect("maillage impossible");
     let (_, ymin, _, ymax) = mesh.bounds();
     let flow = PotentialCylinder {
@@ -24,21 +24,21 @@ fn cas() -> (Mesh, PotentialCylinder) {
 }
 
 #[test]
-fn les_debits_sont_a_divergence_nulle_partout() {
-    let (mesh, flow) = cas();
+fn face_fluxes_are_divergence_free_everywhere() {
+    let (mesh, flow) = case();
     let solver = Solver::new(&mesh, &flow, Upwind, Config::default()).unwrap();
-    let pire = (0..mesh.n_cells())
+    let worst = (0..mesh.n_cells())
         .map(|i| solver.divergence(wind_tunnel::mesh::CellId(i as u32)).abs())
         .fold(0.0_f64, f64::max);
-    assert!(pire < 1e-12, "divergence maximale {pire:e}");
+    assert!(worst < 1e-12, "divergence maximale {worst:e}");
 }
 
 #[test]
-fn le_traceur_reste_entre_ses_bornes() {
+fn the_tracer_stays_within_its_bounds() {
     // le décentrement amont vérifie un principe du maximum : partant de valeurs dans
     // [0, 1], aucune cellule ne doit sortir de cet intervalle, jamais. Un dépassement
     // signalerait que le champ de débits n'est plus à divergence nulle.
-    let (mesh, flow) = cas();
+    let (mesh, flow) = case();
     let config = Config {
         steps: 300,
         output_every: 0,
@@ -48,10 +48,10 @@ fn le_traceur_reste_entre_ses_bornes() {
     let solver = Solver::new(&mesh, &flow, Upwind, config).unwrap();
 
     let (_, ymin, _, ymax) = mesh.bounds();
-    let bande = (ymax - ymin) / 7.0;
+    let band = (ymax - ymin) / 7.0;
     let mut c = Field::from_fn(&mesh, |id| {
         let y = mesh.cell(id).centroid.y;
-        if ((y - ymin) / bande).floor() as i64 % 2 == 0 {
+        if ((y - ymin) / band).floor() as i64 % 2 == 0 {
             1.0
         } else {
             0.0
@@ -59,8 +59,8 @@ fn le_traceur_reste_entre_ses_bornes() {
     });
 
     solver
-        .run(&mut c, |_, _, champ| {
-            let (lo, hi) = champ.min_max();
+        .run(&mut c, |_, _, field| {
+            let (lo, hi) = field.min_max();
             assert!(lo >= -1e-12 && hi <= 1.0 + 1e-12, "c ∈ [{lo}, {hi}]");
             Ok(())
         })
@@ -71,9 +71,9 @@ fn le_traceur_reste_entre_ses_bornes() {
 }
 
 #[test]
-fn la_fumee_finit_par_sortir() {
+fn the_smoke_eventually_leaves() {
     // sans injection en amont, le domaine se vide : la masse décroît strictement
-    let (mesh, flow) = cas();
+    let (mesh, flow) = case();
     let config = Config {
         steps: 200,
         output_every: 0,
@@ -81,9 +81,9 @@ fn la_fumee_finit_par_sortir() {
     };
     let solver = Solver::new(&mesh, &flow, Upwind, config).unwrap();
     let mut c = Field::filled(mesh.n_cells(), 1.0);
-    let avant = c.total_mass(&mesh);
+    let before = c.total_mass(&mesh);
     solver.run(&mut c, |_, _, _| Ok(())).unwrap();
-    let apres = c.total_mass(&mesh);
-    assert!(apres < avant, "masse {avant} → {apres}");
-    assert!(apres > 0.0);
+    let after = c.total_mass(&mesh);
+    assert!(after < before, "masse {before} → {after}");
+    assert!(after > 0.0);
 }

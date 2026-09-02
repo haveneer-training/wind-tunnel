@@ -282,13 +282,13 @@ mod tests {
     use crate::mask::Mask;
     use crate::velocity::Uniform;
 
-    fn maillage() -> Mesh {
+    fn test_mesh() -> Mesh {
         Mesh::from_mask(&Mask::parse("....\n....\n....\n").unwrap(), 1.0).unwrap()
     }
 
     #[test]
-    fn pas_de_temps_instable_refuse() {
-        let mesh = maillage();
+    fn unstable_time_step_is_rejected() {
+        let mesh = test_mesh();
         let flow = Uniform {
             value: Vec2::new(1.0, 0.0),
         };
@@ -304,9 +304,9 @@ mod tests {
     }
 
     #[test]
-    fn champ_uniforme_reste_uniforme() {
+    fn a_uniform_field_stays_uniform() {
         // avec la même valeur imposée en entrée qu'à l'intérieur, rien ne doit bouger
-        let mesh = maillage();
+        let mesh = test_mesh();
         let flow = Uniform {
             value: Vec2::new(1.0, 0.0),
         };
@@ -328,8 +328,8 @@ mod tests {
     }
 
     #[test]
-    fn une_valeur_non_finie_arrete_le_calcul() {
-        let mesh = maillage();
+    fn a_non_finite_value_stops_the_run() {
+        let mesh = test_mesh();
         let flow = Uniform {
             value: Vec2::new(1.0, 0.0),
         };
@@ -349,7 +349,7 @@ mod tests {
     }
 
     #[test]
-    fn les_debits_de_face_sont_a_divergence_nulle() {
+    fn face_fluxes_are_divergence_free() {
         // y compris autour d'un obstacle, où les cellules sont chanfreinées
         let mesh = Mesh::from_mask(
             &Mask::parse(".......\n...##..\n...##..\n.......\n").unwrap(),
@@ -371,9 +371,9 @@ mod tests {
     }
 
     #[test]
-    fn la_diffusion_pure_conserve_la_masse() {
+    fn pure_diffusion_conserves_mass() {
         // domaine fermé, aucune vitesse : la masse totale est un invariant exact
-        let mesh = maillage();
+        let mesh = test_mesh();
         let flow = Uniform { value: Vec2::ZERO };
         let config = Config {
             diffusivity: 0.1,
@@ -384,12 +384,12 @@ mod tests {
         };
         let solver = Solver::new(&mesh, &flow, Upwind, config).unwrap();
         let mut c = Field::from_fn(&mesh, |id| if id.index() % 3 == 0 { 1.0 } else { 0.0 });
-        let avant = c.total_mass(&mesh);
+        let before = c.total_mass(&mesh);
         solver.run(&mut c, |_, _, _| Ok(())).unwrap();
-        let apres = c.total_mass(&mesh);
+        let after = c.total_mass(&mesh);
         assert!(
-            (apres - avant).abs() / avant < 1e-13,
-            "masse {avant} → {apres}"
+            (after - before).abs() / before < 1e-13,
+            "masse {before} → {after}"
         );
     }
 }
