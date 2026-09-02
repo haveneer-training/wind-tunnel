@@ -84,8 +84,22 @@ l'animation.
   trou — et `#[cfg(not(feature = "step9"))]` pour la version séquentielle d'avant,
   toujours complète, jamais un trou). Vérifié par un tour complet
   `starter --force` → `goto 3/5/7/8/9/10` → `cargo run` à chaque étape intermédiaire.
-  Cette convention est ajoutée à la liste ci-dessous ; les étapes 9 et 10 en sont
-  aujourd'hui les deux seuls cas.
+  Cette convention est ajoutée à la liste ci-dessous.
+- **Correction (2026-09-02, bis) : `residual` avait le même défaut envers l'étape 7.**
+  Trouvé par `scripts/check-steps.sh` (nouveau, voir plus bas) : aux étapes 5 et 6,
+  `residual` appelait quand même `gradient::limited_gradients`, un calcul de l'étape 7,
+  ajouté là par le commit de l'étape 7 sans garder de version d'avant — donc 3 des
+  tests de l'étape 5 restaient rouges après `solve 5`. `residual` a maintenant trois
+  définitions : `#[cfg(not(feature = "step7"))]` (sans gradient, celle d'avant l'étape 7),
+  `#[cfg(all(feature = "step7", not(feature = "step9")))]` (avec gradient, séquentielle),
+  `#[cfg(feature = "step9")]` (parallèle, inchangée). Les étapes 7, 9 et 10 sont
+  aujourd'hui les cas connus (`residual` ; `face_flux`/`limited_gradients` ;
+  `write_png`).
+- **`scripts/check-steps.sh`** rejoue `starter --force` puis `goto`/`solve` de 0 à
+  `LAST_STEP` dans l'ordre croissant, et échoue si `cargo run` panique sur une étape
+  antérieure à celle en cours (avant `solve`) ou déjà résolue (après) — exactement la
+  classe de bug ci-dessus. À relancer après toute étape qui touche du code déjà
+  fonctionnel plutôt qu'un trou resté vide.
 
 ## Ce qui reste
 
@@ -105,13 +119,16 @@ explicite là-dessus.
    d'un commentaire `// TODO-STEP:<n>` qui porte la consigne. Le bloc doit couvrir un
    corps de fonction entier ou une expression complète : son remplacement par `todo!()`
    doit typecheck.
-   **Si l'étape remplace un calcul déjà fonctionnel** (comme l'étape 9 sur `face_flux`
-   ou l'étape 10 sur `write_png`) plutôt que de combler un trou resté vide depuis le
-   début, donnez-lui deux définitions choisies par `#[cfg(feature = "stepN")]` /
-   `#[cfg(not(feature = "stepN"))]` : la version avec le trou d'un côté, l'ancienne
-   version séquentielle (complète, sans `todo!()`) de l'autre. Sinon, dans `travail/`,
-   ce calcul reste un `todo!()` — et donc `cargo run` cassé — de l'étape précédente
-   jusqu'à celle-ci, pas seulement pendant celle-ci.
+   **Si l'étape remplace un calcul déjà fonctionnel** (comme l'étape 7 sur `residual`,
+   l'étape 9 sur `face_flux`, ou l'étape 10 sur `write_png`) plutôt que de combler un
+   trou resté vide depuis le début, donnez-lui deux définitions choisies par
+   `#[cfg(feature = "stepN")]` / `#[cfg(not(feature = "stepN"))]` : la version avec le
+   trou d'un côté, l'ancienne version (complète, sans `todo!()`) de l'autre — trois
+   définitions si l'étape suivante y touche encore (voir `residual`, qui cumule 7 et 9).
+   Sinon, dans `travail/`, ce calcul reste un `todo!()` — et donc `cargo run` cassé — de
+   l'étape précédente jusqu'à celle-ci, pas seulement pendant celle-ci.
+   **`scripts/check-steps.sh`** vérifie automatiquement cette propriété sur toutes les
+   étapes ; le relancer après avoir touché du code partagé entre étapes.
 2. **Les tests de l'étape n** vont sous `#[cfg(all(test, feature = "stepN"))]`, ou
    `#![cfg(feature = "stepN")]` en tête d'un fichier de `tests/`. Les features sont
    chaînées dans `Cargo.toml` (`stepN = ["stepN-1"]`), ce qui fait que `cargo test` ne
@@ -169,4 +186,6 @@ cargo run --release -- domains/tunnel.dom --refine 4 --bands 9 --steps 960
 cargo xtask starter --force                  # régénère travail/
 cd travail && cargo test                     # 4 tests rouges : étape 0
 cargo xtask goto 10 && cargo xtask solve 10  # ... et tout doit redevenir vert
+
+cd .. && scripts/check-steps.sh              # le même tour, automatisé, étape par étape
 ```

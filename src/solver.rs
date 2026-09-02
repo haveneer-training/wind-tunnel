@@ -252,13 +252,13 @@ impl<'m, F: FluxScheme> Solver<'m, F> {
         // SOLUTION-END
     }
 
-    /// Calcule `dc/dt` dans `out` — version séquentielle, avant l'étape 9.
+    /// Calcule `dc/dt` dans `out` — version séquentielle, entre les étapes 7 et 9.
     ///
     /// `c` est emprunté en lecture, `out` en écriture exclusive : le compilateur refuse
     /// qu'on lui passe deux fois le même champ. En C, le même appel avec le même
     /// pointeur des deux côtés compile, tourne, et donne un résultat faux ; `restrict`
     /// ne fait que promettre le contraire.
-    #[cfg(not(feature = "step9"))]
+    #[cfg(all(feature = "step7", not(feature = "step9")))]
     pub fn residual(&self, c: &Field, out: &mut Field) {
         let mut gradients = vec![Vec2::ZERO; c.len()];
         gradient::limited_gradients(self.mesh, c, &mut gradients);
@@ -302,6 +302,56 @@ impl<'m, F: FluxScheme> Solver<'m, F> {
                     to_face_left,
                     grad_right,
                     to_face_right,
+                });
+                // Le terme convectif utilise le débit tel quel : c'est lui qui se
+                // télescope exactement sur le contour de la cellule.
+                sum += flux * c_face
+                    - self.config.diffusivity * (c_other - ci) / face.distance * face.length;
+            }
+
+            out[id] = -sum / cell.area;
+        }
+    }
+
+    /// Calcule `dc/dt` dans `out`, sans rien allouer — version d'avant l'étape 7 (pas
+    /// de reconstruction de gradient, `FaceState` prend ses valeurs par défaut).
+    ///
+    /// `c` est emprunté en lecture, `out` en écriture exclusive : le compilateur refuse
+    /// qu'on lui passe deux fois le même champ. En C, le même appel avec le même
+    /// pointeur des deux côtés compile, tourne, et donne un résultat faux ; `restrict`
+    /// ne fait que promettre le contraire.
+    #[cfg(not(feature = "step7"))]
+    pub fn residual(&self, c: &Field, out: &mut Field) {
+        for (i, cell) in self.mesh.cells().iter().enumerate() {
+            let id = CellId(i as u32);
+            let ci = c[id];
+            let mut sum = 0.0;
+
+            for &fid in self.mesh.cell_faces(id) {
+                let face = self.mesh.face(fid);
+                // Le débit stocké est sortant de `face.left` : on le retourne si la
+                // cellule courante se trouve de l'autre côté.
+                let outward = if face.left == id { 1.0 } else { -1.0 };
+                let flux = self.face_flux[fid.index()] * outward;
+                let un = flux / face.length;
+
+                let c_other = match face.right {
+                    Side::Inner(other) => {
+                        let neighbour = if face.left == id { other } else { face.left };
+                        c[neighbour]
+                    }
+                    Side::Boundary(kind) => match self.bc(kind) {
+                        Bc::NoFlux => continue,
+                        Bc::Fixed(value) => value,
+                        Bc::ZeroGradient => ci,
+                    },
+                };
+
+                let c_face = self.scheme.interface_value(&FaceState {
+                    c_left: ci,
+                    c_right: c_other,
+                    un,
+                    ..Default::default()
                 });
                 // Le terme convectif utilise le débit tel quel : c'est lui qui se
                 // télescope exactement sur le contour de la cellule.
