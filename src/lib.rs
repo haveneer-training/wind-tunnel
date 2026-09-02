@@ -12,6 +12,7 @@
 
 #![warn(missing_docs)]
 
+pub mod app;
 pub mod error;
 pub mod field;
 pub mod flux;
