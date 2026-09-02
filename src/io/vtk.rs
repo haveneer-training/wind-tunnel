@@ -4,7 +4,9 @@
 //! de texte, et Paraview comme Tecplot l'ouvrent sans discuter.
 
 use std::fmt;
+#[cfg_attr(not(feature = "step3"), allow(unused_imports))] // trou étape 3
 use std::fs::File;
+#[cfg_attr(not(feature = "step3"), allow(unused_imports))] // trou étape 3
 use std::io::{self, BufWriter, Write};
 use std::path::Path;
 
@@ -34,6 +36,7 @@ use crate::mesh::Mesh;
 /// nombre se formate directement dans le tampon de sortie, sans allocation
 /// intermédiaire — `write!(w, "{}", VtkF64(x))` s'écrit pareil et n'alloue rien. C'est
 /// l'usage normal de `Display` en Rust : *savoir s'écrire*, pas *fabriquer une chaîne*.
+#[cfg_attr(not(feature = "step4"), allow(dead_code))] // collatéral du trou étape 3
 struct VtkF64(f64);
 
 impl fmt::Display for VtkF64 {
@@ -51,6 +54,7 @@ impl fmt::Display for VtkF64 {
 }
 
 /// Écrit le maillage et une liste de champs nommés.
+#[cfg_attr(not(feature = "step3"), allow(unused_variables))] // trou étape 3
 pub fn write_vtk(path: impl AsRef<Path>, mesh: &Mesh, fields: &[(&str, &Field)]) -> io::Result<()> {
     // TODO-STEP:3 Écrire l'en-tête, les POINTS, les CELLS (précédées de leur nombre de
     // sommets), les CELL_TYPES, puis chaque champ en CELL_DATA / SCALARS.

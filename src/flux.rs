@@ -58,6 +58,7 @@ impl FluxScheme for Box<dyn FluxScheme> {
 pub struct Upwind;
 
 impl FluxScheme for Upwind {
+    #[cfg_attr(not(feature = "step5"), allow(unused_variables))] // trou étape 5
     fn interface_value(&self, s: &FaceState) -> f64 {
         // TODO-STEP:5 Retenir la valeur du côté d'où vient le fluide, selon le signe de `un`
         // SOLUTION-BEGIN
@@ -95,6 +96,7 @@ impl FluxScheme for Centered {
 pub struct Muscl;
 
 impl FluxScheme for Muscl {
+    #[cfg_attr(not(feature = "step7"), allow(unused_variables))] // trou étape 7
     fn interface_value(&self, s: &FaceState) -> f64 {
         // TODO-STEP:7 Extrapoler linéairement la valeur amont jusqu'à la face à
         // partir de son gradient limité ; sans voisin intérieur de ce côté, retenir la

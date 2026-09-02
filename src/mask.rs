@@ -103,6 +103,7 @@ impl Mask {
     }
 
     /// La cellule `(row, col)` est-elle du fluide ? Hors grille, la réponse est `false`.
+    #[cfg_attr(not(feature = "step1"), allow(unused_variables))] // trou étape 1
     pub fn is_fluid(&self, row: usize, col: usize) -> bool {
         // TODO-STEP:1 Répondre `false` hors de la grille, sinon lire la case du tableau
         // stocké ligne par ligne

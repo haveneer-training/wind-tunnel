@@ -36,6 +36,13 @@ L'énoncé de chaque étape est dans [`docs/etapes/`](docs/etapes/) — commence
 le lire, il explique le *pourquoi* autant que le *quoi*. Le sommaire est dans
 [`ETAPES.md`](ETAPES.md).
 
+Les **avertissements** du compilateur suivent la même règle. Un `todo!()` rend
+mécaniquement inutilisés les paramètres de sa fonction ; ceux des étapes que vous n'avez
+pas encore ouvertes sont tus, pour que vous ne lisiez que les vôtres. Ceux qui restent
+disent quelque chose d'utile : « paramètre `points` inutilisé » sur la fonction que vous
+êtes en train d'écrire, c'est la liste de ce qu'il vous reste à employer. Ils
+disparaissent quand l'étape est finie.
+
 ## Les commandes
 
 | Commande | Effet |

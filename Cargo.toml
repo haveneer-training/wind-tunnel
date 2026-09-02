@@ -10,8 +10,17 @@ license = "CC-BY-NC-SA-4.0"
 # step0 à step3. Les tests de chaque étape sont conditionnés à la sienne, si bien
 # que `cargo test` ne montre que ce qui est déjà au programme du stagiaire.
 # `cargo xtask goto <n>` ne fait rien d'autre que réécrire la ligne `default`.
+#
+# `step12` est la **sentinelle** : c'est l'étape suivant la dernière implémentée
+# (`LAST_STEP` dans `xtask/src/main.rs` vaut 11, et `goto 12` est refusé). Aucun code
+# n'en dépend. Elle sert à écrire `not(feature = "step12")` sur les avertissements
+# collatéraux des trous de l'étape 11 : la condition est vraie dans un dossier de
+# travail, fausse ici, donc l'attribut n'y cache jamais rien. C'est aussi le nom
+# réservé au bonus « écoulement calculé » annoncé dans `ETAPES.md` ; le jour où il
+# sera écrit, `step13` deviendra la sentinelle. Voir `docs/AVANCEMENT.md`
+# § « Avertissements dans travail/ ».
 [features]
-default = ["step11"]
+default = ["step12"]
 step0 = []
 step1 = ["step0"]
 step2 = ["step1"]
@@ -24,6 +33,7 @@ step8 = ["step7"]
 step9 = ["step8"]
 step10 = ["step9"]
 step11 = ["step10"]
+step12 = ["step11"]
 
 [workspace]
 members = ["xtask", "mpi"]
