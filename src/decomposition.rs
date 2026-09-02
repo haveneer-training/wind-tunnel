@@ -292,8 +292,20 @@ pub fn owned_min_max(field: &Field, layout: &Layout) -> (f64, f64) {
 }
 
 /// Recopie dans un tampon les valeurs des cellules désignées.
+///
+/// Alloue son tampon : pratique dans un test, à éviter dans une boucle en temps, où
+/// [`pack_into`] réutilise le même d'un pas à l'autre.
 pub fn pack(field: &Field, ids: &[CellId]) -> Vec<f64> {
     ids.iter().map(|&id| field[id]).collect()
+}
+
+/// Recopie les valeurs des cellules désignées dans un tampon déjà alloué.
+///
+/// C'est [`pack`] sans l'allocation : le tampon est vidé puis rempli, donc sa capacité
+/// — acquise au premier appel — sert à tous les suivants.
+pub fn pack_into(field: &Field, ids: &[CellId], out: &mut Vec<f64>) {
+    out.clear();
+    out.extend(ids.iter().map(|&id| field[id]));
 }
 
 /// Replace dans le champ les valeurs reçues, dans l'ordre des cellules désignées.

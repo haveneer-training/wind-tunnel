@@ -25,16 +25,25 @@ use wind_tunnel::flux::FluxScheme;
 use wind_tunnel::io::{png, vtk};
 use wind_tunnel::solver::{Config, Solver, TimeScheme};
 
-use exchange::{exchange_halo, global_dt_max, global_min_max, global_sum};
+use exchange::{global_dt_max, global_min_max, global_sum, Halo};
 
 /// Ce que le pilote fait du champ à intervalle régulier : l'écrire et le diagnostiquer.
-type Reporter<'a> = dyn FnMut(usize, &mut Field) -> Result<(), Box<dyn Error>> + 'a;
+///
+/// Le `Halo` traverse la signature plutôt que d'être capturé : il n'en existe qu'un par
+/// rang, la boucle en temps s'en sert entre deux appels au rapporteur, et le compilateur
+/// refuserait deux emprunts mutables simultanés. Le passer en argument, c'est le prêter
+/// à tour de rôle.
+type Reporter<'a> = dyn FnMut(usize, &mut Field, &mut Halo) -> Result<(), Box<dyn Error>> + 'a;
 
 /// Déroule le calcul distribué, du premier pas au dernier.
 ///
 /// C'est [`Solver::run`] réécrit ici, et pour une seule raison : il faut reprendre la
 /// main entre les évaluations de résidu pour communiquer. La boucle en temps appartient
 /// désormais au pilote.
+// Huit paramètres, un de plus que ce que tolère `clippy` : les regrouper dans une
+// structure « pilote » n'apporterait rien ici, où chacun a un rôle distinct et une
+// durée de vie différente. On assume, en le disant.
+#[allow(clippy::too_many_arguments)]
 fn time_loop<F: FluxScheme>(
     world: &SimpleCommunicator,
     layout: &Layout,
@@ -42,19 +51,24 @@ fn time_loop<F: FluxScheme>(
     config: &Config,
     every: usize,
     c: &mut Field,
+    halo: &mut Halo,
     report: &mut Reporter<'_>,
 ) -> Result<(), Box<dyn Error>> {
-    // TODO-STEP:11 Écrire la boucle en temps : `exchange_halo` avant CHAQUE évaluation
+    // TODO-STEP:11 Écrire la boucle en temps : `halo.exchange` avant CHAQUE évaluation
     // de résidu — une fois par pas en Euler, deux fois en RK2, car le prédicteur a lui
     // aussi des cellules fantômes à rafraîchir — puis `solver.residual` et la mise à
-    // jour du champ, et `report(step, c)` tous les `every` pas.
+    // jour du champ, et `report(step, c, halo)` tous les `every` pas.
     // SOLUTION-BEGIN
     let dt = solver.dt();
+    // Les trois tampons sont alloués avant la boucle, pas dedans : `predictor` et `k2`
+    // ne servent qu'en RK2, mais ils ne coûtent qu'un `Vec<f64>` chacun, une fois pour
+    // tout le calcul. Voir `docs/BONUS-OPTIMISATION.md`.
     let mut k1 = Field::zeros(c.len());
     let mut k2 = Field::zeros(c.len());
+    let mut predictor = Field::zeros(c.len());
 
     for step in 1..=config.steps {
-        exchange_halo(world, layout, c);
+        halo.exchange(world, layout, c);
         solver.residual(c, &mut k1);
 
         match config.time_scheme {
@@ -64,13 +78,15 @@ fn time_loop<F: FluxScheme>(
                 }
             }
             TimeScheme::Rk2 => {
-                let mut predictor = c.clone();
+                // `copy_from` recopie dans un tampon existant, là où `c.clone()`
+                // allouerait un champ neuf à chaque pas de temps.
+                predictor.copy_from(c);
                 for (value, rate) in predictor.as_mut_slice().iter_mut().zip(k1.as_slice()) {
                     *value += dt * rate;
                 }
                 // Le prédicteur est un champ comme un autre : ses cellules fantômes
                 // sont périmées tant qu'on ne les a pas redemandées aux voisins.
-                exchange_halo(world, layout, &mut predictor);
+                halo.exchange(world, layout, &mut predictor);
                 solver.residual(&predictor, &mut k2);
                 for ((value, a), b) in c
                     .as_mut_slice()
@@ -84,7 +100,7 @@ fn time_loop<F: FluxScheme>(
         }
 
         if every > 0 && step % every == 0 {
-            report(step, c)?;
+            report(step, c, halo)?;
         }
     }
     Ok(())
@@ -165,11 +181,11 @@ fn run() -> Result<(), Box<dyn Error>> {
     // et se recollent au pixel près.
     let band_width = (args.width as usize * layout.extended.len() / mask.cols()).max(1) as u32;
 
-    let report = |step: usize, c: &mut Field| -> Result<(), Box<dyn Error>> {
+    let report = |step: usize, c: &mut Field, halo: &mut Halo| -> Result<(), Box<dyn Error>> {
         // Les cellules fantômes datent de l'échange qui a précédé le dernier résidu :
         // un pas de retard, visible sur les images comme une couture. Un échange de
         // plus, et les bandes se recollent exactement.
-        exchange_halo(&world, &layout, c);
+        halo.exchange(&world, &layout, c);
         let frame = step / every;
         // Pas de rassemblement : chaque rang écrit sa bande. Rapatrier le champ sur le
         // rang 0 l'obligerait à mailler tout le domaine — exactement ce qu'on a passé
@@ -210,7 +226,10 @@ fn run() -> Result<(), Box<dyn Error>> {
         Ok(())
     };
 
-    report(0, &mut c)?;
+    // Un seul jeu de tampons d'échange pour tout le calcul : leur taille ne dépend que
+    // du découpage, qui ne bouge plus.
+    let mut halo = Halo::new(&layout);
+    report(0, &mut c, &mut halo)?;
 
     let mut report = report;
     time_loop(
@@ -220,6 +239,7 @@ fn run() -> Result<(), Box<dyn Error>> {
         &config,
         every,
         &mut c,
+        &mut halo,
         &mut report,
     )?;
 

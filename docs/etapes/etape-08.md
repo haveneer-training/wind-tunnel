@@ -71,7 +71,9 @@ limiteur de l'étape 7, pas de l'intégration en temps.
   pas de temps — comme `residual` alloue son tampon de gradients depuis l'étape 7.
   Ajoutez les tampons manquants à la signature de `step` et `run` (`Solver::run` en
   possède déjà un, `work`) pour que la boucle en temps n'alloue plus rien, quel que soit
-  le schéma temporel.
+  le schéma temporel. `Field::copy_from` est là pour ça : il recopie dans un tampon
+  existant là où `c.clone()` en alloue un neuf. Énoncé complet et solution dans
+  [`docs/BONUS-OPTIMISATION.md`](../BONUS-OPTIMISATION.md).
 - Chronométrez un grand maillage (`--refine 8` ou plus, `--steps` élevé) en Euler puis
   en RK2, avec `std::time::Instant`. Le rapport de temps mesuré est-il proche de 2, comme
   attendu du nombre d'évaluations du résidu ?

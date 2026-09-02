@@ -96,6 +96,10 @@ pub fn write_png(
     // `mesh`/`field`/`image`, pas d'`Arc`), un `Mutex<RgbImage>` verrouillé juste pour
     // recopier les pixels déjà calculés, et un `mpsc::channel` cloné par thread pour
     // annoncer le nombre de cellules traitées (voir `docs/etapes/etape-10.md`).
+    // Facultatif, mais recommandé : déclarer les tampons de travail (polygone, coins,
+    // pixels) au niveau du thread et les vider par `clear()` à chaque cellule, plutôt
+    // que de les réallouer une fois par cellule et par image. Étant par thread, ils
+    // restent privés et n'ont besoin d'aucun verrou — voir `docs/BONUS-OPTIMISATION.md`.
     // SOLUTION-BEGIN
     let image = Mutex::new(img);
     let (tx, rx) = mpsc::channel::<usize>();
@@ -109,23 +113,32 @@ pub fn write_png(
             let image = &image;
             scope.spawn(move || {
                 let base = chunk_index * chunk_size;
+                // Alloués une fois par thread, vidés à chaque cellule : le rendu d'une
+                // image n'alloue plus qu'une poignée de fois, au lieu de trois fois par
+                // cellule.
+                let mut polygon: Vec<Point> = Vec::with_capacity(4);
+                let mut corners: Vec<(f64, f64)> = Vec::with_capacity(4);
+                let mut pixels: Vec<(u32, u32)> = Vec::new();
+
                 for (local, cell) in chunk.iter().enumerate() {
                     let id = CellId((base + local) as u32);
-                    let polygon: Vec<Point> = cell
-                        .kind
-                        .vertices()
-                        .iter()
-                        .map(|v| mesh.vertices()[v.index()])
-                        .collect();
+                    polygon.clear();
+                    polygon.extend(
+                        cell.kind
+                            .vertices()
+                            .iter()
+                            .map(|v| mesh.vertices()[v.index()]),
+                    );
                     let color = colormap((field[id] - lo) / span);
 
-                    let corners: Vec<(f64, f64)> = polygon.iter().map(|&p| to_pixel(p)).collect();
+                    corners.clear();
+                    corners.extend(polygon.iter().map(|&p| to_pixel(p)));
                     let px0 = corners.iter().map(|c| c.0).fold(f64::MAX, f64::min).floor() as i64;
                     let px1 = corners.iter().map(|c| c.0).fold(f64::MIN, f64::max).ceil() as i64;
                     let py0 = corners.iter().map(|c| c.1).fold(f64::MAX, f64::min).floor() as i64;
                     let py1 = corners.iter().map(|c| c.1).fold(f64::MIN, f64::max).ceil() as i64;
 
-                    let mut pixels = Vec::new();
+                    pixels.clear();
                     for py in py0.max(0)..=py1.min(height as i64 - 1) {
                         for px in px0.max(0)..=px1.min(width as i64 - 1) {
                             let sample = Point::new(
@@ -139,7 +152,7 @@ pub fn write_png(
                     }
 
                     let mut image = image.lock().unwrap();
-                    for (px, py) in pixels {
+                    for &(px, py) in &pixels {
                         image.put_pixel(px, py, color);
                     }
                 }
@@ -190,16 +203,23 @@ pub fn write_png(
 
     let to_pixel = |p: Point| ((p.x - xmin) * scale, (ymax - p.y) * scale);
 
+    // Alloués une fois pour toutes, vidés à chaque cellule : une cellule a au plus
+    // quatre sommets, mais il y en a des dizaines de milliers, et autant d'images.
+    let mut polygon: Vec<Point> = Vec::with_capacity(4);
+    let mut corners: Vec<(f64, f64)> = Vec::with_capacity(4);
+
     for (i, cell) in mesh.cells().iter().enumerate() {
-        let polygon: Vec<Point> = cell
-            .kind
-            .vertices()
-            .iter()
-            .map(|v| mesh.vertices()[v.index()])
-            .collect();
+        polygon.clear();
+        polygon.extend(
+            cell.kind
+                .vertices()
+                .iter()
+                .map(|v| mesh.vertices()[v.index()]),
+        );
         let color = colormap((field[CellId(i as u32)] - lo) / span);
 
-        let corners: Vec<(f64, f64)> = polygon.iter().map(|&p| to_pixel(p)).collect();
+        corners.clear();
+        corners.extend(polygon.iter().map(|&p| to_pixel(p)));
         let px0 = corners.iter().map(|c| c.0).fold(f64::MAX, f64::min).floor() as i64;
         let px1 = corners.iter().map(|c| c.0).fold(f64::MIN, f64::max).ceil() as i64;
         let py0 = corners.iter().map(|c| c.1).fold(f64::MAX, f64::min).floor() as i64;
