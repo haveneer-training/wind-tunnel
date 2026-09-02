@@ -21,6 +21,9 @@ step5 = ["step4"]
 
 [workspace]
 members = ["xtask"]
+# Le dossier de travail engendré est un projet à part entière : cargo doit
+# l'ignorer tant qu'on travaille depuis la racine du corrigé.
+exclude = ["travail"]
 
 [dependencies]
 image = { version = "0.25", default-features = false, features = ["png"] }

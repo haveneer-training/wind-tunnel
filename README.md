@@ -12,10 +12,39 @@ l'est pas : c'est celui de n'importe quel code de calcul, en réduction.
 
 ## Démarrage
 
+Ce dépôt contient le **code complet**. Pour le construire vous-même, engendrez votre
+dossier de travail : les passages à écrire y deviennent des `todo!()`, tout le reste est
+fourni.
+
 ```shell
-cargo test                                   # tout doit être vert
-cargo run --release -- domains/tunnel.dom     # écrit out/frame_XXXX.png et .vtk
-open out/frame_0010.png                      # ou paraview out/frame_0010.vtk
+cargo xtask starter    # crée travail/ (14 trous à combler)
+cd travail
+cargo test             # quatre tests rouges : l'étape 0 vous attend
+```
+
+À partir de là, la boucle est toujours la même :
+
+```shell
+cargo test             # rouge : chaque échec nomme le fichier et la ligne
+#   ... lire docs/etapes/etape-00.md, remplacer le todo!() entre >>> et <<< ...
+cargo test             # vert
+cargo xtask goto 1     # étape suivante
+```
+
+`cargo test` ne montre que les étapes déjà ouvertes : quatre tests rouges au démarrage,
+pas quarante. `cargo xtask status` dit où vous en êtes ; `cargo xtask solve <n>` remplit
+une étape à votre place si vous décrochez, `reset <n>` la rouvre. `goto` **n'écrase
+jamais** ce que vous avez écrit : il ne complète que les blocs restés vides.
+
+Le déroulé complet est dans [`ETAPES.md`](ETAPES.md), les énoncés dans
+[`docs/etapes/`](docs/etapes/) — commencez toujours par lire celui de l'étape en cours.
+
+Et si vous voulez seulement voir tourner la version finie, depuis ce dépôt-ci :
+
+```shell
+cargo test                                # tout est vert
+cargo run --release -- domains/tunnel.dom # écrit out/frame_XXXX.png et .vtk
+open out/frame_0010.png                   # ou paraview out/frame_0010.vtk
 ```
 
 Quelques options utiles :
@@ -78,8 +107,14 @@ masque ASCII ──▶ mask ──▶ mesh ──▶ field ──▶ solver ─�
 | `src/io/` | sorties VTK et PNG |
 | `src/error.rs` | les deux familles d'erreurs |
 
-Le déroulé des étapes est dans [`ETAPES.md`](ETAPES.md), les énoncés dans
-[`docs/etapes/`](docs/etapes/).
+Et à côté du code lui-même :
+
+| Chemin | Rôle |
+|---|---|
+| `ETAPES.md` | le déroulé des étapes |
+| `docs/etapes/` | un énoncé par étape |
+| `domains/` | les masques de domaine |
+| `xtask/` | l'outil qui engendre `travail/` et pilote les étapes |
 
 ## Licence
 
