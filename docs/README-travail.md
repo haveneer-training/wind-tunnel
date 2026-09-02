@@ -11,18 +11,20 @@ domaine, génération d'un maillage non structuré, transport d'un traceur passi
 d'un obstacle, écriture des résultats en VTK et en PNG.
 
 Le squelette est là, les tests aussi. Ce qui manque, ce sont **14 `todo!()`**, répartis
-sur six étapes. Le corrigé complet vous est remis en même temps que ce dépôt :
-consultez-le quand vous voulez, mais essayez d'abord.
+sur six étapes. Le code complet, lui, se trouve dans le répertoire parent, celui d'où
+vous avez lancé `cargo xtask starter` : consultez-le quand vous voulez, mais essayez
+d'abord.
+
+Tout ce qui suit se passe **dans ce dossier-ci**.
 
 ## La boucle de travail
 
 ```shell
-cargo xtask status          # où j'en suis
-cargo xtask goto 0          # commencer
 cargo test                  # rouge : voici ce qu'il faut écrire
 #   ... ouvrir le fichier indiqué, remplacer le todo!() ...
 cargo test                  # vert : étape terminée
 cargo xtask goto 1          # étape suivante
+cargo xtask status          # à tout moment : où j'en suis
 ```
 
 `cargo test` ne montre jamais que les étapes déjà ouvertes : vous n'avez pas cinquante

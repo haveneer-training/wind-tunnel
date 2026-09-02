@@ -1,6 +1,5 @@
 /target
 /out
-/starter
-Cargo.lock
+/travail
 .DS_Store
 .idea/

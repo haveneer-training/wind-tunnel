@@ -1,17 +1,18 @@
 //! Outillage du fil rouge.
 //!
-//! Deux publics, deux usages.
-//!
-//! **Le formateur**, depuis le dépôt corrigé, engendre le dépôt de travail :
+//! Le dépôt livré contient le code complet. Le stagiaire s'en fabrique un dossier de
+//! travail, où les passages à écrire sont remplacés par des `todo!()` :
 //!
 //! ```shell
-//! cargo xtask starter                 # écrit ../wind-tunnel-starter
+//! cargo xtask starter                 # crée travail/
+//! cd travail
 //! ```
 //!
-//! Chaque bloc encadré par `// SOLUTION-BEGIN` / `// SOLUTION-END` y est remplacé par
-//! un `todo!()`, et le texte d'origine est mis de côté dans `xtask/reference.txt`.
+//! Chaque bloc encadré par `// SOLUTION-BEGIN` / `// SOLUTION-END` y devient un
+//! `todo!()` entouré de marqueurs, et le texte d'origine part dans
+//! `xtask/reference.txt` — c'est de là que viennent les rattrapages.
 //!
-//! **Le stagiaire**, depuis le dépôt de travail, pilote son avancement :
+//! Depuis ce dossier de travail, il pilote ensuite son avancement :
 //!
 //! ```shell
 //! cargo xtask status                  # où j'en suis
@@ -20,8 +21,9 @@
 //! cargo xtask reset 2                 # la rouvrir pour la refaire
 //! ```
 //!
-//! `goto` ne remplit que les trous **restés vides** : le travail déjà fait n'est jamais
-//! écrasé.
+//! Deux garde-fous, parce que ces commandes sont lancées par quelqu'un qui découvre le
+//! projet : `goto` ne remplit que les trous **restés vides**, et `starter` refuse
+//! d'écraser un dossier de travail existant sans `--force`.
 
 use std::collections::BTreeMap;
 use std::fs;
@@ -39,6 +41,8 @@ const REGION_END: &str = "// <<< ÉTAPE ";
 const REFERENCE: &str = "xtask/reference.txt";
 /// Dernière étape couverte par le code actuel.
 const LAST_STEP: u8 = 5;
+/// Nom du dossier de travail engendré, à la racine du dépôt.
+const WORKDIR: &str = "travail";
 
 /// Un bloc à compléter, repéré dans un fichier source.
 struct Block {
@@ -62,11 +66,14 @@ fn main() {
 
     let result = match command {
         "starter" => {
+            let force = args.iter().any(|a| a == "--force");
             let out = args
-                .get(1)
+                .iter()
+                .skip(1)
+                .find(|a| !a.starts_with("--"))
                 .map(PathBuf::from)
-                .unwrap_or_else(|| root.join("../wind-tunnel-starter"));
-            make_starter(&root, &out)
+                .unwrap_or_else(|| root.join(WORKDIR));
+            make_starter(&root, &out, force)
         }
         "status" => status(&root),
         "goto" => parse_step(args.get(1)).and_then(|n| goto(&root, n)),
@@ -92,7 +99,10 @@ fn usage() -> String {
            cargo xtask goto <n>      passer à l'étape n (0 à {LAST_STEP})\n\
            cargo xtask solve <n>     remplir les trous de l'étape n\n\
            cargo xtask reset <n>     rouvrir les trous de l'étape n\n\
-           cargo xtask starter [dir] (formateur) engendrer le dépôt de travail\n"
+           cargo xtask starter       créer le dossier de travail (par défaut : {WORKDIR}/)\n\
+         \n\
+         Les quatre premières commandes s'utilisent depuis le dossier de travail,\n\
+         `starter` depuis le dépôt du corrigé.\n"
     )
 }
 
@@ -430,8 +440,35 @@ fn status(root: &Path) -> Result<(), String> {
 // ------------------------------------------------------------------ génération
 
 /// Engendre le dépôt de travail à partir du corrigé.
-fn make_starter(root: &Path, out: &Path) -> Result<(), String> {
-    if out.exists() {
+fn make_starter(root: &Path, out: &Path, force: bool) -> Result<(), String> {
+    // Le dépôt du corrigé est la source : sans ses marqueurs, il n'y a rien à trouer.
+    // Cette commande lancée depuis un dossier de travail ne produirait qu'une copie
+    // sans exercices, ce qui serait une fausse bonne surprise.
+    let mut sources = Vec::new();
+    rust_files(&root.join("src"), &mut sources);
+    let is_reference = sources.iter().any(|p| {
+        fs::read_to_string(p)
+            .map(|t| t.contains(SOLUTION_BEGIN))
+            .unwrap_or(false)
+    });
+    if !is_reference {
+        return Err(format!(
+            "ce dépôt ne contient aucun bloc de référence : c'est déjà un dossier de \
+             travail.\nLancez `cargo xtask starter` depuis le dépôt du corrigé, ou \
+             `cargo xtask status` pour voir où vous en êtes."
+        ));
+    }
+
+    // Ne jamais détruire le travail de quelqu'un sans le lui demander.
+    if out.exists() && fs::read_dir(out).map(|d| d.count() > 0).unwrap_or(false) {
+        if !force {
+            return Err(format!(
+                "{} existe déjà et n'est pas vide.\nSi c'est votre dossier de travail, \
+                 il contient ce que vous avez écrit : ne le régénérez pas.\nPour le \
+                 remplacer malgré tout — et perdre son contenu — ajoutez --force.",
+                out.display()
+            ));
+        }
         fs::remove_dir_all(out).map_err(|e| format!("{} : {e}", out.display()))?;
     }
     fs::create_dir_all(out).map_err(|e| e.to_string())?;
@@ -511,11 +548,15 @@ fn make_starter(root: &Path, out: &Path) -> Result<(), String> {
         fs::write(out.join("README.md"), readme).map_err(|e| e.to_string())?;
     }
 
+    let shown = out.strip_prefix(root).unwrap_or(out);
     println!(
-        "Dépôt de travail engendré dans {} ({holes} trous).",
-        out.display()
+        "Dossier de travail créé : {} ({holes} trous à combler).\n",
+        shown.display()
     );
-    println!("Vérifiez-le avec : cd {} && cargo test", out.display());
+    println!("  cd {}", shown.display());
+    println!("  cargo test           # quatre tests rouges : l'étape 0 vous attend");
+    println!("  cargo xtask status   # à tout moment, pour savoir où vous en êtes\n");
+    println!("L'énoncé de la première étape est dans docs/etapes/etape-00.md.");
     Ok(())
 }
 
