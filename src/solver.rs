@@ -15,6 +15,8 @@ use std::collections::BTreeMap;
 use crate::error::SolverError;
 use crate::field::Field;
 use crate::flux::{FaceState, FluxScheme};
+use crate::geom::Vec2;
+use crate::gradient;
 use crate::mesh::{BoundaryKind, CellId, Mesh, Side};
 use crate::velocity::VelocityField;
 
@@ -162,13 +164,22 @@ impl<'m, F: FluxScheme> Solver<'m, F> {
         self.config.bc.get(&kind).copied().unwrap_or(Bc::NoFlux)
     }
 
-    /// Calcule `dc/dt` dans `out`, sans rien allouer.
+    /// Calcule `dc/dt` dans `out`.
     ///
     /// `c` est emprunté en lecture, `out` en écriture exclusive : le compilateur refuse
     /// qu'on lui passe deux fois le même champ. En C, le même appel avec le même
     /// pointeur des deux côtés compile, tourne, et donne un résultat faux ; `restrict`
     /// ne fait que promettre le contraire.
+    ///
+    /// Depuis l'étape 7, un tampon de gradients est alloué ici à chaque appel — `c`
+    /// change à chaque pas de temps, donc le gradient aussi, contrairement à
+    /// `face_flux` qui ne dépend que du maillage. `work`, lui, reste réutilisé d'un pas
+    /// à l'autre par [`Solver::run`] : faire de même pour les gradients est une bonne
+    /// extension (voir `docs/etapes/etape-07.md`).
     pub fn residual(&self, c: &Field, out: &mut Field) {
+        let mut gradients = vec![Vec2::ZERO; c.len()];
+        gradient::limited_gradients(self.mesh, c, &mut gradients);
+
         for (i, cell) in self.mesh.cells().iter().enumerate() {
             let id = CellId(i as u32);
             let ci = c[id];
@@ -181,16 +192,22 @@ impl<'m, F: FluxScheme> Solver<'m, F> {
                 let outward = if face.left == id { 1.0 } else { -1.0 };
                 let flux = self.face_flux[fid.index()] * outward;
                 let un = flux / face.length;
+                let to_face_left = face.midpoint - cell.centroid;
 
-                let c_other = match face.right {
+                let (c_other, grad_right, to_face_right) = match face.right {
                     Side::Inner(other) => {
                         let neighbour = if face.left == id { other } else { face.left };
-                        c[neighbour]
+                        let n_centroid = self.mesh.cell(neighbour).centroid;
+                        (
+                            c[neighbour],
+                            Some(gradients[neighbour.index()]),
+                            face.midpoint - n_centroid,
+                        )
                     }
                     Side::Boundary(kind) => match self.bc(kind) {
                         Bc::NoFlux => continue,
-                        Bc::Fixed(value) => value,
-                        Bc::ZeroGradient => ci,
+                        Bc::Fixed(value) => (value, None, Vec2::ZERO),
+                        Bc::ZeroGradient => (ci, None, Vec2::ZERO),
                     },
                 };
 
@@ -198,6 +215,10 @@ impl<'m, F: FluxScheme> Solver<'m, F> {
                     c_left: ci,
                     c_right: c_other,
                     un,
+                    grad_left: gradients[id.index()],
+                    to_face_left,
+                    grad_right,
+                    to_face_right,
                 });
                 // Le terme convectif utilise le débit tel quel : c'est lui qui se
                 // télescope exactement sur le contour de la cellule.

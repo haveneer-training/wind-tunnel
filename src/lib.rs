@@ -16,6 +16,7 @@ pub mod error;
 pub mod field;
 pub mod flux;
 pub mod geom;
+pub mod gradient;
 pub mod io;
 pub mod mask;
 pub mod mesh;
