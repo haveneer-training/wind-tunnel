@@ -81,7 +81,7 @@ impl Default for Config {
             // de l'écoulement analytique, donc un petit débit résiduel la traverse.
             // Le supprimer fabriquerait une divergence artificielle et ferait perdre
             // au schéma sa propriété de borne ; on préfère laisser ce débit emporter
-            // la valeur locale. L'étape 11, qui calcule l'écoulement sur le maillage
+            // la valeur locale. L'étape 12, qui calcule l'écoulement sur le maillage
             // lui-même, supprime le résidu à la source.
             bc: BTreeMap::from([
                 (BoundaryKind::Inlet, Bc::Fixed(0.0)),

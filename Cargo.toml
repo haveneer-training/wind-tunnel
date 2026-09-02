@@ -11,7 +11,7 @@ license = "CC-BY-NC-SA-4.0"
 # que `cargo test` ne montre que ce qui est déjà au programme du stagiaire.
 # `cargo xtask goto <n>` ne fait rien d'autre que réécrire la ligne `default`.
 [features]
-default = ["step10"]
+default = ["step11"]
 step0 = []
 step1 = ["step0"]
 step2 = ["step1"]
@@ -23,11 +23,19 @@ step7 = ["step6"]
 step8 = ["step7"]
 step9 = ["step8"]
 step10 = ["step9"]
+step11 = ["step10"]
 
 [workspace]
-members = ["xtask"]
+members = ["xtask", "mpi"]
 # Le dossier de travail engendré est un projet à part entière : cargo doit
 # l'ignorer tant qu'on travaille depuis la racine du corrigé.
+#
+# `mpi` reste dans les *membres* pour partager Cargo.lock et être visible de
+# `cargo metadata` / rust-analyzer, mais un workspace non virtuel comme celui-ci ne
+# construit par défaut que le paquet racine (`workspace_default_members`) : `cargo build`,
+# `cargo test` et `cargo clippy --all-features` sans `-p`/`--workspace` ne touchent donc
+# jamais `mpi/` et restent verts sur une machine sans MPI. Le bâtir explicitement :
+# `cargo build -p wind-tunnel-mpi` (ou `--manifest-path mpi/Cargo.toml`).
 exclude = ["travail"]
 
 [dependencies]

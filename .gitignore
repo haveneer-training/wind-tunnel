@@ -1,4 +1,5 @@
 /target
+/mpi/target
 /out*
 /travail
 .DS_Store

@@ -1,0 +1,21 @@
+[package]
+name = "wind-tunnel-mpi"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.90"
+description = "Soufflerie numérique — pilote MPI (étape 11)"
+license = "CC-BY-NC-SA-4.0"
+
+# Membre du workspace racine, mais seul crate à dépendre de MPI. Non listé dans
+# `default-members` (implicite : un workspace non virtuel ne construit par défaut que
+# son paquet racine) — `cargo build`/`test`/`clippy` sans `-p` ni `--workspace` ne le
+# touchent donc jamais, et le reste du projet continue de se construire et de se tester
+# sur une machine sans MPI. `[profile.*]` d'un membre non racine est ignoré par cargo :
+# voir `[profile.release]` dans le Cargo.toml de la racine.
+[dependencies]
+mpi = "0.8"
+wind-tunnel = { path = "..", features = ["step11"] }
+
+[[bin]]
+name = "wind-tunnel-mpi"
+path = "src/main.rs"

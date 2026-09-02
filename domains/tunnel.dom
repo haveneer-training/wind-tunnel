@@ -1,7 +1,7 @@
 % Veine de soufflerie avec cylindre.
 % '.' = fluide, '#' = solide, '%' = commentaire.
 % L'ecoulement porteur analytique suppose un obstacle circulaire :
-% si vous redessinez l'obstacle, gardez-le rond (ou passez a l'etape 11).
+% si vous redessinez l'obstacle, gardez-le rond (ou passez a l'etape 12).
 
 ........................................................................................................................
 ........................................................................................................................

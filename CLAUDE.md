@@ -17,7 +17,7 @@ to undo. Read it before making non-trivial changes.
 ## Commands
 
 ```shell
-cargo test                                              # all tests (54 currently)
+cargo test                                              # all tests (69 currently)
 cargo test --test mesh                                  # one test file
 cargo test the_mesh_is_mixed                             # one test by name
 cargo clippy --all-targets --all-features -- -D warnings # must stay clean
@@ -44,9 +44,21 @@ cargo test
 cargo clippy --all-targets --all-features -- -D warnings
 cargo fmt --all --check
 cargo xtask starter --force && cd travail && cargo test   # 4 red tests expected: step 0
-cargo xtask goto 5 && cargo xtask solve 5                  # ... and back to green
+cargo xtask goto 11 && cargo xtask solve 11                # ... and back to green
 
 scripts/check-steps.sh   # same round-trip, automated, step by step from 0 to LAST_STEP
+```
+
+Step 11 (MPI, bonus) lives in the `mpi/` crate. It **is** a workspace member (shared
+`Cargo.lock`, visible to `cargo metadata`/rust-analyzer), but not a *default* one — a
+non-virtual workspace only builds its root package by default, so plain `cargo build`,
+`cargo test`, `cargo clippy --all-features` (no `-p`/`--workspace`) never touch it and stay
+green on a machine without MPI. To build and run it:
+
+```shell
+cargo build --release -p wind-tunnel-mpi
+mpirun -n 4 target/release/wind-tunnel-mpi domains/tunnel.dom --refine 4 --steps 200
+scripts/check-mpi.sh     # 1/2/3/4 ranks vs. the sequential binary; exits 0 if no mpirun
 ```
 
 ## Architecture
@@ -70,6 +82,9 @@ mask ──▶ mesh ──▶ field ──▶ solver ──▶ io (VTK / PNG)
 | `src/solver.rs` | time-stepping loop, CFL, boundary conditions |
 | `src/io/` | VTK and PNG output |
 | `src/error.rs` | the two error families (mesh-time vs. solver-time) |
+| `src/app.rs` | CLI args and case assembly, shared by both binaries |
+| `src/decomposition.rs` | vertical band decomposition for MPI (step 11, feature-gated) |
+| `mpi/` | the MPI driver — a separate crate, excluded from the workspace (step 11) |
 | `xtask/` | generates `travail/` and drives step progression (see Commands) |
 
 ### Load-bearing design decisions (do not casually change — see `docs/AVANCEMENT.md`)
@@ -80,20 +95,26 @@ mask ──▶ mesh ──▶ field ──▶ solver ──▶ io (VTK / PNG)
   drift to 1.78 — two tests lock this property in.
 - **Walls use `ZeroGradient`, not `NoFlux`.** A staircase wall isn't exactly a streamline of
   the analytic flow; forcing zero flux would fabricate an artificial divergence and break the
-  boundedness. Step 11 (bonus) removes the residual at the source instead.
+  boundedness. Step 12 (bonus) removes the residual at the source instead.
 - **Typed indices** (`CellId`, `FaceId`, `VertexId`) instead of pointers, and **`Side`**
   instead of an `Option` + separate flag — deliberate teaching choices as well as technical
   ones.
 - **The time loop is written in *gather* form**, not *scatter* — this is what makes it
   parallelizable with `rayon` (step 9) without restructuring, and is used as the
   C/OpenMP-style pitfall example.
-- `obstacle()` in `src/main.rs` reduces the drawn shape to an equivalent-area disk, and
+- `obstacle()` in `src/app.rs` reduces the drawn shape to an equivalent-area disk, and
   `PotentialCylinder` flows around that disk — the flow does not "see" the actual drawn shape
-  (fixed in bonus step 11, not yet implemented).
+  (also fixed by bonus step 12, not yet implemented).
+- **`format_f64()` in `src/io/vtk.rs` writes denormals as `0`** (and switches to `{:e}`
+  outside the usual exponent range). Not cosmetic: VTK's legacy ASCII reader parses with
+  `istream >> double`, which sets `failbit` on underflow, then abandons the rest of the file
+  — ParaView shows "Unsupported cell attribute type" and displays garbage. The tracer decays
+  below `f64::MIN_POSITIVE` within a few dozen steps, so this hits every real run. One test
+  locks it in.
 
 ### Step machinery (feature-gated exercises)
 
-Each training step is a Cargo feature (`step0` … `step5` currently, chained: `stepN = ["stepN-1"]`),
+Each training step is a Cargo feature (`step0` … `step11` currently, chained: `stepN = ["stepN-1"]`),
 so `cargo test` in `travail/` only shows tests for steps already opened. `LAST_STEP` in
 `xtask/src/main.rs` must track the highest implemented step. In this corrigé, source blocks
 between `// SOLUTION-BEGIN` / `// SOLUTION-END` (preceded by a `// TODO-STEP:<n>` comment)
@@ -104,7 +125,10 @@ Conventions when adding a new step (full list in `docs/AVANCEMENT.md`):
 1. One hole = one `SOLUTION-BEGIN`/`SOLUTION-END` block covering a whole function body or
    expression, preceded by `// TODO-STEP:<n>`; it must typecheck with `todo!()` in its place.
 2. Step N's tests live under the `stepN` feature gate.
-3. Bump `LAST_STEP` in `xtask/src/main.rs`.
+3. Bump `LAST_STEP` in `xtask/src/main.rs`. A step that adds a separate crate must also
+   add it to `make_starter`'s copy list **and** to `SOURCE_DIRS`, or xtask never sees its
+   holes. The `// TODO-STEP:<n>` marker must sit within 8 lines above `// SOLUTION-BEGIN`
+   — `step_of` looks no further, and silently attributes the block to step 0.
 4. Add `docs/etapes/etape-NN.md` — a short mandatory core, an optional extension.
 5. **Language convention**: identifiers and filenames in English; prose (comments, doc
    comments, error messages, exercise statements) in French. Test names are code → English.
