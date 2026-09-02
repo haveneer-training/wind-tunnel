@@ -40,7 +40,7 @@ const REGION_END: &str = "// <<< ÉTAPE ";
 /// Où sont rangés les blocs de référence, dans le dépôt de travail.
 const REFERENCE: &str = "xtask/reference.txt";
 /// Dernière étape couverte par le code actuel.
-const LAST_STEP: u8 = 10;
+const LAST_STEP: u8 = 11;
 /// Nom du dossier de travail engendré, à la racine du dépôt.
 const WORKDIR: &str = "travail";
 
@@ -121,6 +121,23 @@ fn parse_step(arg: Option<&String>) -> Result<u8, String> {
 fn repository_root() -> PathBuf {
     let manifest = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     manifest.parent().map(Path::to_path_buf).unwrap_or(manifest)
+}
+
+/// Répertoires de sources fouillés par le dispositif d'étapes.
+///
+/// `mpi/src` en fait partie depuis l'étape 11 : le pilote MPI est un crate à part, membre
+/// du workspace mais pas du groupe par défaut (le reste se construit sans MPI) — ses
+/// trous sont des trous comme les autres, et `goto`/`solve`/`reset`/`status` doivent les
+/// voir.
+const SOURCE_DIRS: [&str; 2] = ["src", "mpi/src"];
+
+/// Liste les fichiers `.rs` de toutes les sources du dépôt.
+fn source_files(root: &Path) -> Vec<PathBuf> {
+    let mut files = Vec::new();
+    for dir in SOURCE_DIRS {
+        rust_files(&root.join(dir), &mut files);
+    }
+    files
 }
 
 /// Liste récursivement les fichiers `.rs` d'un répertoire.
@@ -300,8 +317,7 @@ fn is_empty(block: &Block) -> bool {
 /// Remplit les trous d'une étape ; `force` écrase même ce que le stagiaire a écrit.
 fn fill(root: &Path, step: u8, force: bool) -> Result<(), String> {
     let reference = load_reference(root)?;
-    let mut files = Vec::new();
-    rust_files(&root.join("src"), &mut files);
+    let files = source_files(root);
 
     let mut total = 0;
     for path in files {
@@ -329,8 +345,7 @@ fn fill(root: &Path, step: u8, force: bool) -> Result<(), String> {
 
 /// Rouvre les trous d'une étape.
 fn reset(root: &Path, step: u8) -> Result<(), String> {
-    let mut files = Vec::new();
-    rust_files(&root.join("src"), &mut files);
+    let files = source_files(root);
 
     for path in files {
         let text = fs::read_to_string(&path).map_err(|e| e.to_string())?;
@@ -396,8 +411,7 @@ fn current_step(root: &Path) -> Option<u8> {
 
 /// Affiche l'avancement, étape par étape.
 fn status(root: &Path) -> Result<(), String> {
-    let mut files = Vec::new();
-    rust_files(&root.join("src"), &mut files);
+    let files = source_files(root);
 
     let mut done: BTreeMap<u8, (usize, usize)> = BTreeMap::new();
     let mut corrected = false;
@@ -444,9 +458,7 @@ fn make_starter(root: &Path, out: &Path, force: bool) -> Result<(), String> {
     // Le dépôt du corrigé est la source : sans ses marqueurs, il n'y a rien à trouer.
     // Cette commande lancée depuis un dossier de travail ne produirait qu'une copie
     // sans exercices, ce qui serait une fausse bonne surprise.
-    let mut sources = Vec::new();
-    rust_files(&root.join("src"), &mut sources);
-    let is_reference = sources.iter().any(|p| {
+    let is_reference = source_files(root).iter().any(|p| {
         fs::read_to_string(p)
             .map(|t| t.contains(SOLUTION_BEGIN))
             .unwrap_or(false)
@@ -487,15 +499,15 @@ fn make_starter(root: &Path, out: &Path, force: bool) -> Result<(), String> {
         "tests",
         "xtask/Cargo.toml",
         "xtask/src",
+        "mpi/Cargo.toml",
+        "mpi/src",
         ".cargo",
     ] {
         copy_tree(&root.join(entry), &out.join(entry))?;
     }
 
     // Trouer les sources et mettre les corps de côté.
-    let mut files = Vec::new();
-    rust_files(&out.join("src"), &mut files);
-    for path in files {
+    for path in source_files(out) {
         let text = fs::read_to_string(&path).map_err(|e| e.to_string())?;
         let blocks = find_blocks(&text, SOLUTION_BEGIN, SOLUTION_END);
         if blocks.is_empty() {

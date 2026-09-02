@@ -158,6 +158,44 @@ impl Mask {
         Mask { rows, cols, fluid }
     }
 
+    /// Extrait la tranche de colonnes `range`, sur toute la hauteur du masque.
+    ///
+    /// C'est le découpage en bandes verticales de l'étape 11 : chaque rang MPI ne
+    /// construit un maillage que sur sa tranche. Contrairement à [`Mask::parse`], la
+    /// connexité n'est **pas** vérifiée : une bande qui traverse l'obstacle a du fluide
+    /// au-dessus et au-dessous sans chemin entre les deux, et c'est légitime.
+    ///
+    /// ```
+    /// use wind_tunnel::mask::Mask;
+    /// let m = Mask::parse("....\n.##.\n....\n").unwrap();
+    /// let bande = m.columns(1..3);
+    /// assert_eq!((bande.rows(), bande.cols()), (3, 2));
+    /// assert_eq!(bande.fluid_count(), 4);
+    /// ```
+    ///
+    /// # Panics
+    ///
+    /// Si `range` sort de la grille ou est vide.
+    pub fn columns(&self, range: std::ops::Range<usize>) -> Mask {
+        assert!(
+            range.start < range.end && range.end <= self.cols,
+            "tranche de colonnes {range:?} hors du masque ({} colonnes)",
+            self.cols
+        );
+        let cols = range.len();
+        let mut fluid = Vec::with_capacity(self.rows * cols);
+        for row in 0..self.rows {
+            for col in range.clone() {
+                fluid.push(self.fluid[row * self.cols + col]);
+            }
+        }
+        Mask {
+            rows: self.rows,
+            cols,
+            fluid,
+        }
+    }
+
     /// Nombre de cellules fluides.
     pub fn fluid_count(&self) -> usize {
         self.fluid.iter().filter(|&&f| f).count()

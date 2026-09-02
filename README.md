@@ -74,7 +74,11 @@ lecture (voir la fin de l'énoncé de l'étape 5).
 ## Prérequis
 
 - Rust ≥ 1.90 (`rustup update stable`)
-- rien d'autre : une seule dépendance, `image`, pour encoder les PNG
+- rien d'autre : deux dépendances, `image` pour encoder les PNG et `rayon` pour
+  l'étape 9
+- pour l'étape 11 seulement, une implémentation de MPI (`brew install open-mpi`,
+  `apt install libopenmpi-dev`). Elle n'est utilisée que par le crate `mpi/`, exclu du
+  workspace : sans elle, tout le reste se construit et se teste normalement.
 
 En réseau isolé, `cargo vendor` permet de récupérer les dépendances à l'avance.
 
@@ -97,7 +101,7 @@ triangles et quadrangles.
 
 Attention : l'écoulement porteur analytique est celui d'un **cylindre**. Si vous
 redessinez l'obstacle, gardez-le rond, ou calculez l'écoulement sur votre géométrie
-(étape 11).
+(étape 12).
 
 ## Organisation
 
@@ -118,6 +122,9 @@ masque ASCII ──▶ mask ──▶ mesh ──▶ field ──▶ solver ─�
 | `src/solver.rs` | boucle en temps, CFL, conditions aux limites |
 | `src/io/` | sorties VTK et PNG |
 | `src/error.rs` | les deux familles d'erreurs |
+| `src/app.rs` | montage d'un cas, partagé par les deux exécutables |
+| `src/decomposition.rs` | découpage en bandes pour le calcul distribué (étape 11) |
+| `mpi/` | le pilote MPI, crate à part (étape 11) |
 
 Et à côté du code lui-même :
 
@@ -127,6 +134,7 @@ Et à côté du code lui-même :
 | `docs/etapes/` | un énoncé par étape |
 | `domains/` | les masques de domaine |
 | `xtask/` | l'outil qui engendre `travail/` et pilote les étapes |
+| `scripts/` | vérifications automatiques du dispositif d'étapes et du pilote MPI |
 | `docs/AVANCEMENT.md` | état du projet, ce qui reste, décisions à ne pas défaire |
 
 ## Licence

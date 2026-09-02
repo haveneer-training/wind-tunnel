@@ -50,6 +50,18 @@ pub enum MeshError {
         /// Son aire signée.
         area: f64,
     },
+    /// Le découpage en bandes demandé donnerait des bandes plus étroites que le halo.
+    ///
+    /// Propre à l'étape 11 : une bande qui ne compte pas au moins `halo` colonnes ne
+    /// peut pas fournir à son voisin les colonnes qu'il attend.
+    BandsTooNarrow {
+        /// Nombre de colonnes du masque.
+        cols: usize,
+        /// Nombre de bandes demandé.
+        parts: usize,
+        /// Largeur du halo, en colonnes.
+        halo: usize,
+    },
     /// Une arête est partagée par plus de deux cellules : le maillage n'est pas une surface.
     NonManifoldEdge {
         /// Premier sommet de l'arête.
@@ -75,6 +87,11 @@ impl fmt::Display for MeshError {
             MeshError::InvalidChar { line, col, ch } => write!(
                 f,
                 "ligne {line}, colonne {col} : caractère {ch:?} inattendu (attendu « . » ou « # »)"
+            ),
+            MeshError::BandsTooNarrow { cols, parts, halo } => write!(
+                f,
+                "{cols} colonnes en {parts} bandes donnent des bandes de moins de {halo} \
+                 colonne(s) : réduisez le nombre de rangs, ou raffinez le masque"
             ),
             MeshError::Disconnected { components } => write!(
                 f,

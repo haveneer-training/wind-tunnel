@@ -13,6 +13,8 @@
 #![warn(missing_docs)]
 
 pub mod app;
+#[cfg(feature = "step11")]
+pub mod decomposition;
 pub mod error;
 pub mod field;
 pub mod flux;

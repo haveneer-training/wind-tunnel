@@ -307,6 +307,27 @@ impl Mesh {
         (tri, self.cells.len() - tri)
     }
 
+    /// Translate tout le maillage de `delta`.
+    ///
+    /// Sert au découpage en bandes de l'étape 11 : [`Mesh::from_mask`] place toujours la
+    /// première colonne du masque en `x = 0`, or la bande d'un rang commence ailleurs
+    /// dans le domaine. On la remet à sa place, et l'écoulement analytique — évalué en
+    /// coordonnées globales — redevient le bon.
+    ///
+    /// Longueurs, normales et distances sont invariantes par translation : seuls les
+    /// points bougent.
+    pub fn translate(&mut self, delta: Vec2) {
+        for vertex in &mut self.vertices {
+            *vertex = *vertex + delta;
+        }
+        for cell in &mut self.cells {
+            cell.centroid = cell.centroid + delta;
+        }
+        for face in &mut self.faces {
+            face.midpoint = face.midpoint + delta;
+        }
+    }
+
     /// Boîte englobante `(xmin, ymin, xmax, ymax)` du maillage.
     pub fn bounds(&self) -> (f64, f64, f64, f64) {
         self.vertices.iter().fold(

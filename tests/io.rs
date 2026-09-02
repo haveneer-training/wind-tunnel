@@ -67,6 +67,46 @@ fn the_vtk_file_describes_the_whole_mesh() {
     fs::remove_file(&path).ok();
 }
 
+/// Le traceur décroît exponentiellement loin de sa source : en quelques dizaines de pas,
+/// les cellules du fond portent des valeurs *dénormales* (sous `f64::MIN_POSITIVE`). Le
+/// lecteur VTK legacy les lit par `istream >> double`, qui échoue au sous-débordement,
+/// puis abandonne le reste du fichier — Paraview n'affiche plus rien. Elles doivent donc
+/// sortir à zéro, ce qu'elles sont à toutes fins utiles.
+#[test]
+fn denormal_values_are_written_as_zero() {
+    let mesh = small_mesh();
+    // dénormal, dénormal négatif, normal minuscule, ordinaire
+    let probes = [3.5e-323, -7e-323, 2.196_746_312_594_583e-303, 0.25];
+    let field = Field::from_fn(&mesh, |id| probes[id.index() % probes.len()]);
+
+    let path = std::env::temp_dir().join("wind-tunnel-test-denormal.vtk");
+    write_vtk(&path, &mesh, &[("c", &field)]).expect("écriture impossible");
+    let text = fs::read_to_string(&path).expect("relecture impossible");
+
+    let values: Vec<f64> = text
+        .lines()
+        .skip_while(|l| !l.starts_with("LOOKUP_TABLE"))
+        .skip(1)
+        .filter_map(|l| l.trim().parse().ok())
+        .collect();
+    assert_eq!(values.len(), mesh.n_cells());
+
+    for (i, value) in values.iter().enumerate() {
+        let expected = field[CellId(i as u32)];
+        if expected.abs() < f64::MIN_POSITIVE {
+            assert_eq!(
+                *value, 0.0,
+                "dénormal {expected:e} écrit tel quel (cellule {i})"
+            );
+        } else {
+            // Écourter les autres ne doit rien perdre : elles se relisent à l'identique.
+            assert_eq!(*value, expected, "valeur {i} altérée");
+        }
+    }
+
+    fs::remove_file(&path).ok();
+}
+
 #[test]
 fn the_field_values_are_written_in_cell_order() {
     let mesh = small_mesh();

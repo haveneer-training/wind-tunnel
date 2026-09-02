@@ -33,8 +33,8 @@ facultative : personne n'attend son voisin.
 | [8](docs/etapes/etape-08.md) | RK2 : pourquoi l'ordre n'avait pas bougé | J3 | 25 min | `enum` de schéma, relecture critique d'un résultat |
 | [9](docs/etapes/etape-09.md) | Paralléliser avec `rayon` | J3 | 40 min | style fonctionnel, `par_iter`, performance |
 | [10](docs/etapes/etape-10.md) | Threads : écriture recouverte, suivi | J3 | 30 min | `thread::scope`, `mpsc`, `Arc`, `Mutex` |
-| 11 | *Bonus* : calculer l'écoulement | — | 40 min | algorithme itératif, convergence |
-| 12 | *Bonus* : passage à l'échelle en MPI | — | — | décomposition de domaine |
+| [11](docs/etapes/etape-11.md) | *Bonus* : passage à l'échelle en MPI | J3 | 60 min | processus, messages, réductions |
+| 12 | *Bonus* : calculer l'écoulement | — | 40 min | algorithme itératif, convergence |
 
 Les étapes 0 à 5 forment le noyau : à la fin de l'étape 5, le code tourne et produit ses
 premières images. Les suivantes l'améliorent.
@@ -59,3 +59,9 @@ dès le départ pour s'y prêter. L'étape 9 traite le cas facile — chaque cel
 propre case, `rayon` n'a besoin de rien d'autre — et l'étape 10 le cas où ça ne suffit
 plus : plusieurs cellules dessinent dans la même image, il faut un verrou (`Mutex`), et
 `thread::scope`/`mpsc` en sont l'occasion pour voir ce que `rayon` cache d'habitude.
+
+L'étape 11, en bonus, franchit la limite de la machine : plusieurs processus, chacun sa
+mémoire, chacun sa bande du domaine. Le solveur n'y change pas d'une ligne — c'est le
+signe qu'il ne supposait déjà plus que « son » maillage était tout le domaine — et la
+difficulté se déplace là où elle est vraiment dans un code distribué : savoir qui possède
+quoi.
