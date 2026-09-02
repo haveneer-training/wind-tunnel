@@ -3,7 +3,7 @@
 Document de passation. Il dit où en est le fil rouge, ce qui reste à faire, et les
 décisions qu'il ne faut pas défaire sans le savoir. À tenir à jour.
 
-Dernière mise à jour : 2026-09-02 (étape 9).
+Dernière mise à jour : 2026-09-02 (étape 10).
 
 ## Contexte
 
@@ -17,17 +17,33 @@ dépôt : `~/.claude/plans/pour-la-formation-rust-happy-seahorse.md`.
 
 ## Ce qui est fait
 
-**Étapes 0 à 9** : géométrie, masque, maillage non structuré et connectivité, sorties
+**Étapes 0 à 10** : géométrie, masque, maillage non structuré et connectivité, sorties
 VTK/PNG et erreurs typées, écoulement porteur, solveur explicite (le noyau, étapes 0 à 5),
 conservation et ordre de convergence mesurés (étape 6), reconstruction d'ordre 2 par
 moindres carrés et limiteur de Barth–Jespersen (étape 7, schéma `Muscl`), RK2 qui fait
-enfin apparaître l'ordre 2 mesuré (étape 8), puis la parallélisation `rayon` des trois
-boucles en *gather* du solveur (étape 9). Le code tourne et produit l'animation.
+enfin apparaître l'ordre 2 mesuré (étape 8), la parallélisation `rayon` des trois
+boucles en *gather* du solveur (étape 9), puis le rendu PNG parallélisé « à la main »
+avec `thread::scope`, `Mutex` et `mpsc` (étape 10). Le code tourne et produit
+l'animation.
 
-- 55 tests verts, `cargo clippy --all-targets --all-features -- -D warnings` propre,
+- 56 tests verts, `cargo clippy --all-targets --all-features -- -D warnings` propre,
   `cargo fmt` appliqué
-- 21 trous répartis : 4 en étape 0, 2 en 1, 2 en 2, 2 en 3, 1 en 4, 3 en 5, 1 en 6, 2 en 7,
-  1 en 8, 3 en 9
+- 22 trous répartis : 4 en étape 0, 2 en 1, 2 en 2, 2 en 3, 1 en 4, 3 en 5, 1 en 6, 2 en 7,
+  1 en 8, 3 en 9, 1 en 10
+- **Étape 10** parallélise le rendu PNG (`src/io/png.rs::write_png`), le seul endroit du
+  projet où plusieurs unités de travail écrivent dans **la même** structure partagée (une
+  `RgbImage`) plutôt que chacune dans sa propre case — le compilateur ne peut pas prouver
+  que les cellules n'écrivent jamais le même pixel, donc il refuse tout accès concurrent
+  tant qu'il n'est pas protégé. Contrairement à l'étape 9, ce n'est pas `rayon` qui est
+  utilisé mais `std::thread::scope` (emprunt de `mesh`/`field`/`Mutex`, pas d'`Arc`
+  nécessaire puisque le scope rejoint tous les threads), un `Mutex<RgbImage>` verrouillé
+  le temps le plus court possible (le calcul des pixels se fait hors verrou), et un
+  `mpsc::channel` cloné par thread pour le suivi — vérifié par un `debug_assert_eq!` qui
+  compare la somme reçue à `mesh.n_cells()`. `Arc` est volontairement absent du socle
+  (pas nécessaire avec `thread::scope`) ; l'énoncé (`docs/etapes/etape-10.md`) l'explique
+  et le fait pratiquer en extension via `std::thread::spawn`, qui lui l'exige. `tests/
+  render.rs` verrouille le résultat : deux rendus du même champ doivent être identiques
+  au bit près, y compris avec moins de cellules que de threads disponibles
 - l'ordre mesuré à l'étape 6 est **≈ 1** (décentrement amont + Euler explicite, CFL fixe
   donc `dt ∝ h`) — c'est voulu, et l'étape 7 ne le fait **pas** bouger non plus, parce que
   l'erreur en temps domine tant que `dt ∝ h`, quel que soit l'ordre spatial. L'étape 8
@@ -57,23 +73,24 @@ boucles en *gather* du solveur (étape 9). Le code tourne et produit l'animation
   toutes lettres). `tests/parallel.rs` verrouille le résultat : un run forcé à un thread
   et un run à plusieurs threads doivent produire des champs identiques au bit près —
   aucune réduction flottante dont l'ordre dépendrait du nombre de threads
-- **Correction : `cargo run` était cassé de l'étape 5 à l'étape 8.** Le bloc
+- **Correction (2026-09-02) : `cargo run` était cassé de l'étape 5 à l'étape 8.** Le bloc
   `TODO-STEP:9` de `face_flux`/`residual`/`limited_gradients` remplaçait *tout* le calcul
   (version séquentielle comprise) par sa version `rayon` : dans `travail/`, tant que
   l'étape 9 n'était pas atteinte, ce bloc restait un `todo!()`, et `cargo run` paniquait
   dès l'étape 5 malgré ce que dit plus haut « à la fin de l'étape 5, le code tourne ».
-  Corrigé en donnant à chaque calcul concerné deux définitions, choisies par les
-  features `stepN` déjà présentes (`#[cfg(feature = "step9")]` pour la version `rayon`
-  — avec son trou — et `#[cfg(not(feature = "step9"))]` pour la version séquentielle
-  d'avant, toujours complète, jamais un trou). Vérifié par un tour complet
-  `starter --force` → `goto 3/5/7/8/9` → `cargo run` à chaque étape intermédiaire.
-  Cette convention est ajoutée à la liste ci-dessous.
+  Trouvé en préparant l'étape 10, qui répétait le même défaut sur `write_png`. Corrigé
+  en donnant à chaque calcul concerné deux définitions, choisies par les features
+  `stepN` déjà présentes (`#[cfg(feature = "step9")]` pour la version `rayon` — avec son
+  trou — et `#[cfg(not(feature = "step9"))]` pour la version séquentielle d'avant,
+  toujours complète, jamais un trou). Vérifié par un tour complet
+  `starter --force` → `goto 3/5/7/8/9/10` → `cargo run` à chaque étape intermédiaire.
+  Cette convention est ajoutée à la liste ci-dessous ; les étapes 9 et 10 en sont
+  aujourd'hui les deux seuls cas.
 
 ## Ce qui reste
 
 | # | Étape | État de préparation |
 |---|---|---|
-| 10 | Threads : écriture recouverte, `Arc`/`Mutex` | Rien de préparé. Le quiz montre que le groupe connaît le faux partage mais moins les verrous : orienter vers les seconds. |
 | 11 | *Bonus* : écoulement calculé (Jacobi puis CG matrix-free) | Supprimerait deux approximations d'un coup : le débit résiduel aux parois, et le fait que l'écoulement ne « voit » qu'un disque équivalent. |
 | 12 | *Bonus* : MPI | Crate à part, hors du workspace par défaut, pour ne pas casser `cargo build` sans MPI. |
 
@@ -88,13 +105,13 @@ explicite là-dessus.
    d'un commentaire `// TODO-STEP:<n>` qui porte la consigne. Le bloc doit couvrir un
    corps de fonction entier ou une expression complète : son remplacement par `todo!()`
    doit typecheck.
-   **Si l'étape remplace un calcul déjà fonctionnel** (comme l'étape 9 sur `face_flux`)
-   plutôt que de combler un trou resté vide depuis le début, donnez-lui deux
-   définitions choisies par `#[cfg(feature = "stepN")]` / `#[cfg(not(feature =
-   "stepN"))]` : la version avec le trou d'un côté, l'ancienne version séquentielle
-   (complète, sans `todo!()`) de l'autre. Sinon, dans `travail/`, ce calcul reste un
-   `todo!()` — et donc `cargo run` cassé — de l'étape précédente jusqu'à celle-ci, pas
-   seulement pendant celle-ci.
+   **Si l'étape remplace un calcul déjà fonctionnel** (comme l'étape 9 sur `face_flux`
+   ou l'étape 10 sur `write_png`) plutôt que de combler un trou resté vide depuis le
+   début, donnez-lui deux définitions choisies par `#[cfg(feature = "stepN")]` /
+   `#[cfg(not(feature = "stepN"))]` : la version avec le trou d'un côté, l'ancienne
+   version séquentielle (complète, sans `todo!()`) de l'autre. Sinon, dans `travail/`,
+   ce calcul reste un `todo!()` — et donc `cargo run` cassé — de l'étape précédente
+   jusqu'à celle-ci, pas seulement pendant celle-ci.
 2. **Les tests de l'étape n** vont sous `#[cfg(all(test, feature = "stepN"))]`, ou
    `#![cfg(feature = "stepN")]` en tête d'un fichier de `tests/`. Les features sont
    chaînées dans `Cargo.toml` (`stepN = ["stepN-1"]`), ce qui fait que `cargo test` ne
@@ -144,12 +161,12 @@ qu'on exhibe.
 ## Vérifier que tout va bien
 
 ```shell
-cargo test                                   # 55 tests
+cargo test                                   # 56 tests
 cargo clippy --all-targets --all-features -- -D warnings
 cargo fmt --all --check
 cargo run --release -- domains/tunnel.dom --refine 4 --bands 9 --steps 960
 
 cargo xtask starter --force                  # régénère travail/
 cd travail && cargo test                     # 4 tests rouges : étape 0
-cargo xtask goto 9 && cargo xtask solve 9    # ... et tout doit redevenir vert
+cargo xtask goto 10 && cargo xtask solve 10  # ... et tout doit redevenir vert
 ```
