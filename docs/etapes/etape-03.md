@@ -1,6 +1,6 @@
 # Étape 3 — Écrire les résultats, et les erreurs
 
-**Fichiers :** `src/io/vtk.rs`, `src/error.rs` · **Vérification :** `cargo test --test errors` · **≈ 30 min**
+**Fichiers :** `src/io/vtk.rs`, `src/error.rs` · **Vérification :** `cargo xtask goto 3` puis `cargo test` · **≈ 30 min**
 
 Un calcul dont on ne voit rien ne sert à rien, et un calcul qui échoue sans le dire est
 pire qu'inutile. Cette étape traite les deux faces de la même pièce : les sorties, et ce

@@ -68,7 +68,7 @@ impl FluxScheme for Centered {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "step5"))]
 mod tests {
     use super::*;
 

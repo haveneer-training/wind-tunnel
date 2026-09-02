@@ -1,3 +1,5 @@
+#![cfg(feature = "step5")]
+
 //! Propriétés du transport, de bout en bout sur le domaine livré.
 
 use wind_tunnel::field::Field;

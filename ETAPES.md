@@ -4,9 +4,16 @@ Chaque étape tient en un énoncé court, quelques trous à combler, et des test
 qui disent si c'est juste. Le principe est toujours le même :
 
 ```shell
-cargo test          # rouge : il reste des todo!() à remplir
-cargo test          # vert  : l'étape est finie
+cargo xtask goto 2   # ouvrir l'étape 2 (et compléter les précédentes restées vides)
+cargo test           # rouge : voici ce qu'il faut écrire, fichier et ligne à l'appui
+#   ... remplacer le todo!() entre les marqueurs >>> et <<< ...
+cargo test           # vert  : l'étape est finie
 ```
+
+`cargo test` ne montre que les étapes déjà ouvertes : jamais cinquante tests rouges d'un
+coup, seulement ceux qui vous concernent. `cargo xtask status` dit où vous en êtes,
+`cargo xtask solve <n>` remplit une étape à votre place si vous décrochez, et
+`cargo xtask reset <n>` la rouvre pour la refaire.
 
 Chaque énoncé comporte un **socle**, que tout le monde termine, et une **extension**,
 facultative : personne n'attend son voisin.

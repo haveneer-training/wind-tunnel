@@ -12,6 +12,7 @@ use wind_tunnel::mesh::Mesh;
 use wind_tunnel::solver::{Config, Solver};
 use wind_tunnel::velocity::Uniform;
 
+#[cfg(feature = "step1")]
 #[test]
 fn inconsistent_line_length() {
     match Mask::parse("...\n..\n") {
@@ -26,6 +27,7 @@ fn inconsistent_line_length() {
     }
 }
 
+#[cfg(feature = "step1")]
 #[test]
 fn unknown_character_is_located() {
     match Mask::parse("..\n.x\n") {
@@ -36,6 +38,7 @@ fn unknown_character_is_located() {
     }
 }
 
+#[cfg(feature = "step1")]
 #[test]
 fn a_fully_solid_domain() {
     assert!(matches!(
@@ -44,6 +47,7 @@ fn a_fully_solid_domain() {
     ));
 }
 
+#[cfg(feature = "step1")]
 #[test]
 fn a_domain_split_in_two() {
     // une cloison qui traverse toute la veine : le calcul n'aurait aucun sens
@@ -53,6 +57,7 @@ fn a_domain_split_in_two() {
     }
 }
 
+#[cfg(feature = "step3")]
 #[test]
 fn the_error_message_points_at_the_fault() {
     let err = Mask::parse("..\n.@\n").unwrap_err();
@@ -61,6 +66,7 @@ fn the_error_message_points_at_the_fault() {
     assert!(message.contains("colonne 2"), "message : {message}");
 }
 
+#[cfg(feature = "step5")]
 #[test]
 fn unstable_time_step_is_rejected_before_computing() {
     let mask = Mask::parse("....\n....\n").unwrap();
@@ -82,6 +88,7 @@ fn unstable_time_step_is_rejected_before_computing() {
     }
 }
 
+#[cfg(feature = "step3")]
 #[test]
 fn a_missing_file() {
     let err = Mask::from_file("domains/ce-fichier-n-existe-pas.dom").unwrap_err();

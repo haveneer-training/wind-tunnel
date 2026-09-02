@@ -274,7 +274,7 @@ fn max_stable_dt(mesh: &Mesh, face_flux: &[f64], diffusivity: f64) -> f64 {
     // SOLUTION-END
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "step5"))]
 mod tests {
     use super::*;
     use crate::flux::Upwind;
