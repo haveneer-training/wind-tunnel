@@ -3,7 +3,7 @@
 Document de passation. Il dit où en est le fil rouge, ce qui reste à faire, et les
 décisions qu'il ne faut pas défaire sans le savoir. À tenir à jour.
 
-Dernière mise à jour : 2026-09-02 (étape 8).
+Dernière mise à jour : 2026-09-02 (étape 9).
 
 ## Contexte
 
@@ -17,16 +17,17 @@ dépôt : `~/.claude/plans/pour-la-formation-rust-happy-seahorse.md`.
 
 ## Ce qui est fait
 
-**Étapes 0 à 8** : géométrie, masque, maillage non structuré et connectivité, sorties
+**Étapes 0 à 9** : géométrie, masque, maillage non structuré et connectivité, sorties
 VTK/PNG et erreurs typées, écoulement porteur, solveur explicite (le noyau, étapes 0 à 5),
 conservation et ordre de convergence mesurés (étape 6), reconstruction d'ordre 2 par
-moindres carrés et limiteur de Barth–Jespersen (étape 7, schéma `Muscl`), puis RK2 qui
-fait enfin apparaître l'ordre 2 mesuré (étape 8). Le code tourne et produit l'animation.
+moindres carrés et limiteur de Barth–Jespersen (étape 7, schéma `Muscl`), RK2 qui fait
+enfin apparaître l'ordre 2 mesuré (étape 8), puis la parallélisation `rayon` des trois
+boucles en *gather* du solveur (étape 9). Le code tourne et produit l'animation.
 
-- 54 tests verts, `cargo clippy --all-targets --all-features -- -D warnings` propre,
+- 55 tests verts, `cargo clippy --all-targets --all-features -- -D warnings` propre,
   `cargo fmt` appliqué
-- 18 trous répartis : 4 en étape 0, 2 en 1, 2 en 2, 2 en 3, 1 en 4, 3 en 5, 1 en 6, 2 en 7,
-  1 en 8
+- 21 trous répartis : 4 en étape 0, 2 en 1, 2 en 2, 2 en 3, 1 en 4, 3 en 5, 1 en 6, 2 en 7,
+  1 en 8, 3 en 9
 - l'ordre mesuré à l'étape 6 est **≈ 1** (décentrement amont + Euler explicite, CFL fixe
   donc `dt ∝ h`) — c'est voulu, et l'étape 7 ne le fait **pas** bouger non plus, parce que
   l'erreur en temps domine tant que `dt ∝ h`, quel que soit l'ordre spatial. L'étape 8
@@ -47,12 +48,20 @@ fait enfin apparaître l'ordre 2 mesuré (étape 8). Le code tourne et produit l
 - le dispositif de travail (`cargo xtask starter` puis `goto` / `solve` / `reset` /
   `status`) est en place et vérifié depuis un clone neuf, `LAST_STEP` à jour dans
   `xtask/src/main.rs`
+- **Étape 9** parallélise trois boucles en *gather* avec `rayon` : le calcul des débits
+  de face dans `Solver::new` (un simple `map`), `gradient::limited_gradients`, et la
+  boucle principale de `Solver::residual`. Aucune n'écrit chez le voisin, donc aucune ne
+  demande de réécriture — juste `.iter()` → `.par_iter()` (et `.par_iter_mut()` côté
+  écriture). `FluxScheme` et `VelocityField` étaient déjà bornés par `Sync` depuis leur
+  écriture (étapes 4-5), en prévision de cette étape justement (`velocity.rs` le dit en
+  toutes lettres). `tests/parallel.rs` verrouille le résultat : un run forcé à un thread
+  et un run à plusieurs threads doivent produire des champs identiques au bit près —
+  aucune réduction flottante dont l'ordre dépendrait du nombre de threads
 
 ## Ce qui reste
 
 | # | Étape | État de préparation |
 |---|---|---|
-| 9 | `rayon` | La boucle est déjà écrite en *gather*, donc parallélisable telle quelle. `--refine 13` donne le million de cellules pour les bancs d'essai. Modèles : `code/rs/benches/sort.rs` et `dispatch.rs` du dépôt de slides. |
 | 10 | Threads : écriture recouverte, `Arc`/`Mutex` | Rien de préparé. Le quiz montre que le groupe connaît le faux partage mais moins les verrous : orienter vers les seconds. |
 | 11 | *Bonus* : écoulement calculé (Jacobi puis CG matrix-free) | Supprimerait deux approximations d'un coup : le débit résiduel aux parois, et le fait que l'écoulement ne « voit » qu'un disque équivalent. |
 | 12 | *Bonus* : MPI | Crate à part, hors du workspace par défaut, pour ne pas casser `cargo build` sans MPI. |
@@ -96,8 +105,9 @@ supprime le résidu à la source.
 plutôt qu'un `Option` doublé d'un drapeau** : ce sont des supports de discours autant
 que des choix techniques.
 
-**La boucle est en *gather***, pas en *scatter* : c'est ce qui rend l'étape 9 possible
-sans réécriture, et c'est le piège C/OpenMP qu'on exhibe.
+**La boucle est en *gather***, pas en *scatter* : c'est ce qui a rendu l'étape 9
+possible sans réécriture (juste `.iter()` → `.par_iter()`), et c'est le piège C/OpenMP
+qu'on exhibe.
 
 ## Pièges connus, non corrigés
 
@@ -116,12 +126,12 @@ sans réécriture, et c'est le piège C/OpenMP qu'on exhibe.
 ## Vérifier que tout va bien
 
 ```shell
-cargo test                                   # 54 tests
+cargo test                                   # 55 tests
 cargo clippy --all-targets --all-features -- -D warnings
 cargo fmt --all --check
 cargo run --release -- domains/tunnel.dom --refine 4 --bands 9 --steps 960
 
 cargo xtask starter --force                  # régénère travail/
 cd travail && cargo test                     # 4 tests rouges : étape 0
-cargo xtask goto 8 && cargo xtask solve 8    # ... et tout doit redevenir vert
+cargo xtask goto 9 && cargo xtask solve 9    # ... et tout doit redevenir vert
 ```

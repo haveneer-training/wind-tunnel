@@ -13,6 +13,8 @@
 //! exactement le défaut de `Centered`, qui fait déborder le champ de `[0, 1]` (étape
 //! 6). Le limiteur de Barth–Jespersen corrige ça après coup, cellule par cellule.
 
+use rayon::prelude::*;
+
 use crate::field::Field;
 use crate::geom::Vec2;
 use crate::mesh::{CellId, Mesh};
@@ -109,12 +111,19 @@ fn barth_jespersen(mesh: &Mesh, c: &Field, gradient: Vec2, id: CellId) -> f64 {
 /// mais `c` change à chaque pas de temps, donc le gradient aussi. `out` doit avoir une
 /// entrée par cellule ; l'appelant le fournit pour ne rien allouer ici.
 pub fn limited_gradients(mesh: &Mesh, c: &Field, out: &mut [Vec2]) {
-    for (i, slot) in out.iter_mut().enumerate().take(mesh.n_cells()) {
-        let id = CellId(i as u32);
-        let gradient = least_squares_gradient(mesh, c, id);
-        let phi = barth_jespersen(mesh, c, gradient, id);
-        *slot = gradient * phi;
-    }
+    // TODO-STEP:9 Paralléliser avec rayon : chaque cellule ne lit que `mesh` et `c`
+    // (partagés, en lecture seule) et n'écrit que sa propre case de `out`.
+    // SOLUTION-BEGIN
+    out.par_iter_mut()
+        .enumerate()
+        .take(mesh.n_cells())
+        .for_each(|(i, slot)| {
+            let id = CellId(i as u32);
+            let gradient = least_squares_gradient(mesh, c, id);
+            let phi = barth_jespersen(mesh, c, gradient, id);
+            *slot = gradient * phi;
+        });
+    // SOLUTION-END
 }
 
 #[cfg(all(test, feature = "step7"))]

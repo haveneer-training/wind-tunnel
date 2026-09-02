@@ -12,6 +12,8 @@
 
 use std::collections::BTreeMap;
 
+use rayon::prelude::*;
+
 use crate::error::SolverError;
 use crate::field::Field;
 use crate::flux::{FaceState, FluxScheme};
@@ -121,13 +123,18 @@ impl<'m, F: FluxScheme> Solver<'m, F> {
         config: Config,
     ) -> Result<Self, SolverError> {
         let vertices = mesh.vertices();
-        let face_flux: Vec<f64> = mesh
-            .faces()
-            .iter()
-            .map(|f| {
-                velocity.stream(vertices[f.b.index()]) - velocity.stream(vertices[f.a.index()])
-            })
-            .collect();
+        // TODO-STEP:9 Paralléliser ce calcul avec rayon. C'est un `map` sur les faces,
+        // chacune indépendante des autres : `.iter()` → `.par_iter()` suffit.
+        let face_flux: Vec<f64> = {
+            // SOLUTION-BEGIN
+            mesh.faces()
+                .par_iter()
+                .map(|f| {
+                    velocity.stream(vertices[f.b.index()]) - velocity.stream(vertices[f.a.index()])
+                })
+                .collect()
+            // SOLUTION-END
+        };
         let dt_max = max_stable_dt(mesh, &face_flux, config.diffusivity);
         let dt = config.dt.unwrap_or(config.cfl * dt_max);
         if dt > dt_max * (1.0 + 1e-12) {
@@ -194,54 +201,65 @@ impl<'m, F: FluxScheme> Solver<'m, F> {
         let mut gradients = vec![Vec2::ZERO; c.len()];
         gradient::limited_gradients(self.mesh, c, &mut gradients);
 
-        for (i, cell) in self.mesh.cells().iter().enumerate() {
-            let id = CellId(i as u32);
-            let ci = c[id];
-            let mut sum = 0.0;
+        // TODO-STEP:9 Paralléliser cette boucle avec rayon. Chaque cellule ne lit que
+        // `self`, `c` et `gradients` (partagés, en lecture seule) et n'écrit que sa
+        // propre case de `out` : `par_iter()` sur les cellules, `zip`é avec `out` en
+        // écriture (`par_iter_mut()`), `enumerate()` pour retrouver l'identifiant.
+        // SOLUTION-BEGIN
+        self.mesh
+            .cells()
+            .par_iter()
+            .zip(out.as_mut_slice().par_iter_mut())
+            .enumerate()
+            .for_each(|(i, (cell, out_value))| {
+                let id = CellId(i as u32);
+                let ci = c[id];
+                let mut sum = 0.0;
 
-            for &fid in self.mesh.cell_faces(id) {
-                let face = self.mesh.face(fid);
-                // Le débit stocké est sortant de `face.left` : on le retourne si la
-                // cellule courante se trouve de l'autre côté.
-                let outward = if face.left == id { 1.0 } else { -1.0 };
-                let flux = self.face_flux[fid.index()] * outward;
-                let un = flux / face.length;
-                let to_face_left = face.midpoint - cell.centroid;
+                for &fid in self.mesh.cell_faces(id) {
+                    let face = self.mesh.face(fid);
+                    // Le débit stocké est sortant de `face.left` : on le retourne si la
+                    // cellule courante se trouve de l'autre côté.
+                    let outward = if face.left == id { 1.0 } else { -1.0 };
+                    let flux = self.face_flux[fid.index()] * outward;
+                    let un = flux / face.length;
+                    let to_face_left = face.midpoint - cell.centroid;
 
-                let (c_other, grad_right, to_face_right) = match face.right {
-                    Side::Inner(other) => {
-                        let neighbour = if face.left == id { other } else { face.left };
-                        let n_centroid = self.mesh.cell(neighbour).centroid;
-                        (
-                            c[neighbour],
-                            Some(gradients[neighbour.index()]),
-                            face.midpoint - n_centroid,
-                        )
-                    }
-                    Side::Boundary(kind) => match self.bc(kind) {
-                        Bc::NoFlux => continue,
-                        Bc::Fixed(value) => (value, None, Vec2::ZERO),
-                        Bc::ZeroGradient => (ci, None, Vec2::ZERO),
-                    },
-                };
+                    let (c_other, grad_right, to_face_right) = match face.right {
+                        Side::Inner(other) => {
+                            let neighbour = if face.left == id { other } else { face.left };
+                            let n_centroid = self.mesh.cell(neighbour).centroid;
+                            (
+                                c[neighbour],
+                                Some(gradients[neighbour.index()]),
+                                face.midpoint - n_centroid,
+                            )
+                        }
+                        Side::Boundary(kind) => match self.bc(kind) {
+                            Bc::NoFlux => continue,
+                            Bc::Fixed(value) => (value, None, Vec2::ZERO),
+                            Bc::ZeroGradient => (ci, None, Vec2::ZERO),
+                        },
+                    };
 
-                let c_face = self.scheme.interface_value(&FaceState {
-                    c_left: ci,
-                    c_right: c_other,
-                    un,
-                    grad_left: gradients[id.index()],
-                    to_face_left,
-                    grad_right,
-                    to_face_right,
-                });
-                // Le terme convectif utilise le débit tel quel : c'est lui qui se
-                // télescope exactement sur le contour de la cellule.
-                sum += flux * c_face
-                    - self.config.diffusivity * (c_other - ci) / face.distance * face.length;
-            }
+                    let c_face = self.scheme.interface_value(&FaceState {
+                        c_left: ci,
+                        c_right: c_other,
+                        un,
+                        grad_left: gradients[id.index()],
+                        to_face_left,
+                        grad_right,
+                        to_face_right,
+                    });
+                    // Le terme convectif utilise le débit tel quel : c'est lui qui se
+                    // télescope exactement sur le contour de la cellule.
+                    sum += flux * c_face
+                        - self.config.diffusivity * (c_other - ci) / face.distance * face.length;
+                }
 
-            out[id] = -sum / cell.area;
-        }
+                *out_value = -sum / cell.area;
+            });
+        // SOLUTION-END
     }
 
     /// Avance d'un pas de temps, selon le schéma d'intégration choisi.
