@@ -495,6 +495,7 @@ fn make_starter(root: &Path, out: &Path, force: bool) -> Result<(), String> {
         "README.md",
         "docs",
         "domains",
+        "examples",
         "src",
         "tests",
         "xtask/Cargo.toml",

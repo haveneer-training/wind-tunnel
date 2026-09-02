@@ -28,7 +28,7 @@ dt ≤ min_i  |Ωi| / Σ_faces ( |débit| + 2·D·L/d )
 | Fonction | Fichier | Ce qu'elle doit faire |
 |---|---|---|
 | `Upwind::interface_value` | `flux.rs` | retenir la valeur du côté d'où vient le fluide |
-| `max_stable_dt` | `solver.rs` | la formule CFL ci-dessus |
+| `max_stable_dt` | `solver.rs` | la formule CFL ci-dessus, ou `None` si aucune cellule n'a de somme strictement positive |
 | `Solver::step` | `solver.rs` | calculer le résidu, puis avancer de `dt · résidu` |
 
 `Solver::residual`, plus longue, vous est donnée : lisez-la, c'est elle qui met tout le
@@ -55,6 +55,17 @@ la promesse n'est pas vérifiée.
 **La boucle en temps n'alloue rien.** Le tampon `work` est alloué une fois avant la
 boucle, puis réutilisé. Une allocation par pas de temps ne se voit pas sur un petit cas,
 et coûte cher sur un gros.
+
+**`Option` plutôt qu'une valeur sentinelle.** `max_stable_dt` renvoie
+`Option<f64>` : le minimum porte sur les cellules dont la somme des débits est
+strictement positive, et si aucune ne l'est — écoulement nul *et* diffusivité nulle —
+il n'y a pas de minimum du tout. En C on renverrait `DBL_MAX` ou `-1`, un appelant
+oublierait de le tester, et `0,4 × DBL_MAX` donnerait un pas de temps de 10³⁰⁸ secondes
+sans que rien ne proteste. Ici le type dit qu'il peut ne pas y avoir de réponse, et
+`Solver::new` est obligé d'en faire quelque chose — en l'occurrence
+`SolverError::NoTransport`. C'est le même réflexe que `Side` plutôt qu'un
+`Option<CellId>` doublé d'un drapeau, à l'étape 2 : rendre l'état douteux
+inexprimable.
 
 **Le CFL est vérifié avant de calculer**, pas après. Une intégration explicite instable ne
 donne pas un résultat approximatif : elle donne du bruit, puis des `NaN`. Autant le dire

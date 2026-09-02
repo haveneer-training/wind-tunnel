@@ -79,6 +79,8 @@ l'énigme que l'étape 8 explique et résout.
   `work`, lui, est alloué une fois par [`Solver::run`] et réutilisé d'un pas à l'autre.
   Faites de même pour les gradients : ajoutez un paramètre à `residual` et `step`, et
   allouez le tampon dans `run`. Mesurez la différence avec `--steps` élevé.
+  L'exercice est repris en détail, chiffres et solution à l'appui, dans
+  [`docs/BONUS-OPTIMISATION.md`](../BONUS-OPTIMISATION.md).
 - Comparez le coût de la répartition dynamique et statique. `main.rs` choisit le schéma
   à l'exécution via `Box<dyn FluxScheme>` : chaque appel à `interface_value` passe par
   une table virtuelle. Le solveur, lui, est générique (`Solver<F: FluxScheme>`) :

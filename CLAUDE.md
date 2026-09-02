@@ -17,7 +17,7 @@ to undo. Read it before making non-trivial changes.
 ## Commands
 
 ```shell
-cargo test                                              # all tests (69 currently)
+cargo test                                              # all tests (70 currently)
 cargo test --test mesh                                  # one test file
 cargo test the_mesh_is_mixed                             # one test by name
 cargo clippy --all-targets --all-features -- -D warnings # must stay clean
@@ -105,12 +105,19 @@ mask ──▶ mesh ──▶ field ──▶ solver ──▶ io (VTK / PNG)
 - `obstacle()` in `src/app.rs` reduces the drawn shape to an equivalent-area disk, and
   `PotentialCylinder` flows around that disk — the flow does not "see" the actual drawn shape
   (also fixed by bonus step 12, not yet implemented).
-- **`format_f64()` in `src/io/vtk.rs` writes denormals as `0`** (and switches to `{:e}`
+- **`VtkF64` in `src/io/vtk.rs` writes denormals as `0`** (and switches to `{:e}`
   outside the usual exponent range). Not cosmetic: VTK's legacy ASCII reader parses with
   `istream >> double`, which sets `failbit` on underflow, then abandons the rest of the file
   — ParaView shows "Unsupported cell attribute type" and displays garbage. The tracer decays
   below `f64::MIN_POSITIVE` within a few dozen steps, so this hits every real run. One test
-  locks it in.
+  locks it in. It is a `Display` type, not a `fn(f64) -> String`: a frame holds ~10⁶ numbers,
+  and one `String` each cost 273 691 allocations per file against 3 now.
+- **Allocation discipline is a teaching thread of its own**, written up in
+  `docs/BONUS-OPTIMISATION.md` and measured by `examples/alloc_count.rs` (a counting
+  `GlobalAlloc`). The time-loop buffers `residual`/`step_rk2` still allocate are deliberate
+  — they are the "pour aller plus loin" of steps 7 and 8, and the bonus doc holds their
+  solution. Output paths (`vtk.rs`, `png.rs`) and the MPI `Halo` buffers are already fixed:
+  do not reintroduce per-cell or per-value allocations there.
 
 ### Step machinery (feature-gated exercises)
 

@@ -35,9 +35,14 @@ facultative : personne n'attend son voisin.
 | [10](docs/etapes/etape-10.md) | Threads : écriture recouverte, suivi | J3 | 30 min | `thread::scope`, `mpsc`, `Arc`, `Mutex` |
 | [11](docs/etapes/etape-11.md) | *Bonus* : passage à l'échelle en MPI | J3 | 60 min | processus, messages, réductions |
 | 12 | *Bonus* : calculer l'écoulement | — | 40 min | algorithme itératif, convergence |
+| — | [*Bonus* : chasse aux allocations](docs/BONUS-OPTIMISATION.md) | — | 45 min | `GlobalAlloc`, tampons réutilisés, emprunts par champ |
 
 Les étapes 0 à 5 forment le noyau : à la fin de l'étape 5, le code tourne et produit ses
 premières images. Les suivantes l'améliorent.
+
+Le bonus « chasse aux allocations » ne s'ouvre pas avec `cargo xtask goto` : il est
+transversal, se fait après les étapes 7 et 8, et reprend le code déjà écrit pour lui
+retirer ce qu'il alloue dans sa boucle en temps.
 
 ## Fil narratif
 

@@ -23,6 +23,21 @@ cellules et signale, via `std::sync::mpsc`, combien il en a traité : c'est le s
 volontairement découplé du verrou — l'un protège une donnée partagée, l'autre fait
 circuler un résultat d'un thread à l'autre sans rien partager.
 
+## Une bonne habitude, pas une obligation
+
+Le corps de la boucle construit trois petits `Vec` par cellule : le polygone, ses coins
+en pixels, la liste des pixels à peindre. Déclarés dans la boucle, ils sont alloués et
+libérés une fois par cellule et par image — quelques centaines de milliers de fois sur un
+maillage fin. Déclarés en tête du thread et vidés par `clear()` à chaque cellule, ils
+gardent leur capacité et n'allouent plus rien.
+
+Ce n'est pas exigé pour que l'étape soit juste, et le socle marche très bien sans ; la
+solution le fait, et c'est l'occasion de comparer. Un détail vaut d'être remarqué : ces
+tampons sont déclarés **par thread**, donc jamais partagés — ce qui les dispense de tout
+verrou. Un tampon unique partagé par tous les threads devrait être protégé, et
+sérialiserait précisément le calcul qu'on cherche à paralléliser. Le sujet est repris
+dans [`docs/BONUS-OPTIMISATION.md`](../BONUS-OPTIMISATION.md).
+
 ## Le piège à éviter
 
 Verrouiller trop tôt. Si le verrou entoure tout le corps de la boucle — y compris le

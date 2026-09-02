@@ -138,6 +138,13 @@ pub enum SolverError {
         /// Pas de temps maximal admissible.
         dt_max: f64,
     },
+    /// Rien ne peut bouger : aucune cellule n'a de débit sortant ni de diffusion.
+    ///
+    /// Le cas se produit quand l'écoulement porteur est nul *et* la diffusivité nulle.
+    /// La condition CFL n'impose alors aucune borne — le pas de temps « maximal stable »
+    /// serait infini — et le calcul demandé n'a pas de sens : le champ initial est déjà
+    /// la solution, à tous les temps.
+    NoTransport,
     /// Une valeur non finie est apparue dans le champ.
     NotFinite {
         /// Numéro du pas de temps fautif.
@@ -164,6 +171,11 @@ impl fmt::Display for SolverError {
             SolverError::Cfl { dt, dt_max } => write!(
                 f,
                 "pas de temps {dt:e} instable : la condition CFL impose au plus {dt_max:e}"
+            ),
+            SolverError::NoTransport => write!(
+                f,
+                "ni convection ni diffusion : l'écoulement est nul et la diffusivité \
+                 aussi, aucun pas de temps n'est plus contraignant qu'un autre"
             ),
             SolverError::NotFinite { step, cell } => write!(
                 f,

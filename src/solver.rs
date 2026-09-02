@@ -124,7 +124,12 @@ impl<'m, F: FluxScheme> Solver<'m, F> {
         config: Config,
     ) -> Result<Self, SolverError> {
         let face_flux = compute_face_flux(mesh, velocity);
-        let dt_max = max_stable_dt(mesh, &face_flux, config.diffusivity);
+        // `None` : aucune cellule n'a de débit sortant ni de diffusion. Plutôt que de
+        // laisser filer une valeur sentinelle — `f64::MAX`, dont `0.4 × f64::MAX` ferait
+        // un pas de temps de 10³⁰⁸ secondes et une date physique qui déborde — on le dit
+        // dans le type de retour, et l'appelant est obligé d'en tenir compte.
+        let dt_max =
+            max_stable_dt(mesh, &face_flux, config.diffusivity).ok_or(SolverError::NoTransport)?;
         let dt = config.dt.unwrap_or(config.cfl * dt_max);
         if dt > dt_max * (1.0 + 1e-12) {
             return Err(SolverError::Cfl { dt, dt_max });
@@ -468,26 +473,34 @@ fn compute_face_flux(mesh: &Mesh, velocity: &dyn VelocityField) -> Vec<f64> {
 }
 
 /// Pas de temps maximal admissible : `min_i |Ωi| / Σ_f (|débit| + 2D L_f/d_f)`.
-fn max_stable_dt(mesh: &Mesh, face_flux: &[f64], diffusivity: f64) -> f64 {
+///
+/// `None` si *aucune* cellule n'a de débit sortant ni de diffusion : il n'y a alors rien
+/// à transporter, et le minimum porterait sur un ensemble vide.
+fn max_stable_dt(mesh: &Mesh, face_flux: &[f64], diffusivity: f64) -> Option<f64> {
     // TODO-STEP:5 Pour chaque cellule, sommer sur ses faces `|débit| + 2·D·L/d`, puis
-    // retenir le plus petit rapport `aire / somme` du maillage
+    // retenir le plus petit rapport `aire / somme` du maillage. Renvoyer `None` si
+    // aucune cellule n'a de somme strictement positive.
     // SOLUTION-BEGIN
-    let mut dt = f64::MAX;
-    for (i, cell) in mesh.cells().iter().enumerate() {
-        let id = CellId(i as u32);
-        let outflow: f64 = mesh
-            .cell_faces(id)
-            .iter()
-            .map(|&fid| {
-                let face = mesh.face(fid);
-                face_flux[fid.index()].abs() + 2.0 * diffusivity * face.length / face.distance
-            })
-            .sum();
-        if outflow > 0.0 {
-            dt = dt.min(cell.area / outflow);
-        }
-    }
-    dt
+    // `filter_map` écarte les cellules sans transport, `reduce` prend le minimum de ce
+    // qui reste — et renvoie `None` s'il ne reste rien, sans qu'on ait à le traiter à
+    // part. C'est là tout l'intérêt de `reduce` face à `fold` : pas de valeur initiale
+    // à inventer, donc pas de sentinelle à faire passer pour un résultat.
+    mesh.cells()
+        .iter()
+        .enumerate()
+        .filter_map(|(i, cell)| {
+            let id = CellId(i as u32);
+            let outflow: f64 = mesh
+                .cell_faces(id)
+                .iter()
+                .map(|&fid| {
+                    let face = mesh.face(fid);
+                    face_flux[fid.index()].abs() + 2.0 * diffusivity * face.length / face.distance
+                })
+                .sum();
+            (outflow > 0.0).then(|| cell.area / outflow)
+        })
+        .reduce(f64::min)
     // SOLUTION-END
 }
 
@@ -517,6 +530,24 @@ mod tests {
             Err(SolverError::Cfl { dt, dt_max }) => assert!(dt > dt_max),
             Err(other) => panic!("erreur inattendue : {other}"),
             Ok(_) => panic!("un pas de temps de 1000 s aurait dû être refusé"),
+        }
+    }
+
+    #[test]
+    fn a_motionless_case_is_rejected() {
+        // vitesse nulle et diffusivité nulle : plus rien ne transporte quoi que ce
+        // soit, et la CFL n'impose aucune borne. Refuser vaut mieux que renvoyer un
+        // pas de temps de 10³⁰⁸ secondes.
+        let mesh = test_mesh();
+        let flow = Uniform { value: Vec2::ZERO };
+        let config = Config {
+            diffusivity: 0.0,
+            ..Config::default()
+        };
+        match Solver::new(&mesh, &flow, Upwind, config) {
+            Err(SolverError::NoTransport) => {}
+            Err(other) => panic!("erreur inattendue : {other}"),
+            Ok(solver) => panic!("pas de temps {} accepté sans transport", solver.dt()),
         }
     }
 

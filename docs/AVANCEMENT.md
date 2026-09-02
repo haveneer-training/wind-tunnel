@@ -3,7 +3,7 @@
 Document de passation. Il dit où en est le fil rouge, ce qui reste à faire, et les
 décisions qu'il ne faut pas défaire sans le savoir. À tenir à jour.
 
-Dernière mise à jour : 2026-09-02 (étape 10).
+Dernière mise à jour : 2026-09-02 (étape 11, puis passe sur les allocations).
 
 ## Contexte
 
@@ -26,7 +26,7 @@ boucles en *gather* du solveur (étape 9), puis le rendu PNG parallélisé « à
 avec `thread::scope`, `Mutex` et `mpsc` (étape 10), et enfin la décomposition de domaine
 MPI (étape 11, bonus). Le code tourne et produit l'animation.
 
-- 69 tests verts (62 hors doctests), `cargo clippy --all-targets --all-features -- -D warnings` propre,
+- 70 tests verts (63 hors doctests), `cargo clippy --all-targets --all-features -- -D warnings` propre,
   `cargo fmt` appliqué
 - 27 trous répartis : 4 en étape 0, 2 en 1, 2 en 2, 2 en 3, 1 en 4, 3 en 5, 1 en 6, 2 en 7,
   1 en 8, 3 en 9, 1 en 10, 5 en 11
@@ -45,9 +45,11 @@ MPI (étape 11, bonus). Le code tourne et produit l'animation.
     `rsmpi`, mais pas du groupe *par défaut* : un workspace non virtuel ne construit que
     son paquet racine sans `-p`/`--workspace`. `cargo build`, `cargo test` et surtout
     `cargo clippy --all-features` à la racine restent donc verts sur une machine sans
-    MPI (`cargo build -p wind-tunnel-mpi` pour le bâtir). Trois trous : `exchange_halo`
+    MPI (`cargo build -p wind-tunnel-mpi` pour le bâtir). Trois trous : `Halo::exchange`
     (réceptions immédiates postées avant les envois, `wait_all`), `global_dt_max`
-    (`all_reduce` MIN) et `time_loop`.
+    (`all_reduce` MIN) et `time_loop`. Les tampons d'échange vivent dans la structure
+    `Halo`, créée une fois par rang : c'est pour cela qu'elle traverse `time_loop` et le
+    rapporteur en `&mut` au lieu d'être capturée.
   - Le pilote écrit **sa propre boucle en temps** au lieu d'appeler `Solver::run` : il
     faut reprendre la main entre les évaluations de résidu pour communiquer (deux
     échanges par pas en RK2, le prédicteur ayant lui aussi des fantômes à rafraîchir).
@@ -160,6 +162,12 @@ MPI (étape 11, bonus). Le code tourne et produit l'animation.
 |---|---|---|
 | 12 | *Bonus* : écoulement calculé (Jacobi puis CG matrix-free) | Supprimerait deux approximations d'un coup : le débit résiduel aux parois, et le fait que l'écoulement ne « voit » qu'un disque équivalent. |
 
+`docs/BONUS-OPTIMISATION.md` est un bonus **transversal**, déjà écrit : pas de feature, pas
+de trou, pas de `LAST_STEP` à bouger. Il reprend les « pour aller plus loin » des étapes 7
+et 8 (tampons de gradients, de RK2) plus la construction du maillage, chiffres et
+solutions dépliables à l'appui, et s'appuie sur `examples/alloc_count.rs` — un allocateur
+global compteur qui donne le tableau des allocations par phase.
+
 Hors étapes : les slides de transition dans `index.html` du dépôt de formation (point
 resté ouvert dans son `TODO-ONERA.md` §3), et le rebranchement éventuel de la démo
 interop existante sur la sortie du fil rouge — **démo seulement**, le programme est
@@ -222,7 +230,7 @@ que des choix techniques.
 possible sans réécriture (juste `.iter()` → `.par_iter()`), et c'est le piège C/OpenMP
 qu'on exhibe.
 
-**`format_f64()` (`src/io/vtk.rs`) écrit les dénormaux `0`.** Ce n'est pas de la
+**`VtkF64` (`src/io/vtk.rs`) écrit les dénormaux `0`.** Ce n'est pas de la
 cosmétique : `vtkDataReader` lit ses nombres par `istream >> double`, qui pose `failbit`
 au sous-débordement (`strtod` renvoie `ERANGE` sous `f64::MIN_POSITIVE`). Le flux reste
 en échec, le lecteur abandonne le reste du fichier et prend le nombre suivant pour un
@@ -232,7 +240,9 @@ constaté). Le traceur descend sous `1e-308` en quelques dizaines de pas, donc t
 un peu long est concerné. Mesuré au passage : la *longueur* du jeton, elle, n'y est pour
 rien — un nombre de 402 caractères se relit parfaitement ; le passage en `{:e}` hors des
 exposants usuels n'est là que pour la taille et la lisibilité des fichiers. Un test
-(`tests/io.rs`) verrouille la propriété.
+(`tests/io.rs`) verrouille la propriété. C'est un type à `Display` et non une fonction
+renvoyant une `String` : un fichier contient de l'ordre du million de nombres, et une
+`String` par nombre faisait 273 691 allocations par fichier contre 3 aujourd'hui.
 
 ## Pièges connus, non corrigés
 
@@ -247,12 +257,17 @@ exposants usuels n'est là que pour la taille et la lisibilité des fichiers. Un
   pas de traînée. Un public CFD le verra en trois secondes — l'annoncer.
 - `travail/` n'est pas versionné (ignoré, exclu du workspace). Le participant peut y
   faire son propre `git init`.
+- Dans `travail/`, `Halo` (`mpi/src/exchange.rs`) déclenche « fields never read » tant
+  que le trou de l'étape 11 n'est pas rempli : ses quatre tampons ne sont lus que par le
+  corps troué. Un avertissement de plus dans un dossier qui en compte déjà beaucoup, et
+  dans un crate qu'on ne bâtit qu'explicitement.
 
 ## Vérifier que tout va bien
 
 ```shell
-cargo test                                   # 69 tests
+cargo test                                   # 70 tests
 cargo clippy --all-targets --all-features -- -D warnings
+cargo clippy -p wind-tunnel-mpi --all-targets -- -D warnings   # nécessite MPI
 cargo fmt --all --check
 cargo run --release -- domains/tunnel.dom --refine 4 --bands 9 --steps 960
 

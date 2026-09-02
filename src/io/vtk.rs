@@ -3,6 +3,7 @@
 //! Format volontairement daté : il tient en cinquante lignes, se lit dans un éditeur
 //! de texte, et Paraview comme Tecplot l'ouvrent sans discuter.
 
+use std::fmt;
 use std::fs::File;
 use std::io::{self, BufWriter, Write};
 use std::path::Path;
@@ -10,7 +11,7 @@ use std::path::Path;
 use crate::field::Field;
 use crate::mesh::Mesh;
 
-/// Met un flottant sous une forme que le lecteur VTK legacy sait relire.
+/// Un flottant sous une forme que le lecteur VTK legacy sait relire.
 ///
 /// Deux précautions, dont une indispensable :
 ///
@@ -26,14 +27,26 @@ use crate::mesh::Mesh;
 ///    correction — un jeton de quatre cents caractères se relit très bien — mais `{}`
 ///    n'écrit jamais en notation scientifique, et `2.2e-303` occuperait trois cent
 ///    vingt-six caractères de zéros. Autant garder des fichiers lisibles et compacts.
-fn format_f64(value: f64) -> String {
-    let magnitude = value.abs();
-    if magnitude < f64::MIN_POSITIVE {
-        "0".to_string()
-    } else if !(1e-6..1e16).contains(&magnitude) {
-        format!("{value:e}")
-    } else {
-        format!("{value}")
+///
+/// C'est un type et non une fonction `fn(f64) -> String`, et ce n'est pas un détail :
+/// un fichier de ce projet contient de l'ordre du million de nombres, soit un million
+/// de `String` allouées puis jetées aussitôt. En implémentant [`fmt::Display`], le
+/// nombre se formate directement dans le tampon de sortie, sans allocation
+/// intermédiaire — `write!(w, "{}", VtkF64(x))` s'écrit pareil et n'alloue rien. C'est
+/// l'usage normal de `Display` en Rust : *savoir s'écrire*, pas *fabriquer une chaîne*.
+struct VtkF64(f64);
+
+impl fmt::Display for VtkF64 {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let value = self.0;
+        let magnitude = value.abs();
+        if magnitude < f64::MIN_POSITIVE {
+            f.write_str("0")
+        } else if !(1e-6..1e16).contains(&magnitude) {
+            write!(f, "{value:e}")
+        } else {
+            write!(f, "{value}")
+        }
     }
 }
 
@@ -42,7 +55,7 @@ pub fn write_vtk(path: impl AsRef<Path>, mesh: &Mesh, fields: &[(&str, &Field)])
     // TODO-STEP:3 Écrire l'en-tête, les POINTS, les CELLS (précédées de leur nombre de
     // sommets), les CELL_TYPES, puis chaque champ en CELL_DATA / SCALARS.
     // Chaque `?` propage l'erreur d'écriture : rien n'est avalé en silence.
-    // Tout flottant passe par `format_f64` — voir la fonction pour la raison.
+    // Tout flottant est enveloppé dans `VtkF64` — voir ce type pour la raison.
     // SOLUTION-BEGIN
     let mut w = BufWriter::new(File::create(path)?);
 
@@ -53,7 +66,7 @@ pub fn write_vtk(path: impl AsRef<Path>, mesh: &Mesh, fields: &[(&str, &Field)])
 
     writeln!(w, "POINTS {} double", mesh.n_vertices())?;
     for p in mesh.vertices() {
-        writeln!(w, "{} {} 0", format_f64(p.x), format_f64(p.y))?;
+        writeln!(w, "{} {} 0", VtkF64(p.x), VtkF64(p.y))?;
     }
 
     let entries: usize = mesh
@@ -81,7 +94,7 @@ pub fn write_vtk(path: impl AsRef<Path>, mesh: &Mesh, fields: &[(&str, &Field)])
         writeln!(w, "SCALARS {name} double 1")?;
         writeln!(w, "LOOKUP_TABLE default")?;
         for value in field.iter() {
-            writeln!(w, "{}", format_f64(*value))?;
+            writeln!(w, "{}", VtkF64(*value))?;
         }
     }
 

@@ -135,6 +135,8 @@ Et à côté du code lui-même :
 | `domains/` | les masques de domaine |
 | `xtask/` | l'outil qui engendre `travail/` et pilote les étapes |
 | `scripts/` | vérifications automatiques du dispositif d'étapes et du pilote MPI |
+| `docs/BONUS-OPTIMISATION.md` | bonus transversal : mesurer et supprimer les allocations |
+| `examples/alloc_count.rs` | compte les allocations de chaque phase du calcul |
 | `docs/AVANCEMENT.md` | état du projet, ce qui reste, décisions à ne pas défaire |
 
 ## Licence

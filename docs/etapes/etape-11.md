@@ -84,11 +84,19 @@ cargo build --release -p wind-tunnel-mpi
 |---|---|---|
 | `Bands::owned` | `src/decomposition.rs` | la répartition des colonnes en bandes aussi égales que possible, le reste sur les premières |
 | `Layout::new` | `src/decomposition.rs` | le tri des cellules de la bande : possédées, à envoyer à gauche/droite, à recevoir de gauche/droite |
-| `exchange_halo` | `mpi/src/exchange.rs` | `pack`, réceptions immédiates puis envois immédiats dans un `multiple_scope`, `wait_all`, `unpack` |
+| `Halo::exchange` | `mpi/src/exchange.rs` | `pack_into`, réceptions immédiates puis envois immédiats dans un `multiple_scope`, `wait_all`, `unpack` |
 | `global_dt_max` | `mpi/src/exchange.rs` | `all_reduce_into` avec `SystemOperation::min()` |
-| `time_loop` | `mpi/src/main.rs` | la boucle en temps du pilote : un `exchange_halo` avant **chaque** `residual` |
+| `time_loop` | `mpi/src/main.rs` | la boucle en temps du pilote : un `halo.exchange` avant **chaque** `residual` |
 
-Les deux premiers ne parlent pas de MPI et se vérifient par `cargo test`, sans MPI
+Les quatre tampons d'un échange — deux à envoyer, deux à recevoir — vivent dans une
+structure `Halo` créée une fois par rang, et non dans `exchange` : leur taille ne dépend
+que du découpage, qui ne bouge plus une fois le maillage construit, alors qu'un échange a
+lieu une à deux fois par pas de temps. C'est la même discipline que le tampon `work` de
+`Solver::run`, et elle explique la forme de la signature : `Halo` traverse `time_loop` et
+le rapporteur en `&mut` plutôt que d'être capturé par l'un d'eux, parce qu'il n'y en a
+qu'un et que deux emprunts exclusifs simultanés ne passeraient pas.
+
+Les deux premiers blocs ne parlent pas de MPI et se vérifient par `cargo test`, sans MPI
 installé — c'est le plus gros de la difficulté, et c'est voulu : dans un code distribué,
 ce qui casse est presque toujours « qui possède quoi », rarement le transport.
 
