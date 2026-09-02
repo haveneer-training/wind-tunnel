@@ -127,6 +127,7 @@ Et à côté du code lui-même :
 | `docs/etapes/` | un énoncé par étape |
 | `domains/` | les masques de domaine |
 | `xtask/` | l'outil qui engendre `travail/` et pilote les étapes |
+| `docs/AVANCEMENT.md` | état du projet, ce qui reste, décisions à ne pas défaire |
 
 ## Licence
 
