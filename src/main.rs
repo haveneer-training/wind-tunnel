@@ -12,7 +12,7 @@ use wind_tunnel::geom::{Point, Vec2};
 use wind_tunnel::io::{png, vtk};
 use wind_tunnel::mask::Mask;
 use wind_tunnel::mesh::Mesh;
-use wind_tunnel::solver::{Config, Solver};
+use wind_tunnel::solver::{Config, Solver, TimeScheme};
 use wind_tunnel::velocity::{PotentialCylinder, Uniform, VelocityField};
 
 const USAGE: &str = "\
@@ -35,6 +35,7 @@ Options :
   --diffusivity <m2/s> diffusivité du traceur          (défaut : 0)
   --dt <s>             pas de temps imposé             (défaut : déduit de la CFL)
   --scheme <nom>       upwind | centered | muscl       (défaut : upwind)
+  --time-scheme <nom>  euler | rk2                     (défaut : euler)
 ";
 
 struct Args {
@@ -52,6 +53,7 @@ struct Args {
     diffusivity: f64,
     dt: Option<f64>,
     scheme: String,
+    time_scheme: String,
 }
 
 impl Default for Args {
@@ -71,6 +73,7 @@ impl Default for Args {
             diffusivity: 0.0,
             dt: None,
             scheme: "upwind".to_string(),
+            time_scheme: "euler".to_string(),
         }
     }
 }
@@ -108,6 +111,7 @@ fn parse_args() -> Result<Option<Args>, String> {
             }
             "--dt" => args.dt = Some(value()?.parse().map_err(|e| format!("--dt : {e}"))?),
             "--scheme" => args.scheme = value()?,
+            "--time-scheme" => args.time_scheme = value()?,
             other if other.starts_with('-') => return Err(format!("option inconnue : {other}")),
             other => {
                 args.mask = PathBuf::from(other);
@@ -185,11 +189,17 @@ fn run() -> Result<(), Box<dyn Error>> {
         }
     };
 
+    let time_scheme = match args.time_scheme.as_str() {
+        "euler" => TimeScheme::Euler,
+        "rk2" => TimeScheme::Rk2,
+        other => return Err(format!("schéma temporel inconnu : {other} (euler ou rk2)").into()),
+    };
     let config = Config {
         diffusivity: args.diffusivity,
         dt: args.dt,
         steps: args.steps,
         output_every: args.every,
+        time_scheme,
         ..Config::default()
     };
     let scheme: Box<dyn FluxScheme> = match args.scheme.as_str() {
