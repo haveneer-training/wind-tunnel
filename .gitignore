@@ -1,5 +1,5 @@
 /target
-/out
+/out*
 /travail
 .DS_Store
 .idea/

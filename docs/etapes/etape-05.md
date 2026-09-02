@@ -90,5 +90,12 @@ sortie —, et la masse décroît régulièrement à mesure que la fumée sort p
   champ atteint 10¹⁶. Le décentrement amont, lui, reste rigoureusement borné. « Ordre
   plus élevé » et « meilleur » sont deux choses différentes, et c'est exactement le
   problème que devra résoudre l'étape 7.
-- Divisez `--h` par deux : quatre fois plus de cellules, deux fois plus de pas de temps.
-  Chronométrez. C'est le sujet des étapes 9 et 10.
+- Raffinez avec `--refine 4` : chaque case du masque est subdivisée en 4×4, soit
+  90 000 cellules au lieu de 5 600, sur le **même** domaine physique. L'interface entre
+  bandes s'affine et le pas de temps stable est divisé par quatre. Chronométrez : c'est
+  le sujet des étapes 9 et 10.
+- Attention à ne pas confondre avec `--h`, qui fixe la *taille* d'une cellule et non
+  leur nombre : le diviser par deux rétrécit le domaine de moitié et redonne exactement
+  la même image. Seul le masque décide de la résolution.
+- `--bands 9` densifie le rideau de fumée. Avec un nombre pair, une bande passe
+  frontalement sur l'obstacle au lieu de l'encadrer.

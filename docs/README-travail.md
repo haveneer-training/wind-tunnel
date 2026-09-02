@@ -4,7 +4,8 @@ Formation **« Découverte du langage Rust pour le calcul scientifique »**.
 
 ![filets de fumée déviés par un cylindre](docs/apercu.png)
 
-Voilà ce que vous aurez produit à la fin de l'étape 5.
+Voilà ce que vous aurez produit à la fin de l'étape 5
+(`cargo run --release -- domains/tunnel.dom --refine 4 --bands 9 --steps 960`).
 
 Vous allez construire, étape par étape, un petit code de calcul complet : lecture d'un
 domaine, génération d'un maillage non structuré, transport d'un traceur passif autour
