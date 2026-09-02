@@ -32,7 +32,7 @@ facultative : personne n'attend son voisin.
 | [7](docs/etapes/etape-07.md) | Passer à l'ordre 2 en espace | J2/J3 | 40 min | généricité, `dyn`, mesure de performance |
 | [8](docs/etapes/etape-08.md) | RK2 : pourquoi l'ordre n'avait pas bougé | J3 | 25 min | `enum` de schéma, relecture critique d'un résultat |
 | [9](docs/etapes/etape-09.md) | Paralléliser avec `rayon` | J3 | 40 min | style fonctionnel, `par_iter`, performance |
-| 10 | Threads : écriture recouverte, suivi | J3 | 30 min | `thread::scope`, `mpsc`, `Arc`, `Mutex` |
+| [10](docs/etapes/etape-10.md) | Threads : écriture recouverte, suivi | J3 | 30 min | `thread::scope`, `mpsc`, `Arc`, `Mutex` |
 | 11 | *Bonus* : calculer l'écoulement | — | 40 min | algorithme itératif, convergence |
 | 12 | *Bonus* : passage à l'échelle en MPI | — | — | décomposition de domaine |
 
@@ -55,4 +55,7 @@ l'ordre 2 avec une intégration Runge-Kutta. On y apprend autant sur la vérific
 code de calcul que sur le langage.
 
 Les étapes 9 et 10 abordent le parallélisme, sur un code dont la structure a été choisie
-dès le départ pour s'y prêter.
+dès le départ pour s'y prêter. L'étape 9 traite le cas facile — chaque cellule écrit sa
+propre case, `rayon` n'a besoin de rien d'autre — et l'étape 10 le cas où ça ne suffit
+plus : plusieurs cellules dessinent dans la même image, il faut un verrou (`Mutex`), et
+`thread::scope`/`mpsc` en sont l'occasion pour voir ce que `rayon` cache d'habitude.
