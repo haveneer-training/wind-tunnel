@@ -11,7 +11,7 @@ license = "CC-BY-NC-SA-4.0"
 # que `cargo test` ne montre que ce qui est déjà au programme du stagiaire.
 # `cargo xtask goto <n>` ne fait rien d'autre que réécrire la ligne `default`.
 [features]
-default = ["step8"]
+default = ["step9"]
 step0 = []
 step1 = ["step0"]
 step2 = ["step1"]
@@ -21,6 +21,7 @@ step5 = ["step4"]
 step6 = ["step5"]
 step7 = ["step6"]
 step8 = ["step7"]
+step9 = ["step8"]
 
 [workspace]
 members = ["xtask"]
@@ -30,6 +31,7 @@ exclude = ["travail"]
 
 [dependencies]
 image = { version = "0.25", default-features = false, features = ["png"] }
+rayon = "1"
 
 [profile.release]
 debug = true

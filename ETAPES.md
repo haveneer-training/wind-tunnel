@@ -31,7 +31,7 @@ facultative : personne n'attend son voisin.
 | [6](docs/etapes/etape-06.md) | Qualité : conservation, ordre, `clippy` | J2 | 30 min | tests, documentation, outillage |
 | [7](docs/etapes/etape-07.md) | Passer à l'ordre 2 en espace | J2/J3 | 40 min | généricité, `dyn`, mesure de performance |
 | [8](docs/etapes/etape-08.md) | RK2 : pourquoi l'ordre n'avait pas bougé | J3 | 25 min | `enum` de schéma, relecture critique d'un résultat |
-| 9 | Paralléliser avec `rayon` | J3 | 40 min | style fonctionnel, `par_iter`, performance |
+| [9](docs/etapes/etape-09.md) | Paralléliser avec `rayon` | J3 | 40 min | style fonctionnel, `par_iter`, performance |
 | 10 | Threads : écriture recouverte, suivi | J3 | 30 min | `thread::scope`, `mpsc`, `Arc`, `Mutex` |
 | 11 | *Bonus* : calculer l'écoulement | — | 40 min | algorithme itératif, convergence |
 | 12 | *Bonus* : passage à l'échelle en MPI | — | — | décomposition de domaine |
