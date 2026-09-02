@@ -20,6 +20,17 @@ use crate::gradient;
 use crate::mesh::{BoundaryKind, CellId, Mesh, Side};
 use crate::velocity::VelocityField;
 
+/// Schéma d'intégration en temps.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub enum TimeScheme {
+    /// Euler explicite : une évaluation du résidu par pas, ordre 1 en temps.
+    #[default]
+    Euler,
+    /// Runge-Kutta d'ordre 2 (méthode de Heun) : deux évaluations du résidu par pas,
+    /// ordre 2 en temps.
+    Rk2,
+}
+
 /// Condition aux limites appliquée à un groupe de faces de bord.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Bc {
@@ -46,6 +57,8 @@ pub struct Config {
     pub output_every: usize,
     /// Période de vérification de la finitude du champ (`0` pour ne pas vérifier).
     pub check_every: usize,
+    /// Schéma d'intégration en temps.
+    pub time_scheme: TimeScheme,
     /// Conditions aux limites, par nature de bord.
     pub bc: BTreeMap<BoundaryKind, Bc>,
 }
@@ -59,6 +72,7 @@ impl Default for Config {
             steps: 600,
             output_every: 10,
             check_every: 20,
+            time_scheme: TimeScheme::Euler,
             // Les parois sont en gradient nul, pas en flux nul, et ce n'est pas un
             // oubli : une paroi en escalier n'est pas exactement une ligne de courant
             // de l'écoulement analytique, donc un petit débit résiduel la traverse.
@@ -230,16 +244,53 @@ impl<'m, F: FluxScheme> Solver<'m, F> {
         }
     }
 
-    /// Avance d'un pas de temps par la méthode d'Euler explicite.
+    /// Avance d'un pas de temps, selon le schéma d'intégration choisi.
     ///
     /// `work` est un tampon fourni par l'appelant et réutilisé d'un pas à l'autre :
-    /// la boucle en temps n'alloue rien.
+    /// la boucle en temps n'y alloue rien. `step_rk2`, lui, alloue en interne son
+    /// prédicteur et son second résidu — comme `residual` alloue son tampon de
+    /// gradients (étape 7) : voir « Pour aller plus loin » de l'étape 8.
     pub fn step(&self, c: &mut Field, work: &mut Field) {
+        match self.config.time_scheme {
+            TimeScheme::Euler => self.step_euler(c, work),
+            TimeScheme::Rk2 => self.step_rk2(c, work),
+        }
+    }
+
+    /// Euler explicite : une évaluation du résidu, ordre 1 en temps.
+    fn step_euler(&self, c: &mut Field, work: &mut Field) {
         // TODO-STEP:5 Calculer le résidu dans `work`, puis avancer `c` de `dt · résidu`
         // SOLUTION-BEGIN
         self.residual(c, work);
         for (value, rate) in c.as_mut_slice().iter_mut().zip(work.as_slice()) {
             *value += self.dt * rate;
+        }
+        // SOLUTION-END
+    }
+
+    /// Runge-Kutta d'ordre 2 (méthode de Heun) : deux évaluations du résidu, ordre 2
+    /// en temps. `work` reçoit `k1`.
+    fn step_rk2(&self, c: &mut Field, work: &mut Field) {
+        // TODO-STEP:8 k1 = résidu(c) dans `work` ; prédicteur = c + dt·k1 ; k2 =
+        // résidu(prédicteur) ; avancer c de dt/2 · (k1 + k2)
+        // SOLUTION-BEGIN
+        self.residual(c, work);
+
+        let mut predictor = c.clone();
+        for (value, k1) in predictor.as_mut_slice().iter_mut().zip(work.as_slice()) {
+            *value += self.dt * k1;
+        }
+
+        let mut k2 = Field::zeros(c.len());
+        self.residual(&predictor, &mut k2);
+
+        for ((value, k1), k2) in c
+            .as_mut_slice()
+            .iter_mut()
+            .zip(work.as_slice())
+            .zip(k2.as_slice())
+        {
+            *value += 0.5 * self.dt * (k1 + k2);
         }
         // SOLUTION-END
     }

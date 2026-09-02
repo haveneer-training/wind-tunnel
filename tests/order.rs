@@ -8,11 +8,11 @@
 //! avant l'étape 8 — l'erreur en temps domine dès que `dt ∝ h`.)
 
 use wind_tunnel::field::Field;
-use wind_tunnel::flux::Upwind;
+use wind_tunnel::flux::{FluxScheme, Upwind};
 use wind_tunnel::geom::{Point, Vec2};
 use wind_tunnel::mask::Mask;
 use wind_tunnel::mesh::Mesh;
-use wind_tunnel::solver::{Config, Solver};
+use wind_tunnel::solver::{Config, Solver, TimeScheme};
 use wind_tunnel::velocity::Uniform;
 
 const SPEED: f64 = 1.0;
@@ -27,8 +27,9 @@ fn bump(p: Point) -> f64 {
 }
 
 /// Écart entre le champ transporté numériquement et sa translation exacte, à un facteur
-/// de raffinement donné du même domaine physique (voir [`Mask::refine`]).
-fn advection_error(factor: usize) -> f64 {
+/// de raffinement donné du même domaine physique (voir [`Mask::refine`]), pour un
+/// schéma de flux et une intégration en temps donnés.
+fn advection_error(factor: usize, scheme: impl FluxScheme + Copy, time_scheme: TimeScheme) -> f64 {
     let base = Mask::parse(
         "............\n\
          ............\n\
@@ -49,14 +50,18 @@ fn advection_error(factor: usize) -> f64 {
 
     // pas de temps déduit du CFL par défaut : dt ∝ h, donc le nombre de pas croît avec
     // le raffinement pour couvrir la même durée physique T_FINAL
-    let probe = Solver::new(&mesh, &flow, Upwind, Config::default()).unwrap();
+    let base_config = Config {
+        time_scheme,
+        ..Config::default()
+    };
+    let probe = Solver::new(&mesh, &flow, scheme, base_config.clone()).unwrap();
     let steps = (T_FINAL / probe.dt()).round() as usize;
     let config = Config {
         steps,
         output_every: 0,
-        ..Config::default()
+        ..base_config
     };
-    let solver = Solver::new(&mesh, &flow, Upwind, config).unwrap();
+    let solver = Solver::new(&mesh, &flow, scheme, config).unwrap();
 
     let mut c = c0.clone();
     solver.run(&mut c, |_, _, _| Ok(())).unwrap();
@@ -71,12 +76,27 @@ fn advection_error(factor: usize) -> f64 {
 
 #[test]
 fn order_of_convergence_is_about_one() {
-    let e_coarse = advection_error(8);
-    let e_fine = advection_error(16);
+    let e_coarse = advection_error(8, Upwind, TimeScheme::Euler);
+    let e_fine = advection_error(16, Upwind, TimeScheme::Euler);
     let order = (e_coarse / e_fine).ln() / 2f64.ln();
     assert!(
         (order - 1.0).abs() < 0.3,
         "ordre observé {order:.2} (attendu ≈ 1 : décentrement amont + Euler explicite, \
          tous deux d'ordre 1)"
+    );
+}
+
+#[cfg(feature = "step8")]
+#[test]
+fn order_of_convergence_reaches_two_with_muscl_and_rk2() {
+    use wind_tunnel::flux::Muscl;
+
+    let e_coarse = advection_error(8, Muscl, TimeScheme::Rk2);
+    let e_fine = advection_error(16, Muscl, TimeScheme::Rk2);
+    let order = (e_coarse / e_fine).ln() / 2f64.ln();
+    assert!(
+        (order - 2.0).abs() < 0.4,
+        "ordre observé {order:.2} (attendu ≈ 2 : reconstruction MUSCL + RK2, tous deux \
+         d'ordre 2 — c'est ce qui résout l'énigme des étapes 6-7)"
     );
 }
