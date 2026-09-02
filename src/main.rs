@@ -7,7 +7,7 @@ use std::process::ExitCode;
 
 use wind_tunnel::error::SolverError;
 use wind_tunnel::field::Field;
-use wind_tunnel::flux::{Centered, FluxScheme, Upwind};
+use wind_tunnel::flux::{Centered, FluxScheme, Muscl, Upwind};
 use wind_tunnel::geom::{Point, Vec2};
 use wind_tunnel::io::{png, vtk};
 use wind_tunnel::mask::Mask;
@@ -34,7 +34,7 @@ Options :
   --circulation <m2/s> circulation autour du cylindre  (défaut : 0)
   --diffusivity <m2/s> diffusivité du traceur          (défaut : 0)
   --dt <s>             pas de temps imposé             (défaut : déduit de la CFL)
-  --scheme <nom>       upwind | centered               (défaut : upwind)
+  --scheme <nom>       upwind | centered | muscl       (défaut : upwind)
 ";
 
 struct Args {
@@ -195,7 +195,10 @@ fn run() -> Result<(), Box<dyn Error>> {
     let scheme: Box<dyn FluxScheme> = match args.scheme.as_str() {
         "upwind" => Box::new(Upwind),
         "centered" => Box::new(Centered),
-        other => return Err(format!("schéma inconnu : {other} (upwind ou centered)").into()),
+        "muscl" => Box::new(Muscl),
+        other => {
+            return Err(format!("schéma inconnu : {other} (upwind, centered ou muscl)").into())
+        }
     };
     let solver = Solver::new(&mesh, velocity.as_ref(), scheme, config)?;
 

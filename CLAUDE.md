@@ -17,7 +17,7 @@ to undo. Read it before making non-trivial changes.
 ## Commands
 
 ```shell
-cargo test                                              # all tests (45 currently)
+cargo test                                              # all tests (53 currently)
 cargo test --test mesh                                  # one test file
 cargo test the_mesh_is_mixed                             # one test by name
 cargo clippy --all-targets --all-features -- -D warnings # must stay clean

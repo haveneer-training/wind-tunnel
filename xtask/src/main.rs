@@ -40,7 +40,7 @@ const REGION_END: &str = "// <<< ÉTAPE ";
 /// Où sont rangés les blocs de référence, dans le dépôt de travail.
 const REFERENCE: &str = "xtask/reference.txt";
 /// Dernière étape couverte par le code actuel.
-const LAST_STEP: u8 = 6;
+const LAST_STEP: u8 = 7;
 /// Nom du dossier de travail engendré, à la racine du dépôt.
 const WORKDIR: &str = "travail";
 
