@@ -498,7 +498,7 @@ mod tests {
     }
 
     #[test]
-    fn cellule_unique() {
+    fn mesh_of_a_two_by_two_mask() {
         let m = mesh_of("..\n..\n");
         assert_eq!(m.n_cells(), 4);
         assert_eq!(m.n_faces(), 12); // 4 cellules × 4 arêtes − 4 arêtes internes partagées
@@ -506,7 +506,7 @@ mod tests {
     }
 
     #[test]
-    fn chanfrein_produit_un_triangle() {
+    fn chamfer_produces_a_triangle() {
         // le coin bas-droit de la cellule (0,0) est coincé entre deux parois
         let m = mesh_of(".#\n##\n");
         let (tri, quad) = m.shape_counts();
@@ -515,14 +515,14 @@ mod tests {
     }
 
     #[test]
-    fn faces_internes_partagees_par_deux_cellules() {
+    fn inner_faces_are_shared_by_two_cells() {
         let m = mesh_of("...\n...\n");
-        let internes = m.faces().iter().filter(|f| !f.is_boundary()).count();
-        assert_eq!(internes, 7); // 2 lignes × 2 verticales + 3 horizontales
+        let inner = m.faces().iter().filter(|f| !f.is_boundary()).count();
+        assert_eq!(inner, 7); // 2 lignes × 2 verticales + 3 horizontales
     }
 
     #[test]
-    fn somme_des_normales_orientees_est_nulle() {
+    fn oriented_normals_sum_to_zero() {
         let m = mesh_of("...\n.#.\n...\n");
         for (i, cell) in m.cells().iter().enumerate() {
             let id = CellId(i as u32);
@@ -540,7 +540,7 @@ mod tests {
     }
 
     #[test]
-    fn groupes_de_bord() {
+    fn boundary_groups_are_classified() {
         let m = mesh_of("...\n.#.\n...\n");
         let g = m.groups();
         assert_eq!(g[&BoundaryKind::Inlet].len(), 3);

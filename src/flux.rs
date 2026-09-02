@@ -73,7 +73,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn upwind_suit_le_sens_de_l_ecoulement() {
+    fn upwind_follows_the_flow_direction() {
         let s = FaceState {
             c_left: 1.0,
             c_right: 2.0,

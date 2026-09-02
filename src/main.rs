@@ -200,7 +200,7 @@ fn run() -> Result<(), Box<dyn Error>> {
     );
     println!("sortie     : {}", args.out.display());
 
-    let masse0 = c.total_mass(&mesh);
+    let initial_mass = c.total_mass(&mesh);
     let out = args.out.clone();
     let every = args.every.max(1);
     solver.run(&mut c, |step, time, field| {
@@ -228,7 +228,7 @@ fn run() -> Result<(), Box<dyn Error>> {
     })?;
 
     println!(
-        "masse initiale {masse0:.6}, finale {:.6} (la fumée sort par l'aval)",
+        "masse initiale {initial_mass:.6}, finale {:.6} (la fumée sort par l'aval)",
         c.total_mass(&mesh)
     );
     Ok(())

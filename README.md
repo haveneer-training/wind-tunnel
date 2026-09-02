@@ -14,14 +14,14 @@ l'est pas : c'est celui de n'importe quel code de calcul, en réduction.
 
 ```shell
 cargo test                                   # tout doit être vert
-cargo run --release -- domains/veine.dom     # écrit out/frame_XXXX.png et .vtk
+cargo run --release -- domains/tunnel.dom     # écrit out/frame_XXXX.png et .vtk
 open out/frame_0010.png                      # ou paraview out/frame_0010.vtk
 ```
 
 Quelques options utiles :
 
 ```shell
-cargo run --release -- domains/veine.dom \
+cargo run --release -- domains/tunnel.dom \
     --steps 800 --every 20 \
     --circulation 4 \        # dissymétrie de l'écoulement (effet Magnus)
     --diffusivity 0.02 \     # diffusion physique du traceur
@@ -39,7 +39,7 @@ En réseau isolé, `cargo vendor` permet de récupérer les dépendances à l'av
 
 ## Le domaine
 
-`domains/veine.dom` est un fichier texte que vous pouvez modifier avec n'importe quel
+`domains/tunnel.dom` est un fichier texte que vous pouvez modifier avec n'importe quel
 éditeur : `.` pour du fluide, `#` pour du solide, `%` pour un commentaire.
 
 ```text

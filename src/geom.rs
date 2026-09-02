@@ -159,13 +159,13 @@ fn edges(points: &[Point]) -> impl Iterator<Item = (&Point, &Point)> {
 ///
 /// ```
 /// use wind_tunnel::geom::{polygon_area, Point};
-/// let carre = [
+/// let square = [
 ///     Point::new(0.0, 0.0),
 ///     Point::new(2.0, 0.0),
 ///     Point::new(2.0, 2.0),
 ///     Point::new(0.0, 2.0),
 /// ];
-/// assert!((polygon_area(&carre) - 4.0).abs() < 1e-15);
+/// assert!((polygon_area(&square) - 4.0).abs() < 1e-15);
 /// ```
 pub fn polygon_area(points: &[Point]) -> f64 {
     // TODO-STEP:0 Aire signée par la formule du lacet : ½ Σ (xᵢ·yᵢ₊₁ − xᵢ₊₁·yᵢ)
@@ -211,42 +211,42 @@ mod tests {
     use super::*;
 
     #[test]
-    fn aire_du_carre_unite() {
-        let carre = [
+    fn area_of_unit_square() {
+        let square = [
             Point::new(0.0, 0.0),
             Point::new(1.0, 0.0),
             Point::new(1.0, 1.0),
             Point::new(0.0, 1.0),
         ];
-        assert!((polygon_area(&carre) - 1.0).abs() < 1e-15);
+        assert!((polygon_area(&square) - 1.0).abs() < 1e-15);
     }
 
     #[test]
-    fn aire_negative_si_sens_indirect() {
-        let carre = [
+    fn area_is_negative_when_clockwise() {
+        let square = [
             Point::new(0.0, 0.0),
             Point::new(0.0, 1.0),
             Point::new(1.0, 1.0),
             Point::new(1.0, 0.0),
         ];
-        assert!(polygon_area(&carre) < 0.0);
+        assert!(polygon_area(&square) < 0.0);
     }
 
     #[test]
-    fn centroide_du_carre() {
-        let carre = [
+    fn centroid_of_square() {
+        let square = [
             Point::new(0.0, 0.0),
             Point::new(2.0, 0.0),
             Point::new(2.0, 2.0),
             Point::new(0.0, 2.0),
         ];
-        let g = polygon_centroid(&carre);
+        let g = polygon_centroid(&square);
         assert!((g.x - 1.0).abs() < 1e-12);
         assert!((g.y - 1.0).abs() < 1e-12);
     }
 
     #[test]
-    fn normale_sortante_du_carre_direct() {
+    fn outward_normal_of_ccw_square() {
         // arête droite du carré, parcourue vers le haut : normale sortante vers +x
         let n = (Point::new(1.0, 1.0) - Point::new(1.0, 0.0))
             .perp_cw()

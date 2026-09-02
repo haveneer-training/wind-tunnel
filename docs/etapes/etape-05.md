@@ -1,6 +1,6 @@
 # Étape 5 — Le solveur
 
-**Fichiers :** `src/flux.rs`, `src/solver.rs` · **Vérification :** `cargo test` puis `cargo run --release -- domains/veine.dom` · **≈ 45 min**
+**Fichiers :** `src/flux.rs`, `src/solver.rs` · **Vérification :** `cargo test` puis `cargo run --release -- domains/tunnel.dom` · **≈ 45 min**
 
 Tout est en place : un maillage, un écoulement, des sorties. Il reste à faire avancer le
 traceur — et, à la fin de cette étape, à regarder l'image.
@@ -61,7 +61,7 @@ donne pas un résultat approximatif : elle donne du bruit, puis des `NaN`. Autan
 tout de suite, avec les deux valeurs en cause :
 
 ```shell
-cargo run --release -- domains/veine.dom --dt 42
+cargo run --release -- domains/tunnel.dom --dt 42
 ```
 
 **Et pendant le calcul, on surveille.** `check_every` déclenche un contrôle de finitude
@@ -72,7 +72,7 @@ histoire vraie, dans à peu près tous les laboratoires.
 ## Le résultat
 
 ```shell
-cargo run --release -- domains/veine.dom --steps 400 --every 20 --circulation 4
+cargo run --release -- domains/tunnel.dom --steps 400 --every 20 --circulation 4
 ```
 
 Les filets de fumée se déforment autour du cylindre, dissymétriquement à cause de la
