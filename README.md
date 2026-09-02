@@ -10,6 +10,8 @@ l'est pas : c'est celui de n'importe quel code de calcul, en réduction.
 
 ![filets de fumée déviés par un cylindre](docs/apercu.png)
 
+<sub>`cargo run --release -- domains/tunnel.dom --refine 4 --bands 9 --steps 960`</sub>
+
 ## Démarrage
 
 Ce dépôt contient le **code complet**. Pour le construire vous-même, engendrez votre
@@ -52,10 +54,16 @@ Quelques options utiles :
 ```shell
 cargo run --release -- domains/tunnel.dom \
     --steps 800 --every 20 \
+    --refine 4 \             # subdivise chaque case en 4×4 : le vrai raffinement
+    --bands 9 \              # densité du rideau de fumée
     --circulation 4 \        # dissymétrie de l'écoulement (effet Magnus)
-    --diffusivity 0.02 \     # diffusion physique du traceur
-    --h 0.5                  # raffinement : cellules deux fois plus petites
+    --diffusivity 0.02       # diffusion physique du traceur
 ```
+
+`--refine` est le seul moyen d'augmenter la résolution : c'est le masque qui fixe le
+nombre de cellules. `--h` ne règle que la *taille* d'une cellule, donc la taille physique
+du domaine — le diviser par deux redonne exactement la même image, sur un domaine deux
+fois plus petit.
 
 `--help` liste le reste.
 

@@ -129,6 +129,35 @@ impl Mask {
         !self.is_fluid(row as usize, col as usize)
     }
 
+    /// Subdivise chaque case en `factor × factor`, sans rien redessiner.
+    ///
+    /// Le domaine reste le même, seule la finesse du maillage augmente : c'est le seul
+    /// moyen de raffiner. À ne pas confondre avec le pas `h` passé à
+    /// [`Mesh::from_mask`](crate::mesh::Mesh::from_mask), qui fixe la *taille* d'une
+    /// cellule : le diviser par deux ne change pas le nombre de cellules, cela rétrécit
+    /// le domaine d'autant et donne exactement la même image.
+    ///
+    /// ```
+    /// use wind_tunnel::mask::Mask;
+    /// let gros = Mask::parse("..\n.#\n").unwrap();
+    /// let fin = gros.refine(3);
+    /// assert_eq!((fin.rows(), fin.cols()), (6, 6));
+    /// assert_eq!(fin.fluid_count(), 9 * gros.fluid_count());
+    /// ```
+    pub fn refine(&self, factor: usize) -> Mask {
+        if factor <= 1 {
+            return self.clone();
+        }
+        let (rows, cols) = (self.rows * factor, self.cols * factor);
+        let mut fluid = Vec::with_capacity(rows * cols);
+        for row in 0..rows {
+            for col in 0..cols {
+                fluid.push(self.is_fluid(row / factor, col / factor));
+            }
+        }
+        Mask { rows, cols, fluid }
+    }
+
     /// Nombre de cellules fluides.
     pub fn fluid_count(&self) -> usize {
         self.fluid.iter().filter(|&&f| f).count()

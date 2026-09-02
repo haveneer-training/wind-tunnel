@@ -26,6 +26,8 @@ Options :
   --every <n>          période de sortie, en pas       (défaut : 10)
   --width <px>         largeur des images              (défaut : 900)
   --h <m>              côté d'une cellule              (défaut : 1)
+  --refine <k>         subdivise chaque case en k×k    (défaut : 1)
+  --bands <n>          nombre de bandes de fumée       (défaut : 4)
   --speed <m/s>        vitesse à l'infini              (défaut : 1)
   --circulation <m2/s> circulation autour du cylindre  (défaut : 0)
   --diffusivity <m2/s> diffusivité du traceur          (défaut : 0)
@@ -40,6 +42,8 @@ struct Args {
     every: usize,
     width: u32,
     h: f64,
+    refine: usize,
+    bands: usize,
     speed: f64,
     circulation: f64,
     diffusivity: f64,
@@ -56,6 +60,8 @@ impl Default for Args {
             every: 10,
             width: 900,
             h: 1.0,
+            refine: 1,
+            bands: 4,
             speed: 1.0,
             circulation: 0.0,
             diffusivity: 0.0,
@@ -82,6 +88,8 @@ fn parse_args() -> Result<Option<Args>, String> {
             "--every" => args.every = value()?.parse().map_err(|e| format!("--every : {e}"))?,
             "--width" => args.width = value()?.parse().map_err(|e| format!("--width : {e}"))?,
             "--h" => args.h = value()?.parse().map_err(|e| format!("--h : {e}"))?,
+            "--refine" => args.refine = value()?.parse().map_err(|e| format!("--refine : {e}"))?,
+            "--bands" => args.bands = value()?.parse().map_err(|e| format!("--bands : {e}"))?,
             "--speed" => args.speed = value()?.parse().map_err(|e| format!("--speed : {e}"))?,
             "--circulation" => {
                 args.circulation = value()?
@@ -137,12 +145,15 @@ fn run() -> Result<(), Box<dyn Error>> {
         return Ok(());
     };
 
-    let mask = Mask::from_file(&args.mask)?;
-    let mesh = Mesh::from_mask(&mask, args.h)?;
+    let mask = Mask::from_file(&args.mask)?.refine(args.refine.max(1));
+    // Raffiner subdivise les cases : on réduit d'autant le pas pour que le domaine
+    // physique, lui, ne bouge pas.
+    let h = args.h / args.refine.max(1) as f64;
+    let mesh = Mesh::from_mask(&mask, h)?;
     let (tri, quad) = mesh.shape_counts();
     let (xmin, ymin, xmax, ymax) = mesh.bounds();
 
-    let velocity: Box<dyn VelocityField> = match obstacle(&mask, args.h) {
+    let velocity: Box<dyn VelocityField> = match obstacle(&mask, h) {
         Some((center, radius)) => Box::new(PotentialCylinder {
             center,
             radius,
@@ -171,7 +182,8 @@ fn run() -> Result<(), Box<dyn Error>> {
     // Rideau de fumée initial : des bandes horizontales, comme le peigne de fumigènes
     // d'une soufflerie. Leur déformation autour de l'obstacle est tout le spectacle,
     // et leur étalement progressif est la diffusion numérique du schéma décentré.
-    let stripe = (ymax - ymin) / 7.0;
+    // n bandes de fumée séparées par n−1 intervalles vides, soit 2n−1 bandes en tout.
+    let stripe = (ymax - ymin) / (2 * args.bands.max(1) - 1) as f64;
     let mut c = Field::from_fn(&mesh, |id| {
         let y = mesh.cell(id).centroid.y;
         let band = ((y - ymin) / stripe).floor() as i64;
