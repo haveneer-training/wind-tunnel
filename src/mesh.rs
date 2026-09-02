@@ -17,6 +17,7 @@
 //! En C ils seraient tous des `int`, et passer un numéro de face là où l'on attend une
 //! cellule compilerait sans un mot. Ici, non.
 
+#[cfg_attr(not(feature = "step2"), allow(unused_imports))] // trou étape 2
 use std::collections::{BTreeMap, HashMap};
 
 use crate::error::MeshError;
@@ -415,6 +416,7 @@ impl Mesh {
 ///
 /// Les coordonnées renvoyées sont celles de la grille de sommets, où `(row, col)` est
 /// le coin **haut gauche** de la cellule `(row, col)`.
+#[cfg_attr(not(feature = "step2"), allow(unused_variables))] // trou étape 2
 fn cell_corners(
     row: usize,
     col: usize,
@@ -464,6 +466,7 @@ fn vertex_id(
 ///
 /// Une arête vue une seule fois est une face de bord ; vue deux fois, une face interne ;
 /// vue trois fois, un maillage cassé — d'où le `HashMap` d'arêtes en cours d'appariement.
+#[cfg_attr(not(feature = "step2"), allow(unused_variables))] // trou étape 2
 fn build_faces(cells: &[Cell], vertices: &[Point]) -> Result<Vec<Face>, MeshError> {
     // TODO-STEP:2 Apparier les arêtes : première rencontre ⇒ nouvelle face de bord
     // provisoire dont la normale est sortante de la cellule courante ; seconde

@@ -13,13 +13,20 @@
 use std::collections::BTreeMap;
 
 #[cfg(feature = "step9")]
+#[cfg_attr(not(feature = "step10"), allow(unused_imports))] // collatéral du trou étape 9
 use rayon::prelude::*;
 
 use crate::error::SolverError;
 use crate::field::Field;
+#[cfg_attr(not(feature = "step10"), allow(unused_imports))] // collatéral du trou étape 9
 use crate::flux::{FaceState, FluxScheme};
+// `Vec2` et `gradient` ne servent qu'aux versions ≥ étape 7 de `residual` : plutôt que
+// de taire l'avertissement, on conditionne l'import lui-même.
+#[cfg(feature = "step7")]
 use crate::geom::Vec2;
+#[cfg(feature = "step7")]
 use crate::gradient;
+#[cfg_attr(not(feature = "step10"), allow(unused_imports))] // collatéral du trou étape 9
 use crate::mesh::{BoundaryKind, CellId, Mesh, Side};
 use crate::velocity::VelocityField;
 
@@ -100,6 +107,7 @@ impl Default for Config {
 pub struct Solver<'m, F: FluxScheme> {
     mesh: &'m Mesh,
     config: Config,
+    #[cfg_attr(not(feature = "step10"), allow(dead_code))] // collatéral du trou étape 9
     scheme: F,
     /// Débit volumique `∫ u·n dl` de chaque face, sortant de `face.left`.
     ///
@@ -175,6 +183,7 @@ impl<'m, F: FluxScheme> Solver<'m, F> {
     }
 
     /// Condition aux limites d'un bord ; imperméable par défaut.
+    #[cfg_attr(not(feature = "step10"), allow(dead_code))] // collatéral du trou étape 9
     fn bc(&self, kind: BoundaryKind) -> Bc {
         self.config.bc.get(&kind).copied().unwrap_or(Bc::NoFlux)
     }
@@ -382,6 +391,7 @@ impl<'m, F: FluxScheme> Solver<'m, F> {
     }
 
     /// Euler explicite : une évaluation du résidu, ordre 1 en temps.
+    #[cfg_attr(not(feature = "step5"), allow(unused_variables))] // trou étape 5
     fn step_euler(&self, c: &mut Field, work: &mut Field) {
         // TODO-STEP:5 Calculer le résidu dans `work`, puis avancer `c` de `dt · résidu`
         // SOLUTION-BEGIN
@@ -394,6 +404,7 @@ impl<'m, F: FluxScheme> Solver<'m, F> {
 
     /// Runge-Kutta d'ordre 2 (méthode de Heun) : deux évaluations du résidu, ordre 2
     /// en temps. `work` reçoit `k1`.
+    #[cfg_attr(not(feature = "step8"), allow(unused_variables))] // trou étape 8
     fn step_rk2(&self, c: &mut Field, work: &mut Field) {
         // TODO-STEP:8 k1 = résidu(c) dans `work` ; prédicteur = c + dt·k1 ; k2 =
         // résidu(prédicteur) ; avancer c de dt/2 · (k1 + k2)
@@ -476,6 +487,7 @@ fn compute_face_flux(mesh: &Mesh, velocity: &dyn VelocityField) -> Vec<f64> {
 ///
 /// `None` si *aucune* cellule n'a de débit sortant ni de diffusion : il n'y a alors rien
 /// à transporter, et le minimum porterait sur un ensemble vide.
+#[cfg_attr(not(feature = "step5"), allow(unused_variables))] // trou étape 5
 fn max_stable_dt(mesh: &Mesh, face_flux: &[f64], diffusivity: f64) -> Option<f64> {
     // TODO-STEP:5 Pour chaque cellule, sommer sur ses faces `|débit| + 2·D·L/d`, puis
     // retenir le plus petit rapport `aire / somme` du maillage. Renvoyer `None` si

@@ -14,6 +14,7 @@
 //! 6). Le limiteur de Barth–Jespersen corrige ça après coup, cellule par cellule.
 
 #[cfg(feature = "step9")]
+#[cfg_attr(not(feature = "step10"), allow(unused_imports))] // collatéral du trou étape 9
 use rayon::prelude::*;
 
 use crate::field::Field;
@@ -22,6 +23,7 @@ use crate::mesh::{CellId, Mesh};
 
 /// Cellule voisine d'une face donnée, vue depuis `id` — quel que soit le côté sur
 /// lequel `id` se trouve.
+#[cfg_attr(not(feature = "step10"), allow(dead_code))] // collatéral du trou étape 9
 fn neighbour_across(id: CellId, face: &crate::mesh::Face) -> Option<CellId> {
     if face.left == id {
         face.neighbor()
@@ -38,6 +40,8 @@ fn neighbour_across(id: CellId, face: &crate::mesh::Face) -> Option<CellId> {
 /// qu'un voisin lointain. Avec moins de deux directions indépendantes (cellule sans
 /// voisin intérieur, ou tous alignés), le système est singulier et la fonction renvoie
 /// le vecteur nul plutôt que de diviser par zéro : rien à reconstruire.
+#[cfg_attr(not(feature = "step7"), allow(unused_variables))] // trou étape 7
+#[cfg_attr(not(feature = "step10"), allow(dead_code))] // collatéral du trou étape 9
 fn least_squares_gradient(mesh: &Mesh, c: &Field, id: CellId) -> Vec2 {
     let ci = c[id];
     let xi = mesh.cell(id).centroid;
@@ -80,6 +84,7 @@ fn least_squares_gradient(mesh: &Mesh, c: &Field, id: CellId) -> Vec2 {
 /// `φ = 1` : le gradient passe tel quel, rien à corriger. `φ = 0` : la cellule est un
 /// extremum local (un pic, un creux) et toute extrapolation le ferait déborder — on
 /// retombe alors exactement sur l'ordre 1.
+#[cfg_attr(not(feature = "step10"), allow(dead_code))] // collatéral du trou étape 9
 fn barth_jespersen(mesh: &Mesh, c: &Field, gradient: Vec2, id: CellId) -> f64 {
     let ci = c[id];
     let xi = mesh.cell(id).centroid;

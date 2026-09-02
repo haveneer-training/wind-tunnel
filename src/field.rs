@@ -98,6 +98,7 @@ impl Field {
     ///
     /// Sert à comparer un champ numérique à une solution de référence, par exemple pour
     /// mesurer l'ordre de convergence d'un schéma.
+    #[cfg_attr(not(feature = "step6"), allow(unused_variables))] // trou étape 6
     pub fn mean_abs_error(&self, other: &Field, mesh: &Mesh) -> f64 {
         // TODO-STEP:6 Écart moyen pondéré par l'aire entre les deux champs
         // SOLUTION-BEGIN

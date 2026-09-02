@@ -3,6 +3,10 @@
 //! Ces tests ne vérifient pas que le programme « ne plante pas » : ils vérifient qu'il
 //! dit précisément ce qui ne va pas et où. C'est la différence entre un code qu'on
 //! donne à quelqu'un d'autre et un code qu'on garde pour soi.
+//!
+//! Les tests sont ouverts un par un par les étapes ; tant qu'ils ne le sont pas tous,
+//! une partie des imports ci-dessous ne sert encore à rien.
+#![cfg_attr(not(feature = "step5"), allow(unused_imports))]
 
 use wind_tunnel::error::{MeshError, SolverError};
 use wind_tunnel::flux::Upwind;

@@ -375,26 +375,33 @@ fn goto(root: &Path, step: u8) -> Result<(), String> {
     Ok(())
 }
 
-/// Réécrit la ligne `default = [...]` du manifeste.
+/// Réécrit la ligne `default = [...]` du manifeste de la racine.
 fn set_default_feature(root: &Path, step: u8) -> Result<(), String> {
-    let path = root.join("Cargo.toml");
-    let text = fs::read_to_string(&path).map_err(|e| e.to_string())?;
+    rewrite_default(&root.join("Cargo.toml"), &format!("[\"step{step}\"]"))
+}
+
+/// Remplace la valeur de la ligne `default = [...]` d'un manifeste.
+fn rewrite_default(path: &Path, value: &str) -> Result<(), String> {
+    let text = fs::read_to_string(path).map_err(|e| e.to_string())?;
     let mut replaced = false;
     let new_text: Vec<String> = text
         .lines()
         .map(|line| {
             if line.starts_with("default = [") && !replaced {
                 replaced = true;
-                format!("default = [\"step{step}\"]")
+                format!("default = {value}")
             } else {
                 line.to_string()
             }
         })
         .collect();
     if !replaced {
-        return Err("ligne `default = [...]` introuvable dans Cargo.toml".to_string());
+        return Err(format!(
+            "ligne `default = [...]` introuvable dans {}",
+            path.display()
+        ));
     }
-    fs::write(&path, new_text.join("\n") + "\n").map_err(|e| e.to_string())
+    fs::write(path, new_text.join("\n") + "\n").map_err(|e| e.to_string())
 }
 
 /// Étape actuellement déclarée dans le manifeste.
@@ -557,6 +564,11 @@ fn make_starter(root: &Path, out: &Path, force: bool) -> Result<(), String> {
 
     // Le dépôt de travail démarre à l'étape 0.
     set_default_feature(out, 0)?;
+    // La sentinelle `step12` ne vaut que pour le corrigé : c'est elle qui y désactive
+    // les `allow` conditionnels posés sur les avertissements collatéraux des trous.
+    // Un dossier de travail ne doit jamais l'activer, sinon ces avertissements
+    // resteraient éteints alors même que le trou est encore ouvert.
+    rewrite_default(&out.join("mpi/Cargo.toml"), "[]")?;
     if let Ok(readme) = fs::read_to_string(root.join("docs/README-travail.md")) {
         fs::write(out.join("README.md"), readme).map_err(|e| e.to_string())?;
     }

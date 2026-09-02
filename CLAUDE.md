@@ -132,14 +132,26 @@ Conventions when adding a new step (full list in `docs/AVANCEMENT.md`):
 1. One hole = one `SOLUTION-BEGIN`/`SOLUTION-END` block covering a whole function body or
    expression, preceded by `// TODO-STEP:<n>`; it must typecheck with `todo!()` in its place.
 2. Step N's tests live under the `stepN` feature gate.
-3. Bump `LAST_STEP` in `xtask/src/main.rs`. A step that adds a separate crate must also
+3. Silence the warnings the hole causes, with a step-conditional attribute:
+   `#[cfg_attr(not(feature = "stepN"), allow(unused_variables))] // trou étape N` on the
+   holed item (visible during step N, where it names what is left to write), and
+   `not(feature = "stepN+1")` for collateral `dead_code` on untouched helpers (never
+   visible). When the warning comes from a `#[cfg]` rather than a hole, gate the import
+   instead of allowing it. Full rationale in `docs/AVANCEMENT.md` § "Avertissements dans
+   travail/".
+   **`step12` is the sentinel feature**: one step past `LAST_STEP`, gating no code, on by
+   default in both `Cargo.toml` and `mpi/Cargo.toml` so that every `not(feature =
+   "stepN+1")` guard is inert in this corrigé. `goto` rewrites the root manifest;
+   `make_starter` clears `mpi/Cargo.toml`'s default, so `travail/` never has it. A step
+   that becomes the new last one must move the sentinel up.
+4. Bump `LAST_STEP` in `xtask/src/main.rs`. A step that adds a separate crate must also
    add it to `make_starter`'s copy list **and** to `SOURCE_DIRS`, or xtask never sees its
    holes. The `// TODO-STEP:<n>` marker must sit within 8 lines above `// SOLUTION-BEGIN`
    — `step_of` looks no further, and silently attributes the block to step 0.
-4. Add `docs/etapes/etape-NN.md` — a short mandatory core, an optional extension.
-5. **Language convention**: identifiers and filenames in English; prose (comments, doc
+5. Add `docs/etapes/etape-NN.md` — a short mandatory core, an optional extension.
+6. **Language convention**: identifiers and filenames in English; prose (comments, doc
    comments, error messages, exercise statements) in French. Test names are code → English.
-6. Regenerate and check: `cargo xtask starter --force && cd travail && cargo test`.
+7. Regenerate and check: `cargo xtask starter --force && cd travail && cargo test`.
 
 `travail/` is gitignored and excluded from the workspace (`Cargo.toml` `[workspace] exclude`)
 — it's a full standalone project a trainee can `git init` themselves.

@@ -12,6 +12,15 @@ license = "CC-BY-NC-SA-4.0"
 # touchent donc jamais, et le reste du projet continue de se construire et de se tester
 # sur une machine sans MPI. `[profile.*]` d'un membre non racine est ignoré par cargo :
 # voir `[profile.release]` dans le Cargo.toml de la racine.
+# Ce crate n'a pas d'étapes à lui — il naît tout entier à l'étape 11 — mais il lui faut
+# la sentinelle du manifeste racine pour pouvoir écrire `not(feature = "step12")` sur
+# les avertissements collatéraux de son trou. Activée par défaut ici, elle est retirée
+# du dossier de travail par `cargo xtask starter` : c'est ce qui fait que le corrigé ne
+# cache rien et que le stagiaire, lui, n'est pas dérangé.
+[features]
+default = ["step12"]
+step12 = ["wind-tunnel/step12"]
+
 [dependencies]
 mpi = "0.8"
 wind-tunnel = { path = "..", features = ["step11"] }

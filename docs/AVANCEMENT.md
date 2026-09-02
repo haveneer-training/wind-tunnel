@@ -3,7 +3,8 @@
 Document de passation. Il dit où en est le fil rouge, ce qui reste à faire, et les
 décisions qu'il ne faut pas défaire sans le savoir. À tenir à jour.
 
-Dernière mise à jour : 2026-09-02 (étape 11, puis passe sur les allocations).
+Dernière mise à jour : 2026-09-02 (étape 11, puis passe sur les allocations et les
+avertissements de `travail/`).
 
 ## Contexte
 
@@ -173,6 +174,69 @@ resté ouvert dans son `TODO-ONERA.md` §3), et le rebranchement éventuel de la
 interop existante sur la sortie du fil rouge — **démo seulement**, le programme est
 explicite là-dessus.
 
+## Avertissements dans `travail/` : la convention `cfg_attr`
+
+Un trou (`todo!()`) rend inutilisés les paramètres de sa fonction, parfois un import ou
+une fonction auxiliaire. Sans précaution, un stagiaire à l'étape 0 voyait **50
+avertissements**, presque tous à propos d'étapes dont il n'avait pas encore entendu
+parler. Chaque cas connu porte donc un `cfg_attr` conditionné à la feature de l'étape :
+
+```rust
+#[cfg_attr(not(feature = "step3"), allow(unused_variables))] // trou étape 3
+pub fn write_vtk(path: impl AsRef<Path>, mesh: &Mesh, fields: &[(&str, &Field)]) -> ...
+```
+
+Deux conditions seulement, et le choix entre les deux se fait sur une question : *cet
+avertissement aide-t-il le stagiaire qui travaille sur cette étape ?*
+
+| Cas | Condition | Effet |
+|---|---|---|
+| L'avertissement **désigne ce qu'il reste à écrire** (paramètre inutilisé de la fonction trouée, import à utiliser) | `not(feature = "stepN")` | muet avant l'étape N, visible **pendant** l'étape N où il sert d'aide-mémoire, muet après (le code est écrit) |
+| L'avertissement est **collatéral** : il porte sur du code que le stagiaire ne touche pas (`dead_code` sur une fonction auxiliaire, champ jamais lu) | `not(feature = "stepN+1")` | muet jusqu'à ce que le trou de l'étape N soit rempli, donc jamais vu |
+
+Le commentaire de fin de ligne (`// trou étape 3`, `// collatéral du trou étape 9`) est
+obligatoire : sans lui, personne ne retrouve à quel trou l'attribut se rapporte.
+
+Dans le corrigé, `default = ["step12"]` rend **toutes** ces conditions fausses : les
+attributs y sont inertes, et rien n'y est caché. Idem dans un `travail/` entièrement
+résolu.
+
+### La feature sentinelle
+
+`step12` est la clé de voûte : c'est l'étape *suivant* la dernière implémentée
+(`LAST_STEP` vaut 11, et `cargo xtask goto 12` est refusé). Aucun code n'en dépend, elle
+n'ouvre aucun test — elle existe pour que la condition `not(feature = "stepN+1")` de la
+seconde ligne du tableau ait un sens quand `N` est la dernière étape. Sans elle, le
+collatéral du trou de l'étape 11 (`Halo`, `mpi/src/exchange.rs`, dont les quatre tampons
+ne sont lus que par le corps troué) n'aurait aucune condition à laquelle se rattacher.
+
+Elle est activée par défaut dans les deux manifestes du corrigé, et retirée du dossier
+de travail :
+
+- `Cargo.toml` racine : `default = ["step12"]`. `cargo xtask goto <n>` réécrit cette
+  ligne, donc `travail/` ne l'a jamais.
+- `mpi/Cargo.toml` : `default = ["step12"]`, avec `step12 = ["wind-tunnel/step12"]` — le
+  crate `mpi` n'a pas d'étapes à lui, il lui faut sa propre déclaration pour pouvoir
+  écrire `#[cfg(feature = ...)]`. Comme `goto` ne touche pas ce manifeste-là,
+  `make_starter` y remet `default = []` au moment d'engendrer `travail/`
+  (`rewrite_default`, dans `xtask/src/main.rs`).
+
+Vérification que la sentinelle ne cache rien : ajouter un champ jamais lu à `Halo` dans
+le corrigé doit produire « field is never read » malgré l'attribut. C'est le test à
+refaire si l'on touche à ce mécanisme.
+
+Quand l'avertissement ne vient pas d'un trou mais d'un `#[cfg]` — un import qui ne sert
+qu'à partir d'une certaine étape —, on **conditionne l'import** plutôt que de le taire :
+
+```rust
+#[cfg(feature = "step7")]
+use crate::geom::Vec2;
+```
+
+Résultat : 252 avertissements sur les douze étapes, réduits à 47, tous rattachés à
+l'étape en cours. Le scan se refait en régénérant `travail/` puis, pour chaque `n` :
+`cargo xtask goto n`, `cargo check --all-targets`, `cargo xtask solve n`.
+
 ## Conventions à respecter pour ajouter une étape
 
 1. **Un trou** = un bloc encadré de `// SOLUTION-BEGIN` / `// SOLUTION-END`, précédé
@@ -207,7 +271,17 @@ explicite là-dessus.
    facultative — l'écart de niveau dans le groupe va de 6 à 9 sur 17 au quiz d'entrée.
 5. **Langue** : identifiants et noms de fichiers de code en anglais, prose en français
    (commentaires, doc, messages d'erreur, énoncés). Les noms de tests sont du code.
-6. Régénérer et vérifier : `cargo xtask starter --force && cd travail && cargo test`.
+6. **Éteindre les avertissements que le trou provoque**, avec le `cfg_attr` conditionné
+   à la feature décrit plus haut (§ « Avertissements dans `travail/` »). Un trou crée en
+   général deux à quatre `unused_variables`, parfois un `unused_imports` ou un
+   `dead_code` sur une fonction auxiliaire devenue orpheline. Se relire après coup avec
+   le scan par étape : un avertissement qui apparaît **avant** l'étape concernée est un
+   attribut manquant.
+   **Si l'étape ajoutée devient la dernière**, déplacer la sentinelle : déclarer
+   `step{N+1} = ["stepN"]` dans `Cargo.toml` et y mettre `default = ["step{N+1}"]`,
+   sans quoi les `not(feature = "step{N+1}")` du collatéral resteraient vrais dans le
+   corrigé et y cacheraient de vrais avertissements.
+7. Régénérer et vérifier : `cargo xtask starter --force && cd travail && cargo test`.
 
 ## Décisions à ne pas défaire
 
@@ -257,10 +331,9 @@ renvoyant une `String` : un fichier contient de l'ordre du million de nombres, e
   pas de traînée. Un public CFD le verra en trois secondes — l'annoncer.
 - `travail/` n'est pas versionné (ignoré, exclu du workspace). Le participant peut y
   faire son propre `git init`.
-- Dans `travail/`, `Halo` (`mpi/src/exchange.rs`) déclenche « fields never read » tant
-  que le trou de l'étape 11 n'est pas rempli : ses quatre tampons ne sont lus que par le
-  corps troué. Un avertissement de plus dans un dossier qui en compte déjà beaucoup, et
-  dans un crate qu'on ne bâtit qu'explicitement.
+- `cargo clippy -p xtask --all-targets -- -D warnings` signale un `useless_format`
+  (message d'erreur de `make_starter`). Antérieur, sans rapport avec les étapes : la
+  vérification documentée ne couvre que le paquet racine et `mpi`, jamais `xtask`.
 
 ## Vérifier que tout va bien
 
@@ -270,6 +343,10 @@ cargo clippy --all-targets --all-features -- -D warnings
 cargo clippy -p wind-tunnel-mpi --all-targets -- -D warnings   # nécessite MPI
 cargo fmt --all --check
 cargo run --release -- domains/tunnel.dom --refine 4 --bands 9 --steps 960
+
+# le corrigé doit être sans avertissement à *chaque* niveau de feature : c'est ce qui
+# prouve que les `cfg_attr` conditionnels n'y cachent rien
+for n in $(seq 0 12); do cargo check --no-default-features --features "step$n" --all-targets; done
 
 cargo xtask starter --force                  # régénère travail/
 cd travail && cargo test                     # 4 tests rouges : étape 0

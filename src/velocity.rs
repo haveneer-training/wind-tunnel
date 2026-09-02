@@ -73,6 +73,7 @@ pub struct PotentialCylinder {
 }
 
 impl VelocityField for PotentialCylinder {
+    #[cfg_attr(not(feature = "step4"), allow(unused_variables))] // trou étape 4
     fn at(&self, p: Point) -> Vec2 {
         // TODO-STEP:4 Évaluer l'écoulement potentiel autour du cylindre (formules ci-dessus),
         // en renvoyant une vitesse nulle très près du centre pour éviter la division par r⁴
