@@ -3,8 +3,7 @@
 Document de passation. Il dit où en est le fil rouge, ce qui reste à faire, et les
 décisions qu'il ne faut pas défaire sans le savoir. À tenir à jour.
 
-Dernière mise à jour : 2026-09-02 (étape 11, puis passe sur les allocations et les
-avertissements de `travail/`).
+Dernière mise à jour : 2026-09-19 (étape 12 : écoulement calculé sur le maillage).
 
 ## Contexte
 
@@ -18,19 +17,20 @@ dépôt : `~/.claude/plans/pour-la-formation-rust-happy-seahorse.md`.
 
 ## Ce qui est fait
 
-**Étapes 0 à 11** : géométrie, masque, maillage non structuré et connectivité, sorties
+**Étapes 0 à 12** : géométrie, masque, maillage non structuré et connectivité, sorties
 VTK/PNG et erreurs typées, écoulement porteur, solveur explicite (le noyau, étapes 0 à 5),
 conservation et ordre de convergence mesurés (étape 6), reconstruction d'ordre 2 par
 moindres carrés et limiteur de Barth–Jespersen (étape 7, schéma `Muscl`), RK2 qui fait
 enfin apparaître l'ordre 2 mesuré (étape 8), la parallélisation `rayon` des trois
 boucles en *gather* du solveur (étape 9), puis le rendu PNG parallélisé « à la main »
 avec `thread::scope`, `Mutex` et `mpsc` (étape 10), et enfin la décomposition de domaine
-MPI (étape 11, bonus). Le code tourne et produit l'animation.
+MPI (étape 11, bonus), et l'écoulement calculé sur le maillage (étape 12, bonus). Le code
+tourne et produit l'animation.
 
-- 70 tests verts (63 hors doctests), `cargo clippy --all-targets --all-features -- -D warnings` propre,
+- 76 tests verts (69 hors doctests), `cargo clippy --all-targets --all-features -- -D warnings` propre,
   `cargo fmt` appliqué
-- 27 trous répartis : 4 en étape 0, 2 en 1, 2 en 2, 2 en 3, 1 en 4, 3 en 5, 1 en 6, 2 en 7,
-  1 en 8, 3 en 9, 1 en 10, 5 en 11
+- 30 trous répartis : 5 en étape 0, 2 en 1, 2 en 2, 2 en 3, 1 en 4, 3 en 5, 1 en 6, 2 en 7,
+  1 en 8, 3 en 9, 0 en 10, 5 en 11, 3 en 12
 - **Étape 11 (bonus)** décompose le domaine en **bandes verticales**, une par rang MPI.
   Chaque rang extrait sa tranche de colonnes du masque (`Mask::columns`, nouveau),
   appelle `Mesh::from_mask` dessus et translate le maillage à sa place (`Mesh::translate`,
@@ -157,11 +157,50 @@ MPI (étape 11, bonus). Le code tourne et produit l'animation.
   classe de bug ci-dessus. À relancer après toute étape qui touche du code déjà
   fonctionnel plutôt qu'un trou resté vide.
 
+## Étape 12 (bonus) : l'écoulement calculé
+
+`src/stream.rs` résout `∇²ψ = 0` **aux sommets** du maillage, par balayages de Jacobi
+parallélisés (`rayon`), avec Dirichlet sur l'entrée, les parois et l'obstacle, et Neumann
+homogène — c'est-à-dire *rien à assembler* — sur la sortie. Le laplacien est celui du
+maillage dual : chaque face interne `(a, b)` est une arête de poids
+`w = face.distance / face.length`, stockée en CSR, jamais sous forme de matrice.
+
+Les deux approximations annoncées disparaissent : les parois portent une valeur de `ψ`
+constante, donc leur débit est **exactement** `0.0` (`assert_eq!`, pas une tolérance) et
+`Bc::NoFlux` devient légitime ; et la forme réellement dessinée est respectée, `domains/square.dom`
+en fait la démonstration. Ce qui reste hors de portée du modèle : c'est toujours un
+écoulement potentiel — pas de couche limite, pas de sillage (voir Pièges).
+
+Trois choix structurants :
+
+- **`StreamSource`** (dans `src/velocity.rs`) est le contrat réellement consommé par
+  `compute_face_flux` : `ψ` à un sommet. Une implémentation générale
+  `impl<F: VelocityField + ?Sized> StreamSource for F` fait que tout écoulement analytique
+  le satisfait déjà, et le `?Sized` est ce qui permet à `Solver::new<S: StreamSource + ?Sized>`
+  d'accepter les vingt sites d'appel existants **sans en modifier un seul**. `ComputedStream`
+  n'implémente pas `VelocityField` : il ne saurait pas répondre en un point quelconque.
+  `app::Carrier` fait l'aiguillage entre les deux — un `&dyn VelocityField` ne pouvant pas
+  être converti en `&dyn StreamSource`, c'est l'énumération qui porte l'impl.
+- **La constante de `ψ` sur l'obstacle est arbitraire** : on prend `ψ₀` de l'ordonnée
+  moyenne de son contour. Exact pour une forme symétrique en `y`, approché sinon. La bonne
+  condition (circulation nulle, par superposition de deux résolutions) est en extension.
+- **Jacobi est volontairement lent** : 7 134 balayages à `--refine 1`, 23 559 à
+  `--refine 2`, 75 221 à `--refine 4` sur `domains/tunnel.dom` (90 780 sommets, quelques
+  minutes) — mesuré, et dans le budget par défaut de 200 000. C'est le ressort de
+  l'extension (gradient conjugué matrix-free) et de `examples/stream_faer.rs`, qui résout
+  le même système par Cholesky creuse avec le crate `faer` : 0,02 s contre 11,6 s, à
+  `--refine 2`. `faer` est une dépendance **optionnelle** — `cargo test` ne la compile
+  jamais, seul `--features faer` l'active.
+
+Non disponible sous MPI : `mpi/src/main.rs` refuse `--flow computed` avec un message
+explicite, aucun rang ne détenant le maillage complet. Le gradient conjugué distribué (le
+`Halo` existe déjà) est proposé en « pour aller plus loin ».
+
 ## Ce qui reste
 
 | # | Étape | État de préparation |
 |---|---|---|
-| 12 | *Bonus* : écoulement calculé (Jacobi puis CG matrix-free) | Supprimerait deux approximations d'un coup : le débit résiduel aux parois, et le fait que l'écoulement ne « voit » qu'un disque équivalent. |
+| 13 | *Bonus* : écoulement à sillage, en variables `ψ`–`ω` | `∇²ψ = −ω` réutilise tel quel le solveur de l'étape 12, et le transport de `ω` réutilise la boucle en temps. Donnerait enfin décollement, sillage et traînée — le piège « écoulement potentiel » ci-dessous. Coût réel : les conditions de paroi sur `ω` et la stabilité en fonction du Reynolds. `step13` est le nom réservé (c'est la sentinelle actuelle). |
 
 `docs/BONUS-OPTIMISATION.md` est un bonus **transversal**, déjà écrit : pas de feature, pas
 de trou, pas de `LAST_STEP` à bouger. Il reprend les « pour aller plus loin » des étapes 7
@@ -233,7 +272,7 @@ qu'à partir d'une certaine étape —, on **conditionne l'import** plutôt que 
 use crate::geom::Vec2;
 ```
 
-Résultat : 252 avertissements sur les douze étapes, réduits à 47, tous rattachés à
+Résultat : 252 avertissements sur les douze premières étapes, réduits à 47, tous rattachés à
 l'étape en cours. Le scan se refait en régénérant `travail/` puis, pour chaque `n` :
 `cargo xtask goto n`, `cargo check --all-targets`, `cargo xtask solve n`.
 
@@ -291,10 +330,18 @@ l'étape en cours. Le scan se refait en régénérant `travail/` puis, pour chaq
 échantillonnait : un champ initialement dans [0, 1] montait à 1,78. Deux tests
 verrouillent la propriété.
 
-**Les parois sont en `ZeroGradient`, pas en `NoFlux`.** Une paroi en escalier n'est pas
-exactement une ligne de courant de l'écoulement analytique ; supprimer le petit débit
-résiduel fabriquerait une divergence artificielle et ferait perdre la borne. L'étape 12
-supprime le résidu à la source.
+**La conservation ne dépend pas de la qualité de l'écoulement.** Le débit d'une face
+étant `ψ(b) − ψ(a)`, le bilan d'une cellule fermée télescope : il est exactement nul pour
+*n'importe quel* champ `ψ` aux sommets, convergé ou non, physique ou non. C'est ce qui
+rend l'étape 12 sans danger pour les deux tests à 1e-12, et c'est le meilleur contenu
+pédagogique du projet : la propriété vient de la forme du schéma, pas du modèle.
+
+**Les parois sont en `ZeroGradient`, pas en `NoFlux`** — *avec l'écoulement analytique*.
+Une paroi en escalier n'en est pas exactement une ligne de courant ; supprimer le petit
+débit résiduel fabriquerait une divergence artificielle et ferait perdre la borne. Avec
+`--flow computed` (étape 12), ce débit est nul par construction et `app::solver_config`
+bascule alors `Wall` et `Obstacle` en `NoFlux`. Ne pas généraliser ce basculement à
+l'analytique.
 
 **Indices typés plutôt que pointeurs** (`CellId`, `FaceId`, `VertexId`) et **`Side`
 plutôt qu'un `Option` doublé d'un drapeau** : ce sont des supports de discours autant
@@ -320,15 +367,23 @@ renvoyant une `String` : un fichier contient de l'ordre du million de nombres, e
 
 ## Pièges connus, non corrigés
 
-- **L'écoulement ne voit pas la forme dessinée** : `obstacle()` dans `src/main.rs` en
-  déduit un disque de même aire, et `PotentialCylinder` utilise ce disque. Dessinez un
-  carré, la fumée contournera un cercle. C'est une excellente image de slide pour
-  justifier l'étape 12, mais c'est un piège si on l'ignore.
+- **L'écoulement analytique ne voit pas la forme dessinée** : `obstacle()` dans
+  `src/app.rs` en déduit un disque de même aire, et `PotentialCylinder` utilise ce disque.
+  Dessinez un carré, la fumée contournera un cercle. Corrigé depuis l'étape 12 par
+  `--flow computed` (démonstration : `domains/square.dom`), mais c'est toujours le
+  comportement **par défaut** — donc toujours un piège si on l'ignore, et toujours la
+  bonne image de slide pour justifier l'étape 12.
 - **Gradient nul sur une frontière d'entrée = problème mal posé.** Visible avec
   `--angle 45` sur `domains/tunnel-empty.dom` : la paroi basse devient une entrée, le
   traceur est réinjecté et la masse augmente de 10 %. Signalé dans l'énoncé 5.
 - **Écoulement potentiel** : pas de couche limite, pas de décollement, pas de sillage,
-  pas de traînée. Un public CFD le verra en trois secondes — l'annoncer.
+  pas de traînée. Un public CFD le verra en trois secondes — l'annoncer. L'étape 12 n'y
+  change rien : elle rend l'écoulement *cohérent avec la géométrie*, pas visqueux. C'est
+  l'étape 13 (`ψ`–`ω`) qui s'y attaquerait.
+- **Le résidu n'est pas l'erreur** (étape 12) : pour Jacobi, le premier vaut environ
+  `(1 − ρ)` fois la seconde, et `1 − ρ` se dégrade comme le carré du raffinement. Avec la
+  tolérance par défaut (1e-6), `ψ` est juste à ~1e-1 près sur une échelle de 48 à
+  `--refine 2` — invisible à l'œil, mais à savoir avant d'en tirer un chiffre.
 - `travail/` n'est pas versionné (ignoré, exclu du workspace). Le participant peut y
   faire son propre `git init`.
 - `cargo clippy -p xtask --all-targets -- -D warnings` signale un `useless_format`
@@ -338,7 +393,7 @@ renvoyant une `String` : un fichier contient de l'ordre du million de nombres, e
 ## Vérifier que tout va bien
 
 ```shell
-cargo test                                   # 70 tests
+cargo test                                   # 76 tests
 cargo clippy --all-targets --all-features -- -D warnings
 cargo clippy -p wind-tunnel-mpi --all-targets -- -D warnings   # nécessite MPI
 cargo fmt --all --check
@@ -346,12 +401,13 @@ cargo run --release -- domains/tunnel.dom --refine 4 --bands 9 --steps 960
 
 # le corrigé doit être sans avertissement à *chaque* niveau de feature : c'est ce qui
 # prouve que les `cfg_attr` conditionnels n'y cachent rien
-for n in $(seq 0 12); do cargo check --no-default-features --features "step$n" --all-targets; done
+for n in $(seq 0 13); do cargo check --no-default-features --features "step$n" --all-targets; done
 
 cargo xtask starter --force                  # régénère travail/
 cd travail && cargo test                     # 4 tests rouges : étape 0
-cargo xtask goto 11 && cargo xtask solve 11  # ... et tout doit redevenir vert
+cargo xtask goto 12 && cargo xtask solve 12  # ... et tout doit redevenir vert
 
 cd .. && scripts/check-steps.sh              # le même tour, automatisé, étape par étape
 scripts/check-mpi.sh                         # étape 11 ; sans effet si mpirun est absent
+cargo run --release --features faer --example stream_faer       # extension de l'étape 12
 ```

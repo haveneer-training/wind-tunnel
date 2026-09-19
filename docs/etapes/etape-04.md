@@ -27,11 +27,15 @@ fluide glisse le long de l'obstacle sans le traverser.
 ## Ce qu'il y a à remarquer
 
 **Un trait nomme un besoin, pas une implémentation.** Le solveur ne connaît que
-`VelocityField` ; il ne sait pas s'il a affaire à une formule analytique ou, à l'étape
-11, au résultat d'un calcul sur le maillage. Ajouter un écoulement ne demandera aucune
-modification du solveur. Un développeur C++ y verra une interface abstraite, en moins
-cher : quand le type est connu à la compilation, l'appel est direct, sans table
-virtuelle, et souvent intégré à l'appelant.
+`VelocityField` ; il ne sait pas s'il a affaire à une formule analytique ou, à l'étape 12,
+au résultat d'un calcul sur le maillage. Ajouter un écoulement ne demandera aucune
+modification du solveur — et l'étape 12 va plus loin dans la même direction : elle
+s'aperçoit que le solveur n'a même pas besoin de tout `VelocityField`, seulement de `ψ`
+aux sommets, et nomme ce besoin plus étroit `StreamSource`.
+
+Un développeur C++ y verra une interface abstraite, en moins cher : quand le type est
+connu à la compilation, l'appel est direct, sans table virtuelle, et souvent intégré à
+l'appelant.
 
 **`Sync` est exigé dès maintenant** dans la déclaration du trait, alors que rien n'est
 encore parallèle. C'est la promesse qu'un champ de vitesse peut être lu depuis plusieurs

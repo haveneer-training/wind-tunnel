@@ -14,19 +14,31 @@ generate their own `travail/` working copy from it with holes (`todo!()`) to fil
 `docs/AVANCEMENT.md` is the up-to-date handoff doc: project state, what's left, decisions not
 to undo. Read it before making non-trivial changes.
 
+Which doc is which:
+
+| File | Audience / content |
+|---|---|
+| `docs/AVANCEMENT.md` | handoff doc — state, remaining work, conventions, rationale. The authority |
+| `README.md` | trainee entry point: what the project is, the `starter` → `goto` → `solve` loop |
+| `ETAPES.md` | the 11 steps + bonuses in one page, trainee-facing |
+| `docs/etapes/etape-NN.md` | one step's statement: mandatory core + optional extension |
+| `docs/BONUS-OPTIMISATION.md` | the allocation thread — measurements and the solutions to steps 7/8's "pour aller plus loin" |
+| `docs/README-travail.md` | `make_starter` writes it as `travail/README.md`, and skips it when copying `docs/` |
+
 ## Commands
 
 ```shell
-cargo test                                              # all tests (70 currently)
+cargo test                                              # all tests (76 currently)
 cargo test --test mesh                                  # one test file
 cargo test the_mesh_is_mixed                             # one test by name
 cargo clippy --all-targets --all-features -- -D warnings # must stay clean
 cargo fmt --all                                          # / --check to verify only
 cargo run --release -- domains/tunnel.dom --refine 4 --bands 9 --steps 960
+cargo run --release --example alloc_count                # allocations per phase (see docs/BONUS-OPTIMISATION.md)
 ```
 
 xtask (drives the step-by-step exercise machinery, used from the repo root on this corrigé,
-and from `travail/` by trainees):
+and from `travail/` by trainees; `cargo xtask` is an alias defined in `.cargo/config.toml`):
 
 ```shell
 cargo xtask starter [--force]   # generate travail/ (holes punched in, from the repo root)
@@ -44,7 +56,7 @@ cargo test
 cargo clippy --all-targets --all-features -- -D warnings
 cargo fmt --all --check
 cargo xtask starter --force && cd travail && cargo test   # 4 red tests expected: step 0
-cargo xtask goto 11 && cargo xtask solve 11                # ... and back to green
+cargo xtask goto 12 && cargo xtask solve 12                # ... and back to green
 
 scripts/check-steps.sh   # same round-trip, automated, step by step from 0 to LAST_STEP
 ```
@@ -77,14 +89,16 @@ mask ──▶ mesh ──▶ field ──▶ solver ──▶ io (VTK / PNG)
 | `src/mask.rs` | domain mask parsing/validation (`.` fluid, `#` solid, `%` comment) |
 | `src/mesh.rs` | cells, faces, connectivity — one cell per fluid cell of the mask, 45° chamfers where perpendicular walls meet, giving a genuinely mixed mesh |
 | `src/field.rs` | a scalar field over cells |
-| `src/velocity.rs` | carrier flows (analytic, e.g. potential flow around a cylinder) |
-| `src/flux.rs` | flux schemes (upwind, centered) |
+| `src/velocity.rs` | analytic carrier flows (uniform, potential flow around a cylinder) + the `StreamSource` contract the solver actually consumes |
+| `src/stream.rs` | the computed flow (step 12): `∇²ψ = 0` solved at the vertices, dual-mesh weights in CSR, Jacobi sweeps |
+| `src/flux.rs` | flux schemes behind the `FluxScheme` trait: `Upwind`, `Centered`, `Muscl` (order 2, step 10) |
+| `src/gradient.rs` | least-squares gradient reconstruction per cell + Barth–Jespersen limiter — what `Muscl` extrapolates with (step 10) |
 | `src/solver.rs` | time-stepping loop, CFL, boundary conditions |
 | `src/io/` | VTK and PNG output |
 | `src/error.rs` | the two error families (mesh-time vs. solver-time) |
 | `src/app.rs` | CLI args and case assembly, shared by both binaries |
 | `src/decomposition.rs` | vertical band decomposition for MPI (step 11, feature-gated) |
-| `mpi/` | the MPI driver — a separate crate, excluded from the workspace (step 11) |
+| `mpi/` | the MPI driver — a separate crate, a workspace member but not a default one (step 11; see above) |
 | `xtask/` | generates `travail/` and drives step progression (see Commands) |
 
 ### Load-bearing design decisions (do not casually change — see `docs/AVANCEMENT.md`)
@@ -93,9 +107,15 @@ mask ──▶ mesh ──▶ field ──▶ solver ──▶ io (VTK / PNG)
   faces. This is what makes the discrete divergence exactly zero (machine precision) and
   keeps the upwind scheme bounded. An earlier velocity-sampling version let a field in [0,1]
   drift to 1.78 — two tests lock this property in.
-- **Walls use `ZeroGradient`, not `NoFlux`.** A staircase wall isn't exactly a streamline of
-  the analytic flow; forcing zero flux would fabricate an artificial divergence and break the
-  boundedness. Step 12 (bonus) removes the residual at the source instead.
+- **Conservation does not depend on the flow's quality.** A face flux is `ψ(b) − ψ(a)`, so a
+  closed cell's balance telescopes to exactly zero for *any* nodal ψ — converged or not,
+  physical or not. This is why step 12 could not endanger the two `1e-12` tests, and it is the
+  project's sharpest teaching point: the property comes from the shape of the scheme.
+- **Walls use `ZeroGradient`, not `NoFlux`** — *with the analytic flow*. A staircase wall isn't
+  exactly a streamline of it; forcing zero flux would fabricate an artificial divergence and
+  break the boundedness. With `--flow computed` (step 12) the residual is zero by construction,
+  and `app::solver_config` switches `Wall`/`Obstacle` to `NoFlux` there. Don't generalize that
+  switch to the analytic flow.
 - **Typed indices** (`CellId`, `FaceId`, `VertexId`) instead of pointers, and **`Side`**
   instead of an `Option` + separate flag — deliberate teaching choices as well as technical
   ones.
@@ -103,8 +123,16 @@ mask ──▶ mesh ──▶ field ──▶ solver ──▶ io (VTK / PNG)
   parallelizable with `rayon` (step 9) without restructuring, and is used as the
   C/OpenMP-style pitfall example.
 - `obstacle()` in `src/app.rs` reduces the drawn shape to an equivalent-area disk, and
-  `PotentialCylinder` flows around that disk — the flow does not "see" the actual drawn shape
-  (also fixed by bonus step 12, not yet implemented).
+  `PotentialCylinder` flows around that disk — the analytic flow does not "see" the actual drawn
+  shape. Fixed by `--flow computed` (step 12, demo: `domains/square.dom`), but analytic is still
+  the default, so the pitfall is still live.
+- **`Solver::new` is generic over `StreamSource + ?Sized`**, which is what let step 12 add a
+  vertex-indexed ψ field without touching any of the twenty existing call sites. A
+  `&dyn VelocityField` cannot be coerced to `&dyn StreamSource`, hence `app::Carrier` carries the
+  impl and dispatches. `ComputedStream` deliberately does not implement `VelocityField`.
+- **`faer` is an optional dependency**, used only by `examples/stream_faer.rs`
+  (`cargo run --release --features faer --example stream_faer`). `cargo test` never compiles it.
+  Don't promote it to a normal dependency: the trainee's inner loop is `cargo test`.
 - **`VtkF64` in `src/io/vtk.rs` writes denormals as `0`** (and switches to `{:e}`
   outside the usual exponent range). Not cosmetic: VTK's legacy ASCII reader parses with
   `istream >> double`, which sets `failbit` on underflow, then abandons the rest of the file
@@ -121,7 +149,7 @@ mask ──▶ mesh ──▶ field ──▶ solver ──▶ io (VTK / PNG)
 
 ### Step machinery (feature-gated exercises)
 
-Each training step is a Cargo feature (`step0` … `step11` currently, chained: `stepN = ["stepN-1"]`),
+Each training step is a Cargo feature (`step0` … `step12` currently, chained: `stepN = ["stepN-1"]`),
 so `cargo test` in `travail/` only shows tests for steps already opened. `LAST_STEP` in
 `xtask/src/main.rs` must track the highest implemented step. In this corrigé, source blocks
 between `// SOLUTION-BEGIN` / `// SOLUTION-END` (preceded by a `// TODO-STEP:<n>` comment)
@@ -139,7 +167,7 @@ Conventions when adding a new step (full list in `docs/AVANCEMENT.md`):
    visible). When the warning comes from a `#[cfg]` rather than a hole, gate the import
    instead of allowing it. Full rationale in `docs/AVANCEMENT.md` § "Avertissements dans
    travail/".
-   **`step12` is the sentinel feature**: one step past `LAST_STEP`, gating no code, on by
+   **`step13` is the sentinel feature**: one step past `LAST_STEP`, gating no code, on by
    default in both `Cargo.toml` and `mpi/Cargo.toml` so that every `not(feature =
    "stepN+1")` guard is inert in this corrigé. `goto` rewrites the root manifest;
    `make_starter` clears `mpi/Cargo.toml`'s default, so `travail/` never has it. A step

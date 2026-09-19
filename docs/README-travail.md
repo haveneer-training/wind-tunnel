@@ -11,8 +11,8 @@ Vous allez construire, étape par étape, un petit code de calcul complet : lect
 domaine, génération d'un maillage non structuré, transport d'un traceur passif autour
 d'un obstacle, écriture des résultats en VTK et en PNG.
 
-Le squelette est là, les tests aussi. Ce qui manque, ce sont **15 `todo!()`**, répartis
-sur sept étapes. Le code complet, lui, se trouve dans le répertoire parent, celui d'où
+Le squelette est là, les tests aussi. Ce qui manque, ce sont **30 `todo!()`**, répartis
+sur treize étapes (0 à 12). Le code complet, lui, se trouve dans le répertoire parent, celui d'où
 vous avez lancé `cargo xtask starter` : consultez-le quand vous voulez, mais essayez
 d'abord.
 
