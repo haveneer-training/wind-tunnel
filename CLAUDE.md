@@ -28,7 +28,7 @@ Which doc is which:
 ## Commands
 
 ```shell
-cargo test                                              # all tests (79 currently)
+cargo test                                              # all tests (80 currently)
 cargo test --test mesh                                  # one test file
 cargo test the_mesh_is_mixed                             # one test by name
 cargo clippy --all-targets --all-features -- -D warnings # must stay clean
@@ -143,10 +143,14 @@ mask ──▶ mesh ──▶ field ──▶ solver ──▶ io (VTK / PNG)
   frame by frame: different flows get different CFL-imposed `dt`, so equal frame indices
   are *not* equal instants. Implemented in `Solver::run` (`Config::output_dt`), hence
   refused by the MPI driver, whose own time loop is the step-11 hole.
-- A `.pvd` collection would be the clean way to carry time into ParaView, and it is
-  deliberately **not** used: it crashes `vtkPVDReader` 6.1.1 on legacy VTK (tested — see
-  the comment in `mpi/src/main.rs`). The date is written as `TIME`/`TimeValue`/`CYCLE`
-  field data instead, and `--frame-dt` is the reader-independent fallback.
+- **ParaView time comes from `frames.vtk.series`**, written by `vtk::write_series` at the
+  end of a run — a small JSON listing each frame and its date. The two alternatives are
+  both dead ends, each verified against ParaView 6.1.1 with `pvpython`: a `.pvd` crashes
+  `vtkPVDReader` on legacy VTK, and the in-file `FIELD FieldData` date is read but *not*
+  used as the time axis. The in-file date is kept anyway (VisIt, and any reader that wants
+  it), but it must sit **between `DATASET` and `POINTS`**: written after `POINT_DATA` it is
+  attached to the points, and ParaView then rejects the whole file with "Attribute
+  Mismatch" and loads zero cells. A test locks the ordering.
 - **`VtkF64` in `src/io/vtk.rs` writes denormals as `0`** (and switches to `{:e}`
   outside the usual exponent range). Not cosmetic: VTK's legacy ASCII reader parses with
   `istream >> double`, which sets `failbit` on underflow, then abandons the rest of the file

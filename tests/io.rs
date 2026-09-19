@@ -14,7 +14,7 @@ use wind_tunnel::field::Field;
 use wind_tunnel::geom::Vec2;
 use wind_tunnel::io::vtk::write_vtk;
 #[cfg(feature = "step4")]
-use wind_tunnel::io::vtk::{write_frame, Frame};
+use wind_tunnel::io::vtk::{write_frame, write_series, Frame};
 use wind_tunnel::mask::Mask;
 use wind_tunnel::mesh::{CellId, Mesh};
 
@@ -177,16 +177,54 @@ fn a_frame_carries_the_flow_and_its_date() {
         .count();
     assert_eq!(psi_values, mesh.n_vertices());
 
-    // la date, sous les trois noms attendus par les lecteurs usuels
+    // La date, sous les trois noms attendus par les lecteurs usuels — et surtout **avant**
+    // les POINTS. Écrite plus bas, elle est rattachée à la dernière section ouverte : le
+    // lecteur y voit un tableau d'une seule valeur pour N points, refuse le fichier entier
+    // (« Attribute Mismatch ») et ParaView n'affiche plus rien. C'est arrivé.
     for keyword in ["TIME 1 1 double", "TimeValue 1 1 double", "CYCLE 1 1 int"] {
         assert!(text.contains(keyword), "{keyword} absent");
     }
+    let field = text.find("FIELD FieldData").expect("FIELD absent");
+    let points = text.find("POINTS").expect("POINTS absent");
+    assert!(
+        field < points,
+        "le bloc FIELD doit précéder POINTS, sinon le lecteur le rattache aux points"
+    );
     let time = text
         .lines()
         .skip_while(|l| !l.starts_with("TIME 1 1 double"))
         .nth(1)
         .expect("valeur de temps absente");
     assert_eq!(time.parse::<f64>().expect("temps illisible"), 1.25);
+
+    fs::remove_file(&path).ok();
+}
+
+#[cfg(feature = "step4")]
+#[test]
+fn the_series_file_dates_every_frame() {
+    let path = std::env::temp_dir().join("wind-tunnel-test.vtk.series");
+    let frames = vec![
+        ("frame_0000.vtk".to_string(), 0.0),
+        ("frame_0001.vtk".to_string(), 0.5),
+        ("frame_0002.vtk".to_string(), 1.25),
+    ];
+    write_series(&path, &frames).expect("écriture impossible");
+    let text = fs::read_to_string(&path).expect("relecture impossible");
+
+    assert!(text.contains("\"file-series-version\": \"1.0\""));
+    for (name, time) in &frames {
+        assert!(
+            text.contains(&format!("\"name\": \"{name}\"")),
+            "{name} absent de la série"
+        );
+        assert!(
+            text.contains(&format!("\"time\": {time}")),
+            "date de {name}"
+        );
+    }
+    // Une virgule de trop après le dernier élément, et le JSON n'est plus lisible.
+    assert!(!text.contains("}},\n  ]"), "virgule finale en trop");
 
     fs::remove_file(&path).ok();
 }

@@ -46,7 +46,7 @@ Et si vous voulez seulement voir tourner la version finie, depuis ce dépôt-ci 
 ```shell
 cargo test                                # tout est vert
 cargo run --release -- domains/tunnel.dom # écrit out/frame_XXXX.png et .vtk
-open out/frame_0010.png                   # ou paraview out/frame_0010.vtk
+open out/frame_0010.png                   # ou paraview out/frames.vtk.series
 ```
 
 Quelques options utiles :
@@ -115,11 +115,15 @@ pas le même pas de temps — la CFL le déduit du débit maximal, et l'écoulem
 accélère davantage dans les passages — donc leurs images de même rang ne montrent pas le
 même instant et ne se comparent pas.
 
+Dans ParaView, **ouvrez `frames.vtk.series`, pas les `frame_*.vtk`** : c'est lui qui porte
+la date de chaque image. Sans lui, ParaView numérote les images 0, 1, 2… et les deux
+calculs ne se superposent pas.
+
 Chaque fichier VTK contient, au-delà du traceur `c` : la vitesse `u` et sa norme `speed`
-aux cellules, la fonction de courant `psi` aux **sommets**, et la date de l'image. Dans
-ParaView, un filtre *Contour* sur `psi` trace les lignes de courant exactes — ce sont les
-isolignes elles-mêmes, pas une intégration de trajectoires — et c'est le moyen le plus
-direct de voir en quoi les deux écoulements diffèrent.
+aux cellules, la fonction de courant `psi` aux **sommets**, et sa date. Un filtre *Contour*
+sur `psi` trace les lignes de courant exactes — ce sont les isolignes elles-mêmes, pas une
+intégration de trajectoires — et c'est le moyen le plus direct de voir en quoi les deux
+écoulements diffèrent.
 
 ## Organisation
 
