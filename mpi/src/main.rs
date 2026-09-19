@@ -127,6 +127,21 @@ fn run() -> Result<(), Box<dyn Error>> {
     // inventerait son propre obstacle et son propre écoulement.
     let mask = args.read_mask()?;
     let h = args.cell_size();
+    // L'écoulement calculé de l'étape 12 résout `ψ` sur *un* maillage, et aucun rang ne
+    // détient le maillage complet : le faire ici demanderait soit que chaque rang maille
+    // le domaine entier — ce que toute l'étape 11 s'emploie à éviter — soit un gradient
+    // conjugué distribué, avec échange de halo à chaque produit matrice-vecteur. C'est un
+    // bon exercice, et c'est celui que propose `docs/etapes/etape-12.md` ; en attendant,
+    // mieux vaut le dire que faire semblant.
+    if args.flow != "analytic" {
+        return Err(format!(
+            "--flow {} n'est pas disponible sous MPI : l'écoulement calculé demande un \
+             maillage complet, qu'aucun rang ne possède.\nUtilisez l'exécutable \
+             séquentiel, ou --flow analytic.",
+            args.flow
+        )
+        .into());
+    }
     let velocity = app::velocity_for(&mask, &args, h)?;
 
     let bands = Bands::new(mask.cols(), parts, HALO)?;

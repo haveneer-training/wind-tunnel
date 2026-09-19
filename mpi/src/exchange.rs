@@ -22,7 +22,7 @@ use wind_tunnel::field::Field;
 /// C'est la même discipline que le tampon `work` de
 /// [`Solver::run`](wind_tunnel::solver::Solver::run) : dans une boucle en temps, la
 /// mémoire se réserve avant la boucle, pas dedans.
-#[cfg_attr(not(feature = "step12"), allow(dead_code))] // collatéral du trou étape 11
+#[cfg_attr(not(feature = "step13"), allow(dead_code))] // collatéral du trou étape 11
 pub struct Halo {
     to_left: Vec<f64>,
     to_right: Vec<f64>,
