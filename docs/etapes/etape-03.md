@@ -37,6 +37,12 @@ LOOKUP_TABLE default
 
 `cell.kind.vtk_code()` vous donne déjà le code de type.
 
+Ce que vous écrivez ici est le squelette du fichier : la géométrie, et un champ par
+cellule. Les images d'un calcul complet en portent davantage — la vitesse, la fonction de
+courant, la date — ajoutés par-dessus, hors de cette fonction. Le tableau de tous les
+champs et leur lecture dans ParaView sont dans le `README.md`, section « Ce que contient
+une sortie ».
+
 ## Ce qu'il y a à remarquer
 
 **`?` est un `goto` discipliné.** Chaque `write!` peut échouer — disque plein, chemin
