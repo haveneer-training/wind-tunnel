@@ -5,6 +5,7 @@
 //! rôle d'un trait : nommer ce dont on a besoin, pas ce dont on dispose.
 
 use crate::geom::{Point, Vec2};
+use crate::mesh::VertexId;
 
 /// Un champ de vitesse stationnaire et incompressible.
 ///
@@ -28,6 +29,33 @@ pub trait VelocityField: Sync {
     /// donnée initiale valant au plus 1. Discrétiser le bon objet vaut mieux que
     /// rattraper l'erreur ensuite.
     fn stream(&self, p: Point) -> f64;
+}
+
+/// Ce dont le solveur a réellement besoin : `ψ` à chaque **sommet** du maillage.
+///
+/// [`VelocityField`] promet plus que ça — une vitesse et une fonction de courant en
+/// *n'importe quel* point — et c'est une promesse qu'un écoulement calculé ne peut pas
+/// tenir : il ne connaît `ψ` qu'aux sommets où il l'a résolue, et rien entre eux. D'où
+/// ce second contrat, plus pauvre, qui est exactement celui que `compute_face_flux`
+/// consomme : le débit d'une face ne demande jamais que les valeurs de ses deux
+/// extrémités.
+///
+/// L'implémentation générale ci-dessous fait que **tout** [`VelocityField`] est déjà une
+/// source de fonction de courant : les écoulements analytiques n'ont rien à écrire, et
+/// l'étape 12 ajoute un type qui n'implémente que ce trait-ci.
+pub trait StreamSource: Sync {
+    /// Fonction de courant au sommet `id`, dont les coordonnées sont `p`.
+    ///
+    /// Les deux arguments sont redondants pour un écoulement analytique (qui n'utilise
+    /// que `p`) comme pour un écoulement calculé (qui n'utilise que `id`) : c'est le
+    /// prix à payer pour que le même appel serve aux deux.
+    fn stream_at(&self, id: VertexId, p: Point) -> f64;
+}
+
+impl<F: VelocityField + ?Sized> StreamSource for F {
+    fn stream_at(&self, _id: VertexId, p: Point) -> f64 {
+        self.stream(p)
+    }
 }
 
 /// Un écoulement uniforme.
