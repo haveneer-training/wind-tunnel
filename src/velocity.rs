@@ -17,6 +17,12 @@ pub trait VelocityField: Sync {
 
     /// Fonction de courant `ψ`, telle que `u = (∂ψ/∂y, −∂ψ/∂x)`.
     ///
+    /// Elle existe dès que l'écoulement est à divergence nulle, ses lignes de niveau sont
+    /// les lignes de courant, et sa différence entre deux points est le débit qui passe
+    /// entre eux. `docs/etapes/etape-04.md` en donne la démonstration, convention de signe
+    /// comprise — le `ψ(b) − ψ(a)` ci-dessous se déduit de l'orientation directe des
+    /// cellules et de `Vec2::perp_cw`, il n'est pas une convention arbitraire.
+    ///
     /// Elle n'est pas là par élégance mathématique. Le débit à travers une arête
     /// `a → b` vaut exactement `ψ(b) − ψ(a)` ; le solveur calcule donc ses débits
     /// par différences de `ψ` plutôt qu'en échantillonnant la vitesse. Le bilan de
