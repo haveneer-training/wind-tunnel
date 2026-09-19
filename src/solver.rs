@@ -27,8 +27,8 @@ use crate::geom::Vec2;
 #[cfg(feature = "step7")]
 use crate::gradient;
 #[cfg_attr(not(feature = "step10"), allow(unused_imports))] // collatéral du trou étape 9
-use crate::mesh::{BoundaryKind, CellId, Mesh, Side};
-use crate::velocity::VelocityField;
+use crate::mesh::{BoundaryKind, CellId, FaceId, Mesh, Side};
+use crate::velocity::StreamSource;
 
 /// Schéma d'intégration en temps.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
@@ -88,8 +88,13 @@ impl Default for Config {
             // de l'écoulement analytique, donc un petit débit résiduel la traverse.
             // Le supprimer fabriquerait une divergence artificielle et ferait perdre
             // au schéma sa propriété de borne ; on préfère laisser ce débit emporter
-            // la valeur locale. L'étape 12, qui calcule l'écoulement sur le maillage
-            // lui-même, supprime le résidu à la source.
+            // la valeur locale.
+            //
+            // C'est le défaut par défaut, celui qui va avec un écoulement analytique.
+            // L'écoulement calculé de l'étape 12 supprime le résidu à la source — ses
+            // parois sont des lignes de courant exactes — et permet alors de passer
+            // `Wall` et `Obstacle` en `NoFlux` ; c'est `app::solver_config` qui le fait,
+            // au vu de l'écoulement demandé.
             bc: BTreeMap::from([
                 (BoundaryKind::Inlet, Bc::Fixed(0.0)),
                 (BoundaryKind::Outlet, Bc::ZeroGradient),
@@ -125,9 +130,14 @@ impl<'m, F: FluxScheme> Solver<'m, F> {
     /// Une intégration explicite instable ne donne pas un résultat approximatif : elle
     /// donne du bruit, puis des `NaN`. Autant le dire avant les dix mille pas de temps
     /// plutôt qu'après.
-    pub fn new(
+    ///
+    /// L'écoulement n'est pas emprunté au-delà de cet appel : les débits de face sont
+    /// calculés une fois ici, et le solveur n'en garde que le résultat. Le paramètre est
+    /// générique et `?Sized` pour accepter indifféremment un écoulement concret, un
+    /// `&dyn VelocityField` et — depuis l'étape 12 — un champ de `ψ` résolu aux sommets.
+    pub fn new<S: StreamSource + ?Sized>(
         mesh: &'m Mesh,
-        velocity: &dyn VelocityField,
+        velocity: &S,
         scheme: F,
         config: Config,
     ) -> Result<Self, SolverError> {
@@ -165,6 +175,14 @@ impl<'m, F: FluxScheme> Solver<'m, F> {
     /// Pas de temps maximal admissible par la condition CFL.
     pub fn max_stable_dt(&self) -> f64 {
         self.dt_max
+    }
+
+    /// Débit volumique d'une face, sortant de `face.left`.
+    ///
+    /// Exposé pour que les tests puissent mesurer ce qui traverse une paroi — c'est la
+    /// propriété qui sépare un écoulement calculé d'un écoulement analytique.
+    pub fn face_flux(&self, id: FaceId) -> f64 {
+        self.face_flux[id.index()]
     }
 
     /// Bilan de débit d'une cellule : `Σ_f débit sortant`.
@@ -460,14 +478,17 @@ impl<'m, F: FluxScheme> Solver<'m, F> {
 /// Débit volumique de chaque face, par différence de fonction de courant (voir le champ
 /// `face_flux` de [`Solver`]).
 #[cfg(feature = "step9")]
-fn compute_face_flux(mesh: &Mesh, velocity: &dyn VelocityField) -> Vec<f64> {
+fn compute_face_flux<S: StreamSource + ?Sized>(mesh: &Mesh, velocity: &S) -> Vec<f64> {
     let vertices = mesh.vertices();
     // TODO-STEP:9 Paralléliser ce calcul avec rayon. C'est un `map` sur les faces,
     // chacune indépendante des autres : `.iter()` → `.par_iter()` suffit.
     // SOLUTION-BEGIN
     mesh.faces()
         .par_iter()
-        .map(|f| velocity.stream(vertices[f.b.index()]) - velocity.stream(vertices[f.a.index()]))
+        .map(|f| {
+            velocity.stream_at(f.b, vertices[f.b.index()])
+                - velocity.stream_at(f.a, vertices[f.a.index()])
+        })
         .collect()
     // SOLUTION-END
 }
@@ -475,11 +496,14 @@ fn compute_face_flux(mesh: &Mesh, velocity: &dyn VelocityField) -> Vec<f64> {
 /// Débit volumique de chaque face, par différence de fonction de courant (voir le champ
 /// `face_flux` de [`Solver`]).
 #[cfg(not(feature = "step9"))]
-fn compute_face_flux(mesh: &Mesh, velocity: &dyn VelocityField) -> Vec<f64> {
+fn compute_face_flux<S: StreamSource + ?Sized>(mesh: &Mesh, velocity: &S) -> Vec<f64> {
     let vertices = mesh.vertices();
     mesh.faces()
         .iter()
-        .map(|f| velocity.stream(vertices[f.b.index()]) - velocity.stream(vertices[f.a.index()]))
+        .map(|f| {
+            velocity.stream_at(f.b, vertices[f.b.index()])
+                - velocity.stream_at(f.a, vertices[f.a.index()])
+        })
         .collect()
 }
 
