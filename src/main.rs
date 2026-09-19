@@ -75,9 +75,12 @@ fn run() -> Result<(), Box<dyn Error>> {
     let speed = wind_tunnel::field::Field::from_fn(&mesh, |id| velocity[id.index()].norm());
 
     let mut frame = 0usize;
+    let mut series: Vec<(String, f64)> = Vec::new();
     solver.run(&mut c, |step, time, field| {
+        let name = format!("frame_{frame:04}.vtk");
+        series.push((name.clone(), time));
         vtk::write_frame(
-            out.join(format!("frame_{frame:04}.vtk")),
+            out.join(&name),
             &mesh,
             &Frame {
                 cells: &[("c", field), ("speed", &speed)],
@@ -105,6 +108,11 @@ fn run() -> Result<(), Box<dyn Error>> {
         frame += 1;
         Ok(())
     })?;
+
+    // Sans cette métadonnée, ParaView numérote les images 0, 1, 2… au lieu de les dater,
+    // et deux calculs de pas de temps différents ne se superposent pas.
+    vtk::write_series(out.join("frames.vtk.series"), &series).map_err(SolverError::Output)?;
+    println!("série      : {}", out.join("frames.vtk.series").display());
 
     // On rapporte la variation sans l'interpréter : selon les conditions aux limites
     // et l'inclinaison de l'écoulement, le domaine peut aussi bien se vider que se

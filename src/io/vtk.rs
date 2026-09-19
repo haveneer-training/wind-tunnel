@@ -54,27 +54,32 @@ impl fmt::Display for VtkF64 {
 /// Écrit le maillage et une liste de champs nommés.
 pub fn write_vtk(path: impl AsRef<Path>, mesh: &Mesh, fields: &[(&str, &Field)]) -> io::Result<()> {
     let mut w = BufWriter::new(File::create(path)?);
+    write_header(&mut w)?;
     write_dataset(&mut w, mesh, fields)?;
     w.flush()
 }
 
-/// Le corps du fichier : géométrie, puis les champs aux cellules.
-///
-/// Écrit dans un `impl Write` plutôt que dans un fichier : c'est ce qui permet à
-/// [`write_frame`] d'ajouter ses propres sections à la suite sans dupliquer une ligne de
-/// géométrie, et à un test d'écrire dans un `Vec<u8>`.
-#[cfg_attr(not(feature = "step3"), allow(unused_variables))] // trou étape 3
-fn write_dataset(w: &mut impl Write, mesh: &Mesh, fields: &[(&str, &Field)]) -> io::Result<()> {
-    // TODO-STEP:3 Écrire l'en-tête, les POINTS, les CELLS (précédées de leur nombre de
-    // sommets), les CELL_TYPES, puis chaque champ en CELL_DATA / SCALARS.
-    // Chaque `?` propage l'erreur d'écriture : rien n'est avalé en silence.
-    // Tout flottant est enveloppé dans `VtkF64` — voir ce type pour la raison.
-    // SOLUTION-BEGIN
+/// Les quatre lignes d'en-tête, identiques dans tous les fichiers.
+fn write_header(w: &mut impl Write) -> io::Result<()> {
     writeln!(w, "# vtk DataFile Version 3.0")?;
     writeln!(w, "wind-tunnel")?;
     writeln!(w, "ASCII")?;
-    writeln!(w, "DATASET UNSTRUCTURED_GRID")?;
+    writeln!(w, "DATASET UNSTRUCTURED_GRID")
+}
 
+/// Le corps du fichier, en-tête exclu : géométrie, puis les champs aux cellules.
+///
+/// Écrit dans un `impl Write` plutôt que dans un fichier : c'est ce qui permet à
+/// [`write_frame`] d'intercaler ses propres sections avant et après, sans dupliquer une
+/// ligne de géométrie, et à un test d'écrire dans un `Vec<u8>`.
+#[cfg_attr(not(feature = "step3"), allow(unused_variables))] // trou étape 3
+fn write_dataset(w: &mut impl Write, mesh: &Mesh, fields: &[(&str, &Field)]) -> io::Result<()> {
+    // TODO-STEP:3 Écrire les POINTS, les CELLS (précédées de leur nombre de sommets),
+    // les CELL_TYPES, puis chaque champ en CELL_DATA / SCALARS. Les quatre lignes
+    // d'en-tête sont déjà écrites par l'appelant.
+    // Chaque `?` propage l'erreur d'écriture : rien n'est avalé en silence.
+    // Tout flottant est enveloppé dans `VtkF64` — voir ce type pour la raison.
+    // SOLUTION-BEGIN
     writeln!(w, "POINTS {} double", mesh.n_vertices())?;
     for p in mesh.vertices() {
         writeln!(w, "{} {} 0", VtkF64(p.x), VtkF64(p.y))?;
@@ -141,6 +146,22 @@ pub struct Frame<'a> {
 /// de même rang portent alors la même date, et se comparent directement.
 pub fn write_frame(path: impl AsRef<Path>, mesh: &Mesh, frame: &Frame) -> io::Result<()> {
     let mut w = BufWriter::new(File::create(path)?);
+    write_header(&mut w)?;
+
+    // Les données de champ du *jeu de données* se déclarent ici, entre `DATASET` et
+    // `POINTS`. Plus bas, le lecteur legacy les rattache à la dernière section ouverte :
+    // écrites après `POINT_DATA`, elles deviennent un tableau aux points, d'où
+    // « Point array TIME with 1 components, only has 1 tuples but there are N points »,
+    // puis « Attribute Mismatch », et ParaView renonce au fichier entier — zéro cellule
+    // lue, série inouvrable. Constaté avec ParaView 6.1.1, corrigé, revérifié.
+    writeln!(w, "FIELD FieldData 3")?;
+    writeln!(w, "TIME 1 1 double")?;
+    writeln!(w, "{}", VtkF64(frame.time))?;
+    writeln!(w, "TimeValue 1 1 double")?;
+    writeln!(w, "{}", VtkF64(frame.time))?;
+    writeln!(w, "CYCLE 1 1 int")?;
+    writeln!(w, "{}", frame.cycle)?;
+
     // Ouvre la section CELL_DATA, que les vecteurs ci-dessous prolongent.
     write_dataset(&mut w, mesh, frame.cells)?;
 
@@ -162,13 +183,35 @@ pub fn write_frame(path: impl AsRef<Path>, mesh: &Mesh, frame: &Frame) -> io::Re
         }
     }
 
-    writeln!(w, "FIELD FieldData 3")?;
-    writeln!(w, "TIME 1 1 double")?;
-    writeln!(w, "{}", VtkF64(frame.time))?;
-    writeln!(w, "TimeValue 1 1 double")?;
-    writeln!(w, "{}", VtkF64(frame.time))?;
-    writeln!(w, "CYCLE 1 1 int")?;
-    writeln!(w, "{}", frame.cycle)?;
+    w.flush()
+}
 
+/// Écrit la métadonnée de série que ParaView lit pour connaître la date de chaque image.
+///
+/// Format `.vtk.series` : un petit JSON listant les fichiers et leur date. C'est la voie
+/// officielle, et la seule qui marche ici — le `.pvd`, plus connu, fait planter
+/// `vtkPVDReader` sur du VTK legacy (voir `mpi/src/main.rs`), et la date inscrite dans le
+/// fichier lui-même, en `FIELD FieldData`, est bien lue mais pas utilisée comme axe du
+/// temps : sans ce fichier, ParaView numérote les images 0, 1, 2… Vérifié avec ParaView
+/// 6.1.1.
+///
+/// Ouvrez `frames.vtk.series` plutôt que `frame_*.vtk` : deux calculs de pas de temps
+/// différents se superposent alors sur le même axe, et l'animation montre le même instant
+/// des deux côtés.
+pub fn write_series(path: impl AsRef<Path>, frames: &[(String, f64)]) -> io::Result<()> {
+    let mut w = BufWriter::new(File::create(path)?);
+    writeln!(w, "{{")?;
+    writeln!(w, "  \"file-series-version\": \"1.0\",")?;
+    writeln!(w, "  \"files\": [")?;
+    for (i, (name, time)) in frames.iter().enumerate() {
+        let comma = if i + 1 == frames.len() { "" } else { "," };
+        writeln!(
+            w,
+            "    {{ \"name\": \"{name}\", \"time\": {} }}{comma}",
+            VtkF64(*time)
+        )?;
+    }
+    writeln!(w, "  ]")?;
+    writeln!(w, "}}")?;
     w.flush()
 }

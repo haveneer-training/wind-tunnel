@@ -27,7 +27,7 @@ avec `thread::scope`, `Mutex` et `mpsc` (étape 10), et enfin la décomposition 
 MPI (étape 11, bonus), et l'écoulement calculé sur le maillage (étape 12, bonus). Le code
 tourne et produit l'animation.
 
-- 79 tests verts (72 hors doctests), `cargo clippy --all-targets --all-features -- -D warnings` propre,
+- 80 tests verts (73 hors doctests), `cargo clippy --all-targets --all-features -- -D warnings` propre,
   `cargo fmt` appliqué
 - 30 trous répartis : 5 en étape 0, 2 en 1, 2 en 2, 2 en 3, 1 en 4, 3 en 5, 1 en 6, 2 en 7,
   1 en 8, 3 en 9, 0 en 10, 5 en 11, 3 en 12
@@ -226,11 +226,23 @@ Deux contraintes de structure ont guidé la mise en œuvre, et ne sont pas à d�
   que ce pilote n'utilise pas — il a sa propre boucle, celle des halos, et c'est le trou de
   l'étape 11.
 
-La date est écrite en `FIELD FieldData` sous trois noms (`TIME`, `TimeValue`, `CYCLE`).
-Aucun n'est garanti par le format : c'est une convention de lecteur. **Le `.pvd`, qui serait
-la voie propre, reste exclu** — il fait planter `vtkPVDReader` de ParaView 6.1.1 sur du VTK
-legacy (testé, voir le commentaire dans `mpi/src/main.rs`). D'où `--frame-dt`, qui ne dépend
-d'aucun lecteur.
+Le temps dans ParaView passe par **`frames.vtk.series`**, écrit en fin de calcul par
+`vtk::write_series` : un petit JSON qui donne la date de chaque image. Les deux autres
+voies sont des impasses, l'une et l'autre vérifiées contre ParaView 6.1.1 avec `pvpython`
+(`/Applications/ParaView-6.1.1.app/Contents/bin/pvpython`) :
+
+- le `.pvd`, le plus connu, fait planter `vtkPVDReader` sur du VTK legacy ;
+- la date inscrite dans le fichier, en `FIELD FieldData`, est bien lue mais **n'est pas**
+  prise comme axe du temps : sans le `.series`, ParaView numérote les images 0, 1, 2…
+
+Cette date reste écrite (VisIt s'en sert, et elle documente le fichier), mais **sa place est
+imposée : entre `DATASET` et `POINTS`**. Écrite après `POINT_DATA`, le lecteur legacy la
+rattache aux points — « Point array TIME with 1 components, only has 1 tuples but there are
+N points », puis « Attribute Mismatch » — et ParaView refuse le fichier entier, zéro cellule
+lue. C'est arrivé, un test verrouille désormais l'ordre.
+
+`--frame-dt` reste utile indépendamment du lecteur : il donne aux images des deux calculs
+les mêmes dates, à un pas de temps près.
 
 ## Ce qui reste
 
@@ -429,7 +441,7 @@ renvoyant une `String` : un fichier contient de l'ordre du million de nombres, e
 ## Vérifier que tout va bien
 
 ```shell
-cargo test                                   # 79 tests
+cargo test                                   # 80 tests
 cargo clippy --all-targets --all-features -- -D warnings
 cargo clippy -p wind-tunnel-mpi --all-targets -- -D warnings   # nécessite MPI
 cargo fmt --all --check
