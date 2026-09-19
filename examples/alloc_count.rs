@@ -72,7 +72,7 @@ fn main() {
 
     for scheme in [TimeScheme::Euler, TimeScheme::Rk2] {
         let config = Config {
-            steps: 20,
+            max_steps: 20,
             output_every: 0,
             check_every: 0,
             time_scheme: scheme,

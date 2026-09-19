@@ -218,14 +218,14 @@ fn owned_masses_sum_to_the_whole() {
 
 /// Rejoue la décomposition dans un seul processus : c'est l'algorithme du crate `mpi/`,
 /// avec des recopies mémoire à la place des messages.
-fn run_decomposed(mask: &Mask, h: f64, parts: usize, steps: usize, dt: f64) -> Vec<(u32, f64)> {
+fn run_decomposed(mask: &Mask, h: f64, parts: usize, max_steps: usize, dt: f64) -> Vec<(u32, f64)> {
     let bands = Bands::new(mask.cols(), parts, HALO).unwrap();
     let flow = Uniform {
         value: wind_tunnel::geom::Vec2::new(1.0, 0.4),
     };
     let config = Config {
         dt: Some(dt),
-        steps,
+        max_steps,
         output_every: 0,
         time_scheme: TimeScheme::Rk2,
         ..Config::default()
@@ -262,7 +262,7 @@ fn run_decomposed(mask: &Mask, h: f64, parts: usize, steps: usize, dt: f64) -> V
     let mut k1: Vec<Field> = meshes.iter().map(|m| Field::zeros(m.n_cells())).collect();
     let mut k2: Vec<Field> = meshes.iter().map(|m| Field::zeros(m.n_cells())).collect();
 
-    for _ in 0..steps {
+    for _ in 0..max_steps {
         // RK2 avec un échange avant *chaque* évaluation de résidu.
         exchange(&mut fields);
         let mut predictors = Vec::with_capacity(parts);
@@ -316,7 +316,7 @@ fn decomposed_run_matches_monolithic() {
 
     let config = Config {
         dt: Some(dt),
-        steps,
+        max_steps: steps,
         output_every: 0,
         time_scheme: TimeScheme::Rk2,
         ..Config::default()

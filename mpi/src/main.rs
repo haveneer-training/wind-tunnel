@@ -67,7 +67,7 @@ fn time_loop<F: FluxScheme>(
     let mut k2 = Field::zeros(c.len());
     let mut predictor = Field::zeros(c.len());
 
-    for step in 1..=config.steps {
+    for step in 1..=config.max_steps {
         halo.exchange(world, layout, c);
         solver.residual(c, &mut k1);
 
@@ -136,9 +136,9 @@ fn run() -> Result<(), Box<dyn Error>> {
     // La cadence en temps physique est mise en œuvre par `Solver::run`, que ce pilote
     // n'utilise pas : il a sa propre boucle, celle qui échange les halos, et c'est
     // l'exercice de l'étape 11. Plutôt que d'alourdir ce trou, on refuse l'option.
-    if args.frame_dt.is_some() {
+    if args.every_dt.is_some() {
         return Err(
-            "--frame-dt n'est pas disponible sous MPI : le pilote distribué a sa \
+            "--every-dt n'est pas disponible sous MPI : le pilote distribué a sa \
                     propre boucle en temps, qui sort tous les --every pas.\nUtilisez \
                     --every, ou l'exécutable séquentiel."
                 .into(),
@@ -169,6 +169,14 @@ fn run() -> Result<(), Box<dyn Error>> {
     )?;
     let dt_max = global_dt_max(&world, probe.max_stable_dt());
     config.dt = Some(args.dt.unwrap_or(config.cfl * dt_max));
+    // `--max-time` s'exprime en secondes, la boucle distribuée compte en pas : la
+    // conversion se fait ici, une fois le pas de temps connu — et donne le même nombre sur
+    // tous les rangs, puisque `dt_max` vient d'une réduction globale. Les deux plafonds se
+    // ramènent alors à un seul, le plus petit, et la boucle n'a rien à savoir.
+    if let Some(end) = config.max_time.filter(|end| *end > 0.0) {
+        let dt = config.dt.expect("pas de temps fixé juste au-dessus");
+        config.max_steps = config.max_steps.min((end / dt).ceil() as usize);
+    }
     drop(probe);
 
     let solver = Solver::new(

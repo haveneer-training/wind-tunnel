@@ -19,7 +19,7 @@ if [ -z "$last_step" ]; then
 fi
 
 domain="$root/domains/tunnel.dom"
-run_args=(--refine 2 --bands 3 --steps 3)
+run_args=(--refine 2 --bands 3 --max-steps 3)
 
 red=$'\033[31m'
 green=$'\033[32m'

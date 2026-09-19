@@ -27,7 +27,7 @@ avec `thread::scope`, `Mutex` et `mpsc` (étape 10), et enfin la décomposition 
 MPI (étape 11, bonus), et l'écoulement calculé sur le maillage (étape 12, bonus). Le code
 tourne et produit l'animation.
 
-- 80 tests verts (73 hors doctests), `cargo clippy --all-targets --all-features -- -D warnings` propre,
+- 83 tests verts (76 hors doctests), `cargo clippy --all-targets --all-features -- -D warnings` propre,
   `cargo fmt` appliqué
 - 30 trous répartis : 5 en étape 0, 2 en 1, 2 en 2, 2 en 3, 1 en 4, 3 en 5, 1 en 6, 2 en 7,
   1 en 8, 3 en 9, 0 en 10, 5 en 11, 3 en 12
@@ -209,11 +209,23 @@ blocage, coins) demandent de savoir quoi regarder. Trois ajouts y répondent.
 - **`vtk::write_frame`** écrit, en plus de `c` : `u` et `speed` aux cellules, `psi` aux
   **sommets**, et la date de l'image. `psi` est le vrai apport — un filtre *Contour* dans
   ParaView en tire les lignes de courant exactes, isolignes et non trajectoires intégrées.
-- **`--frame-dt <s>`** sort les images à date physique fixe, au premier pas qui atteint la
-  date visée et sans dérive cumulée (`Config::output_dt`, mis en œuvre dans `Solver::run`).
-  C'est ce qui rend deux calculs comparables image par image : leurs pas de temps diffèrent,
-  la CFL les déduisant du débit maximal, et l'écoulement calculé accélère davantage dans
-  les passages — mesuré, 2,53e-2 s contre 3,98e-2 s sur `square.dom` à `--refine 2`.
+- **`--max-time <s>` et `--every-dt <s>`** expriment en temps physique ce que `--max-steps` et
+  `--every` expriment en pas. Ils existent parce que deux modèles n'ont pas le même pas de
+  temps — la CFL le déduit du débit maximal, et l'écoulement calculé accélère davantage
+  dans les passages : 2,53e-2 s contre 3,98e-2 s sur `square.dom` à `--refine 2`. À
+  `--max-steps` égal, les deux calculs ne s'arrêtent donc pas au même instant, et leurs images
+  de même rang ne montrent pas la même chose. `--max-time` plafonne la durée (`Config::max_time` ; le
+  calcul s'arrête au premier des deux plafonds atteint), `--every-dt` la cadence
+  (`Config::output_dt`) ; les deux vivent dans `Solver::run`, au premier pas atteignant la
+  date visée et sans dérive cumulée. Le pilote MPI reprend `--max-time` — converti en
+  nombre de pas à côté du `dt` global, hors du trou de l'étape 11, les deux plafonds se
+  ramenant alors au plus petit — mais refuse `--every-dt`.
+
+`app::caps` porte la règle qui rend ces deux plafonds utilisables : **un défaut ne
+contraint jamais une valeur explicitement demandée.** `--max-time 60` donné seul ne subit
+donc aucun plafond en pas — sans quoi il s'arrêterait au bout des 600 pas par défaut, qui
+ne font pas 60 secondes, et le calcul mentirait sur sa propre durée. Les 600 pas ne servent
+que lorsqu'on n'a rien demandé. Un test couvre les quatre combinaisons.
 
 Deux contraintes de structure ont guidé la mise en œuvre, et ne sont pas à défaire :
 
@@ -222,9 +234,10 @@ Deux contraintes de structure ont guidé la mise en œuvre, et ne sont pas à d�
   l'enveloppent, hors trou. Ajouter `psi` — qui n'existe qu'à l'étape 4 — dans le trou
   aurait rendu l'étape 3 incompréhensible. Le test correspondant est d'ailleurs conditionné
   à `step4`, pour que les rouges de l'étape 3 restent au nombre de trois.
-- Le pilote MPI **refuse `--frame-dt`** : la cadence est mise en œuvre dans `Solver::run`,
+- Le pilote MPI **refuse `--every-dt`** : la cadence est mise en œuvre dans `Solver::run`,
   que ce pilote n'utilise pas — il a sa propre boucle, celle des halos, et c'est le trou de
-  l'étape 11.
+  l'étape 11. `--max-time`, lui, passe : il se convertit en nombre de pas dès que le `dt`
+  global est connu, et la boucle n'a rien à savoir.
 
 Le temps dans ParaView passe par **`frames.vtk.series`**, écrit en fin de calcul par
 `vtk::write_series` : un petit JSON qui donne la date de chaque image. Les deux autres
@@ -241,7 +254,7 @@ rattache aux points — « Point array TIME with 1 components, only has 1 tuples
 N points », puis « Attribute Mismatch » — et ParaView refuse le fichier entier, zéro cellule
 lue. C'est arrivé, un test verrouille désormais l'ordre.
 
-`--frame-dt` reste utile indépendamment du lecteur : il donne aux images des deux calculs
+`--every-dt` reste utile indépendamment du lecteur : il donne aux images des deux calculs
 les mêmes dates, à un pas de temps près.
 
 ## Ce qui reste
@@ -441,11 +454,11 @@ renvoyant une `String` : un fichier contient de l'ordre du million de nombres, e
 ## Vérifier que tout va bien
 
 ```shell
-cargo test                                   # 80 tests
+cargo test                                   # 83 tests
 cargo clippy --all-targets --all-features -- -D warnings
 cargo clippy -p wind-tunnel-mpi --all-targets -- -D warnings   # nécessite MPI
 cargo fmt --all --check
-cargo run --release -- domains/tunnel.dom --refine 4 --bands 9 --steps 960
+cargo run --release -- domains/tunnel.dom --refine 4 --bands 9 --max-steps 960
 
 # le corrigé doit être sans avertissement à *chaque* niveau de feature : c'est ce qui
 # prouve que les `cfg_attr` conditionnels n'y cachent rien

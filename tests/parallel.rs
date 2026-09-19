@@ -29,7 +29,7 @@ fn run_on(threads: usize) -> Field {
         value: Vec2::new(1.0, 0.3),
     };
     let config = Config {
-        steps: 60,
+        max_steps: 60,
         output_every: 0,
         time_scheme: TimeScheme::Rk2,
         ..Config::default()

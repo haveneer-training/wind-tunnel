@@ -60,8 +60,17 @@ pub struct Config {
     pub cfl: f64,
     /// Pas de temps imposé. `None` pour le déduire de la condition CFL.
     pub dt: Option<f64>,
-    /// Nombre de pas de temps.
-    pub steps: usize,
+    /// Plafond en nombre de pas de temps.
+    pub max_steps: usize,
+    /// Plafond en temps simulé, en secondes ; aucun s'il vaut `None`.
+    ///
+    /// Les deux plafonds coexistent : le calcul s'arrête au **premier atteint**. Celui en
+    /// temps est le seul qui se compare d'un calcul à l'autre — le pas de temps vient de la
+    /// CFL, donc du débit maximal, et deux écoulements n'ont pas le même. À nombre de pas
+    /// égal, deux calculs ne s'arrêtent pas au même instant ; à `max_time` égal, si.
+    /// Celui en pas reste utile comme garde-fou : on ne sait pas d'avance combien de pas
+    /// coûtera une durée donnée.
+    pub max_time: Option<f64>,
     /// Période de sortie, en pas de temps (`0` pour ne rien sortir).
     pub output_every: usize,
     /// Période de sortie en *temps physique*, si elle est imposée.
@@ -85,7 +94,8 @@ impl Default for Config {
             diffusivity: 0.0,
             cfl: 0.4,
             dt: None,
-            steps: 600,
+            max_steps: 600,
+            max_time: None,
             output_every: 10,
             output_dt: None,
             check_every: 20,
@@ -503,7 +513,7 @@ impl<'m, F: FluxScheme> Solver<'m, F> {
         // indépendantes du pas de temps lui-même.
         let mut next_output = self.config.output_dt.unwrap_or(0.0);
 
-        for step in 1..=self.config.steps {
+        for step in 1..=self.config.max_steps {
             self.step(c, &mut work);
             let time = step as f64 * self.dt;
 
@@ -526,6 +536,16 @@ impl<'m, F: FluxScheme> Solver<'m, F> {
                     if self.config.output_every > 0 && step % self.config.output_every == 0 {
                         observer(step, time, c)?;
                     }
+                }
+            }
+
+            // Second plafond. On s'arrête *après* avoir dépassé la date visée, jamais
+            // avant : raboter le dernier pas pour tomber dessus exactement donnerait un pas
+            // de temps non uniforme, prix trop élevé pour une décimale. Le dépassement vaut
+            // moins d'un pas de temps.
+            if let Some(end) = self.config.max_time {
+                if time >= end {
+                    break;
                 }
             }
         }
@@ -652,7 +672,7 @@ mod tests {
             value: Vec2::new(1.0, 0.0),
         };
         let config = Config {
-            steps: 50,
+            max_steps: 50,
             output_every: 0,
             bc: BTreeMap::from([
                 (BoundaryKind::Inlet, Bc::Fixed(1.0)),
@@ -675,7 +695,7 @@ mod tests {
             value: Vec2::new(1.0, 0.0),
         };
         let config = Config {
-            steps: 10,
+            max_steps: 10,
             output_every: 0,
             check_every: 1,
             ..Config::default()
@@ -715,7 +735,7 @@ mod tests {
         };
         let period = 0.5;
         let config = Config {
-            steps: 400,
+            max_steps: 400,
             output_dt: Some(period),
             output_every: 1, // doit être ignoré quand la cadence est donnée en temps
             ..Config::default()
@@ -743,6 +763,48 @@ mod tests {
             );
         }
         assert!(times.len() > 3, "trop peu d'images : {}", times.len());
+    }
+
+    #[test]
+    fn the_run_stops_at_the_first_cap_reached() {
+        let mesh = test_mesh();
+        let flow = Uniform {
+            value: Vec2::new(1.0, 0.0),
+        };
+        let run_with = |max_steps: usize, max_time: Option<f64>| {
+            let config = Config {
+                max_steps,
+                max_time,
+                output_every: 1,
+                ..Config::default()
+            };
+            let solver = Solver::new(&mesh, &flow, Upwind, config).unwrap();
+            let mut c = Field::filled(mesh.n_cells(), 0.0);
+            let mut last = (0usize, 0.0);
+            solver
+                .run(&mut c, |step, time, _| {
+                    last = (step, time);
+                    Ok(())
+                })
+                .unwrap();
+            (last.0, last.1, solver.dt())
+        };
+
+        // Le plafond en pas tombe le premier.
+        let (steps, time, dt) = run_with(5, Some(1e6));
+        assert_eq!(steps, 5);
+        assert!((time - 5.0 * dt).abs() < 1e-12);
+
+        // Le plafond en temps tombe le premier : on s'arrête au premier pas qui l'atteint,
+        // donc jamais avant la date visée et d'au plus un pas de temps après.
+        let end = 3.0;
+        let (steps, time, dt) = run_with(usize::MAX, Some(end));
+        assert!(time >= end && time < end + dt, "arrêt à t = {time}");
+        assert_eq!(steps, (end / dt).ceil() as usize);
+
+        // Sans plafond en temps, seul celui en pas compte.
+        let (steps, _, _) = run_with(7, None);
+        assert_eq!(steps, 7);
     }
 
     #[test]
@@ -774,7 +836,7 @@ mod tests {
         let flow = Uniform { value: Vec2::ZERO };
         let config = Config {
             diffusivity: 0.1,
-            steps: 200,
+            max_steps: 200,
             output_every: 0,
             bc: BTreeMap::new(), // tout en flux nul, par défaut
             ..Config::default()

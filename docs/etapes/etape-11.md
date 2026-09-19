@@ -133,7 +133,7 @@ binaire séquentiel.
 
 ```shell
 mpirun -n 4 target/release/wind-tunnel-mpi domains/tunnel.dom \
-    --refine 4 --steps 200 --scheme muscl --time-scheme rk2 --out out-mpi
+    --refine 4 --max-steps 200 --scheme muscl --time-scheme rk2 --out out-mpi
 ```
 
 Chaque rang écrit sa bande : `rank2_frame_0010.vtk`. Il n'y a **aucun rassemblement** —

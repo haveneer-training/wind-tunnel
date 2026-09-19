@@ -16,7 +16,7 @@ cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
 ranks="${RANKS:-1 2 3 4}"
 domain=domains/tunnel.dom
-run_args=(--refine 2 --bands 3 --steps 20 --every 10 --scheme muscl --time-scheme rk2)
+run_args=(--refine 2 --bands 3 --max-steps 20 --every 10 --scheme muscl --time-scheme rk2)
 
 if ! command -v mpirun >/dev/null 2>&1; then
     echo "mpirun est introuvable : étape 11 non vérifiée (ce n'est pas une erreur)."

@@ -46,10 +46,20 @@ fn run() -> Result<(), Box<dyn Error>> {
         "domaine    : [{xmin:.2}, {xmax:.2}] × [{ymin:.2}, {ymax:.2}], aire {:.2}",
         mesh.total_area()
     );
+    // Le calcul s'arrête au premier plafond atteint : on annonce donc celui qui tombera.
+    let (max_steps, max_time) = app::caps(&args);
+    let steps = match max_time.filter(|end| *end > 0.0) {
+        Some(end) => max_steps.min((end / solver.dt()).ceil() as usize),
+        None => max_steps,
+    };
     println!(
         "pas de temps : {:.4e} s (maximum stable {:.4e} s)",
         solver.dt(),
         solver.max_stable_dt()
+    );
+    println!(
+        "durée      : {:.3} s en {steps} pas (au plus)",
+        steps as f64 * solver.dt()
     );
     if let Some((iters, residual)) = convergence {
         println!("écoulement : calculé sur le maillage, {iters} balayages, résidu {residual:.2e}");

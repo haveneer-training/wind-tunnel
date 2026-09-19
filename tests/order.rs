@@ -57,7 +57,7 @@ fn advection_error(factor: usize, scheme: impl FluxScheme + Copy, time_scheme: T
     let probe = Solver::new(&mesh, &flow, scheme, base_config.clone()).unwrap();
     let steps = (T_FINAL / probe.dt()).round() as usize;
     let config = Config {
-        steps,
+        max_steps: steps,
         output_every: 0,
         ..base_config
     };
