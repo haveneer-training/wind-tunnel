@@ -57,7 +57,9 @@ cargo run --release -- domains/tunnel.dom \
     --refine 4 \             # subdivise chaque case en 4×4 : le vrai raffinement
     --bands 9 \              # densité du rideau de fumée
     --circulation 4 \        # dissymétrie de l'écoulement (effet Magnus)
-    --diffusivity 0.02       # diffusion physique du traceur
+    --diffusivity 0.02 \     # diffusion physique du traceur
+    --flow computed \        # résout l'écoulement sur le maillage (étape 12)
+    --frame-dt 0.5           # une image toutes les 0,5 s de temps physique
 ```
 
 `--refine` est le seul moyen d'augmenter la résolution : c'est le masque qui fixe le
@@ -104,9 +106,20 @@ redessinez l'obstacle, gardez-le rond — ou calculez l'écoulement sur votre g�
 `--flow computed` (étape 12), et comparez :
 
 ```shell
-cargo run --release -- domains/square.dom --refine 2 --steps 200
-cargo run --release -- domains/square.dom --refine 2 --steps 200 --flow computed
+cargo run --release -- domains/square.dom --refine 2 --frame-dt 0.5 --steps 200 --out out/ana
+cargo run --release -- domains/square.dom --refine 2 --frame-dt 0.5 --steps 200 --out out/calc --flow computed
 ```
+
+`--frame-dt` sort les images à **date physique fixe**. Sans elle, les deux calculs n'ont
+pas le même pas de temps — la CFL le déduit du débit maximal, et l'écoulement calculé
+accélère davantage dans les passages — donc leurs images de même rang ne montrent pas le
+même instant et ne se comparent pas.
+
+Chaque fichier VTK contient, au-delà du traceur `c` : la vitesse `u` et sa norme `speed`
+aux cellules, la fonction de courant `psi` aux **sommets**, et la date de l'image. Dans
+ParaView, un filtre *Contour* sur `psi` trace les lignes de courant exactes — ce sont les
+isolignes elles-mêmes, pas une intégration de trajectoires — et c'est le moyen le plus
+direct de voir en quoi les deux écoulements diffèrent.
 
 ## Organisation
 

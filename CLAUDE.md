@@ -28,7 +28,7 @@ Which doc is which:
 ## Commands
 
 ```shell
-cargo test                                              # all tests (76 currently)
+cargo test                                              # all tests (79 currently)
 cargo test --test mesh                                  # one test file
 cargo test the_mesh_is_mixed                             # one test by name
 cargo clippy --all-targets --all-features -- -D warnings # must stay clean
@@ -133,6 +133,20 @@ mask ──▶ mesh ──▶ field ──▶ solver ──▶ io (VTK / PNG)
 - **`faer` is an optional dependency**, used only by `examples/stream_faer.rs`
   (`cargo run --release --features faer --example stream_faer`). `cargo test` never compiles it.
   Don't promote it to a normal dependency: the trainee's inner loop is `cargo test`.
+- **VTK frames carry more than the tracer**: `write_frame` adds cell velocity `u`/`speed`
+  (reconstructed from the face fluxes by `Solver::velocity_at`, no `VelocityField::at`
+  involved, so it works for a computed flow too), vertex `psi`, and the frame's date. The
+  step-3 hole stays exactly what it was — it is now `write_dataset`, writing the geometry
+  and cell scalars into a `&mut impl Write`; `write_vtk` and `write_frame` are the
+  non-holed wrappers around it.
+- **`--frame-dt` outputs at fixed physical time**, which is what makes two runs comparable
+  frame by frame: different flows get different CFL-imposed `dt`, so equal frame indices
+  are *not* equal instants. Implemented in `Solver::run` (`Config::output_dt`), hence
+  refused by the MPI driver, whose own time loop is the step-11 hole.
+- A `.pvd` collection would be the clean way to carry time into ParaView, and it is
+  deliberately **not** used: it crashes `vtkPVDReader` 6.1.1 on legacy VTK (tested — see
+  the comment in `mpi/src/main.rs`). The date is written as `TIME`/`TimeValue`/`CYCLE`
+  field data instead, and `--frame-dt` is the reader-independent fallback.
 - **`VtkF64` in `src/io/vtk.rs` writes denormals as `0`** (and switches to `{:e}`
   outside the usual exponent range). Not cosmetic: VTK's legacy ASCII reader parses with
   `istream >> double`, which sets `failbit` on underflow, then abandons the rest of the file

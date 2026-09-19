@@ -8,9 +8,11 @@ qu'on raconte quand ça se passe mal.
 
 ## Socle
 
-**`write_vtk`** — le format VTK legacy ASCII, volontairement daté : il tient en cinquante
-lignes, se lit dans un éditeur de texte, et Paraview comme Tecplot l'ouvrent sans
-discuter.
+**`write_dataset`** — le format VTK legacy ASCII, volontairement daté : il tient en
+cinquante lignes, se lit dans un éditeur de texte, et Paraview comme Tecplot l'ouvrent
+sans discuter. La fonction écrit dans un `&mut impl Write`, pas dans un fichier : ouvrir
+le fichier est le travail de `write_vtk`, qui l'appelle, et écrire dans un tampon mémoire
+celui d'un test. Vous n'avez donc à produire que le contenu.
 
 ```text
 # vtk DataFile Version 3.0

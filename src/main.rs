@@ -9,9 +9,12 @@ use std::process::ExitCode;
 
 use wind_tunnel::app::{self, USAGE};
 use wind_tunnel::error::SolverError;
+use wind_tunnel::geom::Vec2;
+use wind_tunnel::io::vtk::Frame;
 use wind_tunnel::io::{png, vtk};
-use wind_tunnel::mesh::Mesh;
+use wind_tunnel::mesh::{CellId, Mesh, VertexId};
 use wind_tunnel::solver::Solver;
+use wind_tunnel::velocity::StreamSource;
 
 fn run() -> Result<(), Box<dyn Error>> {
     let Some(args) = app::parse_args().map_err(|e| format!("{e}\n\n{USAGE}"))? else {
@@ -55,13 +58,34 @@ fn run() -> Result<(), Box<dyn Error>> {
 
     let initial_mass = c.total_mass(&mesh);
     let out = args.out.clone();
-    let every = args.every.max(1);
+
+    // L'écoulement est stationnaire : `ψ` et la vitesse ne dépendent pas du pas de temps.
+    // On les calcule une fois, et chaque image les réécrit sans rien réallouer.
+    //
+    // `ψ` est portée par les *sommets* : dans ParaView, un filtre « Contour » sur `psi`
+    // trace les lignes de courant exactes — pas une intégration de trajectoire, les
+    // isolignes elles-mêmes. C'est ce qui rend les deux écoulements comparables à l'œil.
+    let vertices = mesh.vertices();
+    let psi: Vec<f64> = (0..mesh.n_vertices())
+        .map(|i| carrier.stream_at(VertexId(i as u32), vertices[i]))
+        .collect();
+    let velocity: Vec<Vec2> = (0..mesh.n_cells())
+        .map(|i| solver.velocity_at(CellId(i as u32)))
+        .collect();
+    let speed = wind_tunnel::field::Field::from_fn(&mesh, |id| velocity[id.index()].norm());
+
+    let mut frame = 0usize;
     solver.run(&mut c, |step, time, field| {
-        let frame = step / every;
-        vtk::write_vtk(
+        vtk::write_frame(
             out.join(format!("frame_{frame:04}.vtk")),
             &mesh,
-            &[("c", field)],
+            &Frame {
+                cells: &[("c", field), ("speed", &speed)],
+                vectors: &[("u", &velocity)],
+                points: &[("psi", &psi)],
+                time,
+                cycle: step,
+            },
         )
         .map_err(SolverError::Output)?;
         png::write_png(
@@ -74,9 +98,11 @@ fn run() -> Result<(), Box<dyn Error>> {
         .map_err(|e| SolverError::Output(std::io::Error::other(e)))?;
         let (lo, hi) = field.min_max();
         println!(
-            "  pas {step:5}  t = {time:8.3}  c ∈ [{lo:.3}, {hi:.3}]  masse {:.6}",
+            "  image {frame:4}  pas {step:5}  t = {time:8.3}  c ∈ [{lo:.3}, {hi:.3}]  \
+             masse {:.6}",
             field.total_mass(&mesh)
         );
+        frame += 1;
         Ok(())
     })?;
 

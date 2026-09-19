@@ -133,6 +133,17 @@ fn run() -> Result<(), Box<dyn Error>> {
     // conjugué distribué, avec échange de halo à chaque produit matrice-vecteur. C'est un
     // bon exercice, et c'est celui que propose `docs/etapes/etape-12.md` ; en attendant,
     // mieux vaut le dire que faire semblant.
+    // La cadence en temps physique est mise en œuvre par `Solver::run`, que ce pilote
+    // n'utilise pas : il a sa propre boucle, celle qui échange les halos, et c'est
+    // l'exercice de l'étape 11. Plutôt que d'alourdir ce trou, on refuse l'option.
+    if args.frame_dt.is_some() {
+        return Err(
+            "--frame-dt n'est pas disponible sous MPI : le pilote distribué a sa \
+                    propre boucle en temps, qui sort tous les --every pas.\nUtilisez \
+                    --every, ou l'exécutable séquentiel."
+                .into(),
+        );
+    }
     if args.flow != "analytic" {
         return Err(format!(
             "--flow {} n'est pas disponible sous MPI : l'écoulement calculé demande un \
