@@ -1,6 +1,9 @@
 //! Soufflerie numérique : transport d'un traceur passif autour d'un obstacle,
 //! en volumes finis sur un maillage non structuré.
 //!
+//! Modèle : fluide parfait — incompressible, irrotationnel, non visqueux, stationnaire —
+//! avec glissement aux parois. Ni pression ni quantité de mouvement ne sont calculées.
+//!
 //! Le projet est construit étape par étape pendant la formation ; voir `ETAPES.md`
 //! et `docs/etapes/`. L'organisation suit le chemin de la donnée :
 //!

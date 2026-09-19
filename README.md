@@ -8,6 +8,11 @@ génération d'un maillage non structuré, transport d'un traceur passif autour 
 obstacle, écriture des résultats en VTK et en PNG. Le sujet est modeste, le chemin ne
 l'est pas : c'est celui de n'importe quel code de calcul, en réduction.
 
+**Le modèle**, en une ligne : fluide parfait — incompressible, irrotationnel, non
+visqueux, stationnaire — avec **glissement** aux parois et aux obstacles, et un traceur
+passif transporté par cet écoulement. Donc pas de couche limite, pas de sillage, pas de
+traînée : ni pression ni quantité de mouvement n'apparaissent dans le calcul.
+
 ![filets de fumée déviés par un cylindre](docs/apercu.png)
 
 <sub>`cargo run --release -- domains/tunnel.dom --refine 4 --bands 9 --max-steps 960`</sub>
