@@ -20,10 +20,9 @@ use crate::error::SolverError;
 use crate::field::Field;
 #[cfg_attr(not(feature = "step10"), allow(unused_imports))] // collatéral du trou étape 9
 use crate::flux::{FaceState, FluxScheme};
-// `Vec2` et `gradient` ne servent qu'aux versions ≥ étape 7 de `residual` : plutôt que
-// de taire l'avertissement, on conditionne l'import lui-même.
-#[cfg(feature = "step7")]
 use crate::geom::Vec2;
+// `gradient` ne sert qu'aux versions ≥ étape 7 de `residual` : plutôt que de taire
+// l'avertissement, on conditionne l'import lui-même.
 #[cfg(feature = "step7")]
 use crate::gradient;
 #[cfg_attr(not(feature = "step10"), allow(unused_imports))] // collatéral du trou étape 9
@@ -65,6 +64,13 @@ pub struct Config {
     pub steps: usize,
     /// Période de sortie, en pas de temps (`0` pour ne rien sortir).
     pub output_every: usize,
+    /// Période de sortie en *temps physique*, si elle est imposée.
+    ///
+    /// Elle l'emporte alors sur `output_every`. Son intérêt : deux calculs dont les pas de
+    /// temps diffèrent — parce que la CFL en a décidé ainsi — produisent des images aux
+    /// mêmes dates, donc comparables rang par rang. Sans elle, l'image 40 de l'un et
+    /// l'image 40 de l'autre ne montrent pas le même instant.
+    pub output_dt: Option<f64>,
     /// Période de vérification de la finitude du champ (`0` pour ne pas vérifier).
     pub check_every: usize,
     /// Schéma d'intégration en temps.
@@ -81,6 +87,7 @@ impl Default for Config {
             dt: None,
             steps: 600,
             output_every: 10,
+            output_dt: None,
             check_every: 20,
             time_scheme: TimeScheme::Euler,
             // Les parois sont en gradient nul, pas en flux nul, et ce n'est pas un
@@ -198,6 +205,37 @@ impl<'m, F: FluxScheme> Solver<'m, F> {
                 self.face_flux[fid.index()] * outward
             })
             .sum()
+    }
+
+    /// Vitesse moyenne d'une cellule, reconstruite à partir des seuls débits de face.
+    ///
+    /// Le solveur ne stocke pas de vitesse : il n'a besoin que des débits. Pour *regarder*
+    /// l'écoulement — une sortie, un diagnostic — on la reconstruit par l'identité
+    ///
+    /// ```text
+    /// ∫_Ω u dA = ∮_∂Ω (u·n) (x − x_c) dl      (vraie dès que ∇·u = 0)
+    /// ```
+    ///
+    /// soit, en prenant le milieu de chaque face comme point de quadrature,
+    /// `u_c = (1/A) Σ_f débit_sortant × (x_f − x_c)`. Exacte pour un écoulement uniforme,
+    /// d'ordre 2 sinon — et surtout, indépendante de l'origine de l'écoulement : elle
+    /// donne le même résultat pour une formule analytique et pour une `ψ` calculée.
+    pub fn velocity_at(&self, id: CellId) -> Vec2 {
+        let cell = self.mesh.cell(id);
+        let sum = self
+            .mesh
+            .cell_faces(id)
+            .iter()
+            .fold(Vec2::ZERO, |acc, &fid| {
+                let face = self.mesh.face(fid);
+                let outward = if face.left == id { 1.0 } else { -1.0 };
+                let arm = Vec2::new(
+                    face.midpoint.x - cell.centroid.x,
+                    face.midpoint.y - cell.centroid.y,
+                );
+                acc + arm * (self.face_flux[fid.index()] * outward)
+            });
+        sum * (1.0 / cell.area)
     }
 
     /// Condition aux limites d'un bord ; imperméable par défaut.
@@ -459,16 +497,36 @@ impl<'m, F: FluxScheme> Solver<'m, F> {
         let mut work = Field::zeros(c.len());
         observer(0, 0.0, c)?;
 
+        // Date de la prochaine image, quand la cadence est donnée en temps physique. On
+        // sort au premier pas qui atteint cette date, puis on avance la cible : les dates
+        // obtenues sont donc à moins d'un pas de temps de la cadence demandée, et surtout
+        // indépendantes du pas de temps lui-même.
+        let mut next_output = self.config.output_dt.unwrap_or(0.0);
+
         for step in 1..=self.config.steps {
             self.step(c, &mut work);
+            let time = step as f64 * self.dt;
 
             if self.config.check_every > 0 && step % self.config.check_every == 0 {
                 if let Some(cell) = c.first_non_finite() {
                     return Err(SolverError::NotFinite { step, cell });
                 }
             }
-            if self.config.output_every > 0 && step % self.config.output_every == 0 {
-                observer(step, step as f64 * self.dt, c)?;
+            match self.config.output_dt {
+                Some(period) if period > 0.0 => {
+                    if time >= next_output - 1e-12 * period {
+                        observer(step, time, c)?;
+                        // Un pas de temps peut dépasser plusieurs périodes : on se recale
+                        // sur la première date encore à venir plutôt que d'accumuler du
+                        // retard image après image.
+                        next_output = (time / period).floor() * period + period;
+                    }
+                }
+                _ => {
+                    if self.config.output_every > 0 && step % self.config.output_every == 0 {
+                        observer(step, time, c)?;
+                    }
+                }
             }
         }
         Ok(())
@@ -544,7 +602,6 @@ fn max_stable_dt(mesh: &Mesh, face_flux: &[f64], diffusivity: f64) -> Option<f64
 mod tests {
     use super::*;
     use crate::flux::Upwind;
-    use crate::geom::Vec2;
     use crate::mask::Mask;
     use crate::velocity::Uniform;
 
@@ -630,6 +687,62 @@ mod tests {
             Err(SolverError::NotFinite { step, .. }) => assert_eq!(step, 1),
             other => panic!("la divergence n'a pas été détectée : {other:?}"),
         }
+    }
+
+    #[test]
+    fn the_reconstructed_velocity_matches_a_uniform_flow() {
+        let mesh = test_mesh();
+        let flow = Uniform {
+            value: Vec2::new(0.7, -0.3),
+        };
+        let solver = Solver::new(&mesh, &flow, Upwind, Config::default()).unwrap();
+        // L'identité de reconstruction est exacte pour un écoulement uniforme : elle ne
+        // fait qu'y redistribuer des débits qui somment déjà à la bonne valeur.
+        for i in 0..mesh.n_cells() {
+            let u = solver.velocity_at(CellId(i as u32));
+            assert!(
+                (u.x - 0.7).abs() < 1e-12 && (u.y + 0.3).abs() < 1e-12,
+                "cellule {i} : {u:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn frames_come_out_at_the_requested_times() {
+        let mesh = test_mesh();
+        let flow = Uniform {
+            value: Vec2::new(1.0, 0.0),
+        };
+        let period = 0.5;
+        let config = Config {
+            steps: 400,
+            output_dt: Some(period),
+            output_every: 1, // doit être ignoré quand la cadence est donnée en temps
+            ..Config::default()
+        };
+        let solver = Solver::new(&mesh, &flow, Upwind, config).unwrap();
+        let dt = solver.dt();
+
+        let mut c = Field::filled(mesh.n_cells(), 0.0);
+        let mut times = Vec::new();
+        solver
+            .run(&mut c, |_, time, _| {
+                times.push(time);
+                Ok(())
+            })
+            .unwrap();
+
+        // Chaque image tombe au premier pas ayant atteint sa date : à moins d'un pas de
+        // temps près, donc, et sans dérive cumulée d'une image à l'autre.
+        for (k, time) in times.iter().enumerate() {
+            let expected = k as f64 * period;
+            assert!(
+                *time >= expected && *time < expected + dt,
+                "image {k} à t = {time}, attendue dans [{expected}, {})",
+                expected + dt
+            );
+        }
+        assert!(times.len() > 3, "trop peu d'images : {}", times.len());
     }
 
     #[test]

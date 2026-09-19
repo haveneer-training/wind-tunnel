@@ -27,7 +27,7 @@ avec `thread::scope`, `Mutex` et `mpsc` (étape 10), et enfin la décomposition 
 MPI (étape 11, bonus), et l'écoulement calculé sur le maillage (étape 12, bonus). Le code
 tourne et produit l'animation.
 
-- 76 tests verts (69 hors doctests), `cargo clippy --all-targets --all-features -- -D warnings` propre,
+- 79 tests verts (72 hors doctests), `cargo clippy --all-targets --all-features -- -D warnings` propre,
   `cargo fmt` appliqué
 - 30 trous répartis : 5 en étape 0, 2 en 1, 2 en 2, 2 en 3, 1 en 4, 3 en 5, 1 en 6, 2 en 7,
   1 en 8, 3 en 9, 0 en 10, 5 en 11, 3 en 12
@@ -195,6 +195,42 @@ Trois choix structurants :
 Non disponible sous MPI : `mpi/src/main.rs` refuse `--flow computed` avec un message
 explicite, aucun rang ne détenant le maillage complet. Le gradient conjugué distribué (le
 `Halo` existe déjà) est proposé en « pour aller plus loin ».
+
+## Lire les sorties : ψ, vitesse et date dans les fichiers VTK
+
+Comparer deux modèles d'écoulement à l'œil, sur le seul traceur, ne marche pas : les deux
+images se ressemblent, et les critères qui les distinguent (portée de la perturbation,
+blocage, coins) demandent de savoir quoi regarder. Trois ajouts y répondent.
+
+- **`Solver::velocity_at(CellId)`** reconstruit la vitesse moyenne d'une cellule à partir
+  des seuls débits de face, par l'identité `∫ u dA = ∮ (u·n)(x − x_c) dl`, exacte pour un
+  champ uniforme et d'ordre 2 sinon. Elle ne passe pas par `VelocityField::at`, donc elle
+  marche à l'identique pour l'écoulement calculé, qui n'en a pas.
+- **`vtk::write_frame`** écrit, en plus de `c` : `u` et `speed` aux cellules, `psi` aux
+  **sommets**, et la date de l'image. `psi` est le vrai apport — un filtre *Contour* dans
+  ParaView en tire les lignes de courant exactes, isolignes et non trajectoires intégrées.
+- **`--frame-dt <s>`** sort les images à date physique fixe, au premier pas qui atteint la
+  date visée et sans dérive cumulée (`Config::output_dt`, mis en œuvre dans `Solver::run`).
+  C'est ce qui rend deux calculs comparables image par image : leurs pas de temps diffèrent,
+  la CFL les déduisant du débit maximal, et l'écoulement calculé accélère davantage dans
+  les passages — mesuré, 2,53e-2 s contre 3,98e-2 s sur `square.dom` à `--refine 2`.
+
+Deux contraintes de structure ont guidé la mise en œuvre, et ne sont pas à défaire :
+
+- Le corps de `write_vtk` **est le trou de l'étape 3**. Il est devenu `write_dataset`, de
+  contenu identique mais écrivant dans un `&mut impl Write` ; `write_vtk` et `write_frame`
+  l'enveloppent, hors trou. Ajouter `psi` — qui n'existe qu'à l'étape 4 — dans le trou
+  aurait rendu l'étape 3 incompréhensible. Le test correspondant est d'ailleurs conditionné
+  à `step4`, pour que les rouges de l'étape 3 restent au nombre de trois.
+- Le pilote MPI **refuse `--frame-dt`** : la cadence est mise en œuvre dans `Solver::run`,
+  que ce pilote n'utilise pas — il a sa propre boucle, celle des halos, et c'est le trou de
+  l'étape 11.
+
+La date est écrite en `FIELD FieldData` sous trois noms (`TIME`, `TimeValue`, `CYCLE`).
+Aucun n'est garanti par le format : c'est une convention de lecteur. **Le `.pvd`, qui serait
+la voie propre, reste exclu** — il fait planter `vtkPVDReader` de ParaView 6.1.1 sur du VTK
+legacy (testé, voir le commentaire dans `mpi/src/main.rs`). D'où `--frame-dt`, qui ne dépend
+d'aucun lecteur.
 
 ## Ce qui reste
 
@@ -393,7 +429,7 @@ renvoyant une `String` : un fichier contient de l'ordre du million de nombres, e
 ## Vérifier que tout va bien
 
 ```shell
-cargo test                                   # 76 tests
+cargo test                                   # 79 tests
 cargo clippy --all-targets --all-features -- -D warnings
 cargo clippy -p wind-tunnel-mpi --all-targets -- -D warnings   # nécessite MPI
 cargo fmt --all --check

@@ -43,6 +43,9 @@ Options :
                        résout l'écoulement sur le maillage, étape 12)
   --stream-tol <r>     résidu visé par --flow computed (défaut : 1e-6)
   --stream-iters <n>   balayages au plus               (défaut : 200000)
+  --frame-dt <s>       sortir toutes les <s> secondes  (défaut : tous les --every pas ;
+                       impose la date des images, donc rend deux calculs de pas de
+                       temps différents comparables image par image)
 ";
 
 /// Les options de la ligne de commande, une fois analysées.
@@ -84,6 +87,8 @@ pub struct Args {
     pub stream_tol: f64,
     /// Nombre maximal de balayages de la résolution de la fonction de courant.
     pub stream_iters: usize,
+    /// Période de sortie en temps physique ; remplace `every` si elle est donnée.
+    pub frame_dt: Option<f64>,
 }
 
 impl Default for Args {
@@ -107,6 +112,7 @@ impl Default for Args {
             flow: "analytic".to_string(),
             stream_tol: 1e-6,
             stream_iters: 200_000,
+            frame_dt: None,
         }
     }
 }
@@ -176,6 +182,9 @@ pub fn parse_from(argv: impl IntoIterator<Item = String>) -> Result<Option<Args>
                 args.stream_iters = value()?
                     .parse()
                     .map_err(|e| format!("--stream-iters : {e}"))?
+            }
+            "--frame-dt" => {
+                args.frame_dt = Some(value()?.parse().map_err(|e| format!("--frame-dt : {e}"))?)
             }
             other if other.starts_with('-') => return Err(format!("option inconnue : {other}")),
             other => {
@@ -345,6 +354,7 @@ pub fn solver_config(args: &Args) -> Result<Config, String> {
         dt: args.dt,
         steps: args.steps,
         output_every: args.every,
+        output_dt: args.frame_dt,
         time_scheme,
         ..Config::default()
     };
