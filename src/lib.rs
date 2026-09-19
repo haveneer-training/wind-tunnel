@@ -24,4 +24,6 @@ pub mod io;
 pub mod mask;
 pub mod mesh;
 pub mod solver;
+#[cfg(feature = "step12")]
+pub mod stream;
 pub mod velocity;

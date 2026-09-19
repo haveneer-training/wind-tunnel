@@ -11,9 +11,11 @@ use crate::field::Field;
 use crate::flux::{Centered, FluxScheme, Muscl, Upwind};
 use crate::geom::{Point, Vec2};
 use crate::mask::Mask;
-use crate::mesh::Mesh;
-use crate::solver::{Config, TimeScheme};
-use crate::velocity::{PotentialCylinder, Uniform, VelocityField};
+use crate::mesh::{BoundaryKind, Mesh};
+use crate::solver::{Bc, Config, TimeScheme};
+#[cfg(feature = "step12")]
+use crate::stream::{ComputedStream, StreamOptions};
+use crate::velocity::{PotentialCylinder, StreamSource, Uniform, VelocityField};
 
 /// Aide en ligne, commune aux deux exécutables.
 pub const USAGE: &str = "\
@@ -37,6 +39,10 @@ Options :
   --dt <s>             pas de temps imposé             (défaut : déduit de la CFL)
   --scheme <nom>       upwind | centered | muscl       (défaut : upwind)
   --time-scheme <nom>  euler | rk2                     (défaut : euler)
+  --flow <nom>         analytic | computed             (défaut : analytic ; « computed »
+                       résout l'écoulement sur le maillage, étape 12)
+  --stream-tol <r>     résidu visé par --flow computed (défaut : 1e-6)
+  --stream-iters <n>   balayages au plus               (défaut : 200000)
 ";
 
 /// Les options de la ligne de commande, une fois analysées.
@@ -72,6 +78,12 @@ pub struct Args {
     pub scheme: String,
     /// Nom du schéma en temps.
     pub time_scheme: String,
+    /// Nom de l'écoulement porteur : `analytic` ou `computed`.
+    pub flow: String,
+    /// Résidu visé par la résolution de la fonction de courant.
+    pub stream_tol: f64,
+    /// Nombre maximal de balayages de la résolution de la fonction de courant.
+    pub stream_iters: usize,
 }
 
 impl Default for Args {
@@ -92,6 +104,9 @@ impl Default for Args {
             dt: None,
             scheme: "upwind".to_string(),
             time_scheme: "euler".to_string(),
+            flow: "analytic".to_string(),
+            stream_tol: 1e-6,
+            stream_iters: 200_000,
         }
     }
 }
@@ -151,6 +166,17 @@ pub fn parse_from(argv: impl IntoIterator<Item = String>) -> Result<Option<Args>
             "--dt" => args.dt = Some(value()?.parse().map_err(|e| format!("--dt : {e}"))?),
             "--scheme" => args.scheme = value()?,
             "--time-scheme" => args.time_scheme = value()?,
+            "--flow" => args.flow = value()?,
+            "--stream-tol" => {
+                args.stream_tol = value()?
+                    .parse()
+                    .map_err(|e| format!("--stream-tol : {e}"))?
+            }
+            "--stream-iters" => {
+                args.stream_iters = value()?
+                    .parse()
+                    .map_err(|e| format!("--stream-iters : {e}"))?
+            }
             other if other.starts_with('-') => return Err(format!("option inconnue : {other}")),
             other => {
                 args.mask = PathBuf::from(other);
@@ -217,6 +243,84 @@ pub fn velocity_for(mask: &Mask, args: &Args, h: f64) -> Result<Box<dyn Velocity
     }
 }
 
+/// L'écoulement porteur du cas, quelle que soit son origine.
+///
+/// Les deux variantes ne satisfont pas le même contrat — l'analytique répond en tout
+/// point, le calculé seulement aux sommets du maillage — mais toutes deux savent donner
+/// `ψ` là où le solveur la lit. C'est ce que dit [`Carrier::as_source`].
+pub enum Carrier {
+    /// Une formule : écoulement uniforme ou potentiel autour d'un cylindre.
+    Analytic(Box<dyn VelocityField>),
+    /// Une fonction de courant résolue sur le maillage (étape 12).
+    #[cfg(feature = "step12")]
+    Computed(ComputedStream),
+}
+
+// `Carrier` est lui-même une source de fonction de courant : c'est ce qui permet de le
+// passer tel quel à `Solver::new`. Un `&dyn VelocityField` ne peut pas être converti en
+// `&dyn StreamSource` — on ne réétiquette pas un objet-trait déjà dénué de taille — donc
+// l'aiguillage se fait ici, sur l'énumération, plutôt que par coercition.
+impl StreamSource for Carrier {
+    // `id` ne sert qu'à la variante calculée : l'avertissement vient du `#[cfg]`, pas
+    // d'un trou, et il n'a donc rien à dire au stagiaire.
+    #[cfg_attr(not(feature = "step12"), allow(unused_variables))] // collatéral du cfg étape 12
+    fn stream_at(&self, id: crate::mesh::VertexId, p: Point) -> f64 {
+        match self {
+            Carrier::Analytic(flow) => flow.stream(p),
+            #[cfg(feature = "step12")]
+            Carrier::Computed(stream) => stream.stream_at(id, p),
+        }
+    }
+}
+
+/// L'écoulement porteur demandé par `--flow`, monté sur le maillage déjà construit.
+#[cfg_attr(not(feature = "step12"), allow(unused_variables))] // collatéral du cfg étape 12
+pub fn carrier_for(
+    mask: &Mask,
+    mesh: &Mesh,
+    args: &Args,
+    h: f64,
+) -> Result<(Carrier, Option<(usize, f64)>), String> {
+    match args.flow.as_str() {
+        "analytic" => Ok((Carrier::Analytic(velocity_for(mask, args, h)?), None)),
+        #[cfg(feature = "step12")]
+        "computed" => {
+            if args.angle != 0.0 {
+                return Err(format!(
+                    "--angle {} n'a pas de sens avec --flow computed : l'écoulement \
+                     calculé entre horizontalement dans la veine et suit ensuite la \
+                     géométrie.",
+                    args.angle
+                ));
+            }
+            if args.circulation != 0.0 {
+                return Err("--circulation ne s'applique qu'à l'écoulement analytique \
+                            autour du cylindre ; avec --flow computed, la circulation \
+                            autour de l'obstacle est celle que fixe le calcul."
+                    .to_string());
+            }
+            let options = StreamOptions {
+                speed: args.speed,
+                max_iters: args.stream_iters,
+                tol: args.stream_tol,
+            };
+            let (stream, iters, residual) = ComputedStream::solve(mesh, &options).map_err(|e| {
+                format!(
+                    "{e}\nLe balayage de Jacobi converge lentement : relevez \
+                     --stream-iters, relâchez --stream-tol, ou maillez plus grossièrement \
+                     (--refine)."
+                )
+            })?;
+            Ok((Carrier::Computed(stream), Some((iters, residual))))
+        }
+        #[cfg(not(feature = "step12"))]
+        "computed" => Err("--flow computed arrive à l'étape 12".to_string()),
+        other => Err(format!(
+            "écoulement inconnu : {other} (analytic ou computed)"
+        )),
+    }
+}
+
 /// Le schéma de flux nommé par `--scheme`.
 pub fn flux_scheme(args: &Args) -> Result<Box<dyn FluxScheme>, String> {
     match args.scheme.as_str() {
@@ -236,14 +340,23 @@ pub fn solver_config(args: &Args) -> Result<Config, String> {
         "rk2" => TimeScheme::Rk2,
         other => return Err(format!("schéma temporel inconnu : {other} (euler ou rk2)")),
     };
-    Ok(Config {
+    let mut config = Config {
         diffusivity: args.diffusivity,
         dt: args.dt,
         steps: args.steps,
         output_every: args.every,
         time_scheme,
         ..Config::default()
-    })
+    };
+
+    // Les parois d'un écoulement calculé sont des lignes de courant exactes : aucun débit
+    // ne les traverse, et le flux nul cesse d'être un mensonge commode (voir
+    // `Config::default` et `src/stream.rs`).
+    if args.flow == "computed" {
+        config.bc.insert(BoundaryKind::Wall, Bc::NoFlux);
+        config.bc.insert(BoundaryKind::Obstacle, Bc::NoFlux);
+    }
+    Ok(config)
 }
 
 /// Rideau de fumée initial : des bandes horizontales, comme le peigne de fumigènes

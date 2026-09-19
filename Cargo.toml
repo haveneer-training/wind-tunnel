@@ -11,16 +11,16 @@ license = "CC-BY-NC-SA-4.0"
 # que `cargo test` ne montre que ce qui est déjà au programme du stagiaire.
 # `cargo xtask goto <n>` ne fait rien d'autre que réécrire la ligne `default`.
 #
-# `step12` est la **sentinelle** : c'est l'étape suivant la dernière implémentée
-# (`LAST_STEP` dans `xtask/src/main.rs` vaut 11, et `goto 12` est refusé). Aucun code
-# n'en dépend. Elle sert à écrire `not(feature = "step12")` sur les avertissements
-# collatéraux des trous de l'étape 11 : la condition est vraie dans un dossier de
-# travail, fausse ici, donc l'attribut n'y cache jamais rien. C'est aussi le nom
-# réservé au bonus « écoulement calculé » annoncé dans `ETAPES.md` ; le jour où il
-# sera écrit, `step13` deviendra la sentinelle. Voir `docs/AVANCEMENT.md`
+# `step13` est la **sentinelle** : c'est l'étape suivant la dernière implémentée
+# (`LAST_STEP` dans `xtask/src/main.rs` vaut 12, et `goto 13` est refusé). Aucun code
+# n'en dépend. Elle sert à écrire `not(feature = "step13")` sur les avertissements
+# collatéraux des trous de la dernière étape : la condition est vraie dans un dossier de
+# travail, fausse ici, donc l'attribut n'y cache jamais rien. C'est aussi le nom réservé
+# au bonus suivant — un écoulement à sillage, en variables `ψ`–`ω` ; le jour où il sera
+# écrit, `step14` deviendra la sentinelle. Voir `docs/AVANCEMENT.md`
 # § « Avertissements dans travail/ ».
 [features]
-default = ["step12"]
+default = ["step13"]
 step0 = []
 step1 = ["step0"]
 step2 = ["step1"]
@@ -34,6 +34,7 @@ step9 = ["step8"]
 step10 = ["step9"]
 step11 = ["step10"]
 step12 = ["step11"]
+step13 = ["step12"]
 
 [workspace]
 members = ["xtask", "mpi"]
@@ -54,3 +55,15 @@ rayon = "1"
 
 [profile.release]
 debug = true
+
+# `faer` ne sert qu'à l'exemple `stream_faer` (l'extension « ne réinventez pas la roue »
+# de l'étape 12). Dépendance *optionnelle* plutôt que de développement : son arbre est
+# gros, et `cargo test` — la boucle de travail du stagiaire — n'a aucune raison de le
+# compiler. `cargo run --features faer --example stream_faer` le fait, et lui seul.
+[dependencies.faer]
+version = "0.24"
+optional = true
+
+[[example]]
+name = "stream_faer"
+required-features = ["faer"]

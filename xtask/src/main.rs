@@ -40,7 +40,7 @@ const REGION_END: &str = "// <<< ÉTAPE ";
 /// Où sont rangés les blocs de référence, dans le dépôt de travail.
 const REFERENCE: &str = "xtask/reference.txt";
 /// Dernière étape couverte par le code actuel.
-const LAST_STEP: u8 = 11;
+const LAST_STEP: u8 = 12;
 /// Nom du dossier de travail engendré, à la racine du dépôt.
 const WORKDIR: &str = "travail";
 
@@ -564,7 +564,7 @@ fn make_starter(root: &Path, out: &Path, force: bool) -> Result<(), String> {
 
     // Le dépôt de travail démarre à l'étape 0.
     set_default_feature(out, 0)?;
-    // La sentinelle `step12` ne vaut que pour le corrigé : c'est elle qui y désactive
+    // La sentinelle `step13` ne vaut que pour le corrigé : c'est elle qui y désactive
     // les `allow` conditionnels posés sur les avertissements collatéraux des trous.
     // Un dossier de travail ne doit jamais l'activer, sinon ces avertissements
     // resteraient éteints alors même que le trou est encore ouvert.

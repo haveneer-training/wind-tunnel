@@ -25,10 +25,10 @@ fn run() -> Result<(), Box<dyn Error>> {
     let (tri, quad) = mesh.shape_counts();
     let (xmin, ymin, xmax, ymax) = mesh.bounds();
 
-    let velocity = app::velocity_for(&mask, &args, h)?;
+    let (carrier, convergence) = app::carrier_for(&mask, &mesh, &args, h)?;
     let scheme = app::flux_scheme(&args)?;
     let config = app::solver_config(&args)?;
-    let solver = Solver::new(&mesh, velocity.as_ref(), scheme, config)?;
+    let solver = Solver::new(&mesh, &carrier, scheme, config)?;
 
     let mut c = app::initial_field(&mesh, args.bands);
 
@@ -48,6 +48,9 @@ fn run() -> Result<(), Box<dyn Error>> {
         solver.dt(),
         solver.max_stable_dt()
     );
+    if let Some((iters, residual)) = convergence {
+        println!("écoulement : calculé sur le maillage, {iters} balayages, résidu {residual:.2e}");
+    }
     println!("sortie     : {}", args.out.display());
 
     let initial_mass = c.total_mass(&mesh);
