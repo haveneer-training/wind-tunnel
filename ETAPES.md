@@ -34,7 +34,7 @@ facultative : personne n'attend son voisin.
 | [9](docs/etapes/etape-09.md) | Paralléliser avec `rayon` | J3 | 40 min | style fonctionnel, `par_iter`, performance |
 | [10](docs/etapes/etape-10.md) | Threads : écriture recouverte, suivi | J3 | 30 min | `thread::scope`, `mpsc`, `Arc`, `Mutex` |
 | [11](docs/etapes/etape-11.md) | *Bonus* : passage à l'échelle en MPI | J3 | 60 min | processus, messages, réductions |
-| 12 | *Bonus* : calculer l'écoulement — *pas encore écrit* | — | 40 min | algorithme itératif, convergence |
+| [12](docs/etapes/etape-12.md) | *Bonus* : calculer l'écoulement | J3 | 40 min | algorithme itératif, convergence |
 | — | [*Bonus* : chasse aux allocations](docs/BONUS-OPTIMISATION.md) | — | 45 min | `GlobalAlloc`, tampons réutilisés, emprunts par champ |
 
 Les étapes 0 à 5 forment le noyau : à la fin de l'étape 5, le code tourne et produit ses

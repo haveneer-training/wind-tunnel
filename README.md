@@ -19,7 +19,7 @@ dossier de travail : les passages à écrire y deviennent des `todo!()`, tout le
 fourni.
 
 ```shell
-cargo xtask starter    # crée travail/ (15 trous à combler)
+cargo xtask starter    # crée travail/ (30 trous à combler)
 cd travail
 cargo test             # quatre tests rouges : l'étape 0 vous attend
 ```
@@ -100,8 +100,13 @@ deux parois perpendiculaires se rejoignent — d'où un maillage réellement mix
 triangles et quadrangles.
 
 Attention : l'écoulement porteur analytique est celui d'un **cylindre**. Si vous
-redessinez l'obstacle, gardez-le rond, ou calculez l'écoulement sur votre géométrie
-(étape 12).
+redessinez l'obstacle, gardez-le rond — ou calculez l'écoulement sur votre géométrie avec
+`--flow computed` (étape 12), et comparez :
+
+```shell
+cargo run --release -- domains/square.dom --refine 2 --steps 200
+cargo run --release -- domains/square.dom --refine 2 --steps 200 --flow computed
+```
 
 ## Organisation
 
@@ -117,12 +122,13 @@ masque ASCII ──▶ mask ──▶ mesh ──▶ field ──▶ solver ─�
 | `src/mask.rs` | lecture et validation du domaine |
 | `src/mesh.rs` | cellules, faces, connectivité |
 | `src/field.rs` | un champ scalaire aux cellules |
-| `src/velocity.rs` | écoulements porteurs |
+| `src/velocity.rs` | écoulements porteurs analytiques |
 | `src/flux.rs` | schémas de flux |
 | `src/solver.rs` | boucle en temps, CFL, conditions aux limites |
 | `src/io/` | sorties VTK et PNG |
 | `src/error.rs` | les deux familles d'erreurs |
 | `src/app.rs` | montage d'un cas, partagé par les deux exécutables |
+| `src/stream.rs` | fonction de courant résolue sur le maillage (étape 12) |
 | `src/decomposition.rs` | découpage en bandes pour le calcul distribué (étape 11) |
 | `mpi/` | le pilote MPI, crate à part (étape 11) |
 
