@@ -95,7 +95,7 @@ gradient::limited_gradients(self.mesh, c, &mut gradients);
 ```
 
 Une allocation de 16 octets par cellule — 1,4 Mo ici — à chaque évaluation du résidu,
-donc à chaque pas de temps. Sur `--steps 960`, cela fait 1,3 Go alloués et rendus pour un
+donc à chaque pas de temps. Sur `--max-steps 960`, cela fait 1,3 Go alloués et rendus pour un
 tableau dont la taille ne change jamais.
 
 `limited_gradients` prend déjà son `out` en paramètre, précisément pour que l'appelant

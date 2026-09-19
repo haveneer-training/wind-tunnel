@@ -28,12 +28,12 @@ Which doc is which:
 ## Commands
 
 ```shell
-cargo test                                              # all tests (80 currently)
+cargo test                                              # all tests (83 currently)
 cargo test --test mesh                                  # one test file
 cargo test the_mesh_is_mixed                             # one test by name
 cargo clippy --all-targets --all-features -- -D warnings # must stay clean
 cargo fmt --all                                          # / --check to verify only
-cargo run --release -- domains/tunnel.dom --refine 4 --bands 9 --steps 960
+cargo run --release -- domains/tunnel.dom --refine 4 --bands 9 --max-steps 960
 cargo run --release --example alloc_count                # allocations per phase (see docs/BONUS-OPTIMISATION.md)
 ```
 
@@ -69,7 +69,7 @@ green on a machine without MPI. To build and run it:
 
 ```shell
 cargo build --release -p wind-tunnel-mpi
-mpirun -n 4 target/release/wind-tunnel-mpi domains/tunnel.dom --refine 4 --steps 200
+mpirun -n 4 target/release/wind-tunnel-mpi domains/tunnel.dom --refine 4 --max-steps 200
 scripts/check-mpi.sh     # 1/2/3/4 ranks vs. the sequential binary; exits 0 if no mpirun
 ```
 
@@ -139,10 +139,17 @@ mask ──▶ mesh ──▶ field ──▶ solver ──▶ io (VTK / PNG)
   step-3 hole stays exactly what it was — it is now `write_dataset`, writing the geometry
   and cell scalars into a `&mut impl Write`; `write_vtk` and `write_frame` are the
   non-holed wrappers around it.
-- **`--frame-dt` outputs at fixed physical time**, which is what makes two runs comparable
-  frame by frame: different flows get different CFL-imposed `dt`, so equal frame indices
-  are *not* equal instants. Implemented in `Solver::run` (`Config::output_dt`), hence
-  refused by the MPI driver, whose own time loop is the step-11 hole.
+- **Two runs are compared in physical time, never in steps.** Different flows get different
+  CFL-imposed `dt`, so neither equal step counts nor equal frame indices are equal instants.
+  `--max-time <s>` (`Config::max_time`) caps the simulated duration — the run stops at the
+  first of the two caps. `app::caps` holds the rule that makes this usable: **a default cap
+  never constrains an explicitly requested one**, so `--max-time` alone leaves no step cap
+  at all (otherwise it would silently stop after the default 600 steps, which are not 60
+  seconds). Give both and `--max-steps` becomes the guard rail, the step count for a given
+  duration not being knowable in advance;
+  `--every-dt <s>` (`Config::output_dt`) outputs at fixed physical dates. Both live in
+  `Solver::run`. The MPI driver refuses `--every-dt` — its own time loop is the step-11
+  hole — but supports `--max-time`, converted to a step count next to the global `dt`.
 - **ParaView time comes from `frames.vtk.series`**, written by `vtk::write_series` at the
   end of a run — a small JSON listing each frame and its date. The two alternatives are
   both dead ends, each verified against ParaView 6.1.1 with `pvpython`: a `.pvd` crashes

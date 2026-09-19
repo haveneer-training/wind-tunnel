@@ -23,29 +23,51 @@ Soufflerie numérique
 
   wind-tunnel <masque.dom> [options]
 
-Options :
-  --out <dir>          répertoire de sortie            (défaut : out)
-  --steps <n>          nombre de pas de temps          (défaut : 600)
-  --every <n>          période de sortie, en pas       (défaut : 10)
-  --width <px>         largeur des images              (défaut : 900)
-  --h <m>              côté d'une cellule              (défaut : 1)
-  --refine <k>         subdivise chaque case en k×k    (défaut : 1)
-  --bands <n>          nombre de bandes de fumée       (défaut : 4)
+Maillage
+  --refine <k>         subdivise chaque case en k×k    (défaut : 1 ; le seul moyen
+                       d'augmenter la résolution, le masque fixant le nombre de cases)
+  --h <m>              côté d'une cellule              (défaut : 1 ; change la taille
+                       physique du domaine, pas le nombre de cellules)
+
+Écoulement porteur
+  --flow <nom>         analytic | computed             (défaut : analytic ; « computed »
+                       résout ∇²ψ = 0 sur le maillage — étape 12 — et respecte alors la
+                       forme dessinée et les parois)
   --speed <m/s>        vitesse à l'infini              (défaut : 1)
-  --angle <deg>        incline l'écoulement uniforme   (défaut : 0 ; sans effet
-                       si le masque contient un obstacle)
-  --circulation <m2/s> circulation autour du cylindre  (défaut : 0)
-  --diffusivity <m2/s> diffusivité du traceur          (défaut : 0)
-  --dt <s>             pas de temps imposé             (défaut : déduit de la CFL)
+  --angle <deg>        incline l'écoulement uniforme   (défaut : 0 ; sans obstacle et
+                       sans --flow computed uniquement)
+  --circulation <m2/s> circulation autour du cylindre  (défaut : 0 ; analytique seul)
+  --stream-tol <r>     résidu visé, --flow computed    (défaut : 1e-6)
+  --stream-iters <n>   balayages au plus, idem         (défaut : 200000)
+
+Transport du traceur
+  --bands <n>          nombre de bandes de fumée       (défaut : 4)
   --scheme <nom>       upwind | centered | muscl       (défaut : upwind)
   --time-scheme <nom>  euler | rk2                     (défaut : euler)
-  --flow <nom>         analytic | computed             (défaut : analytic ; « computed »
-                       résout l'écoulement sur le maillage, étape 12)
-  --stream-tol <r>     résidu visé par --flow computed (défaut : 1e-6)
-  --stream-iters <n>   balayages au plus               (défaut : 200000)
-  --frame-dt <s>       sortir toutes les <s> secondes  (défaut : tous les --every pas ;
-                       impose la date des images, donc rend deux calculs de pas de
-                       temps différents comparables image par image)
+  --diffusivity <m2/s> diffusivité du traceur          (défaut : 0)
+  --dt <s>             pas de temps imposé             (défaut : déduit de la CFL)
+
+Durée du calcul — il s'arrête au premier plafond atteint
+  --max-steps <n>      plafond en pas de temps         (défaut : 600, sauf si
+                       --max-time est donné — auquel cas il n'y a pas de plafond en pas)
+  --max-time <s>       plafond en temps simulé         (défaut : aucun ; c'est la durée,
+                       pas le nombre de pas, qui se compare d'un calcul à l'autre — le
+                       pas de temps vient de la CFL et dépend de l'écoulement)
+
+Sorties
+  --out <dir>          répertoire de sortie            (défaut : out ; ouvrir le
+                       frames.vtk.series qui s'y trouve, pas les frame_*.vtk)
+  --every <n>          période de sortie, en pas       (défaut : 10)
+  --every-dt <s>       période de sortie, en secondes  (défaut : aucune ; remplace
+                       --every et donne aux images des dates comparables d'un calcul
+                       à l'autre)
+  --width <px>         largeur des images PNG          (défaut : 900)
+
+Divers
+  -h, --help           cette aide
+
+Sous MPI (wind-tunnel-mpi) : --flow computed et --every-dt sont indisponibles — aucun
+rang ne détient le maillage complet, et la boucle en temps y est distincte.
 ";
 
 /// Les options de la ligne de commande, une fois analysées.
@@ -55,8 +77,8 @@ pub struct Args {
     pub mask: PathBuf,
     /// Répertoire où écrire les images et les fichiers VTK.
     pub out: PathBuf,
-    /// Nombre de pas de temps.
-    pub steps: usize,
+    /// Plafond en pas de temps ; `None` tant que l'option n'est pas donnée.
+    pub max_steps: Option<usize>,
     /// Période de sortie, en pas de temps.
     pub every: usize,
     /// Largeur des images produites, en pixels.
@@ -88,7 +110,9 @@ pub struct Args {
     /// Nombre maximal de balayages de la résolution de la fonction de courant.
     pub stream_iters: usize,
     /// Période de sortie en temps physique ; remplace `every` si elle est donnée.
-    pub frame_dt: Option<f64>,
+    pub every_dt: Option<f64>,
+    /// Durée simulée, en secondes ; remplace `steps` si elle est donnée.
+    pub max_time: Option<f64>,
 }
 
 impl Default for Args {
@@ -96,7 +120,7 @@ impl Default for Args {
         Args {
             mask: PathBuf::new(),
             out: PathBuf::from("out"),
-            steps: 600,
+            max_steps: None,
             every: 10,
             width: 900,
             h: 1.0,
@@ -112,7 +136,8 @@ impl Default for Args {
             flow: "analytic".to_string(),
             stream_tol: 1e-6,
             stream_iters: 200_000,
-            frame_dt: None,
+            every_dt: None,
+            max_time: None,
         }
     }
 }
@@ -151,7 +176,9 @@ pub fn parse_from(argv: impl IntoIterator<Item = String>) -> Result<Option<Args>
         match arg.as_str() {
             "-h" | "--help" => return Ok(None),
             "--out" => args.out = PathBuf::from(value()?),
-            "--steps" => args.steps = value()?.parse().map_err(|e| format!("--steps : {e}"))?,
+            "--max-steps" => {
+                args.max_steps = Some(value()?.parse().map_err(|e| format!("--max-steps : {e}"))?)
+            }
             "--every" => args.every = value()?.parse().map_err(|e| format!("--every : {e}"))?,
             "--width" => args.width = value()?.parse().map_err(|e| format!("--width : {e}"))?,
             "--h" => args.h = value()?.parse().map_err(|e| format!("--h : {e}"))?,
@@ -183,8 +210,11 @@ pub fn parse_from(argv: impl IntoIterator<Item = String>) -> Result<Option<Args>
                     .parse()
                     .map_err(|e| format!("--stream-iters : {e}"))?
             }
-            "--frame-dt" => {
-                args.frame_dt = Some(value()?.parse().map_err(|e| format!("--frame-dt : {e}"))?)
+            "--every-dt" => {
+                args.every_dt = Some(value()?.parse().map_err(|e| format!("--every-dt : {e}"))?)
+            }
+            "--max-time" => {
+                args.max_time = Some(value()?.parse().map_err(|e| format!("--max-time : {e}"))?)
             }
             other if other.starts_with('-') => return Err(format!("option inconnue : {other}")),
             other => {
@@ -342,6 +372,24 @@ pub fn flux_scheme(args: &Args) -> Result<Box<dyn FluxScheme>, String> {
     }
 }
 
+/// Les deux plafonds d'arrêt, une fois la règle des valeurs par défaut appliquée.
+///
+/// Le piège qu'elle évite : `--max-time 60` seul s'arrêterait en réalité au bout de 600
+/// pas, le défaut de l'autre plafond l'emportant en silence — et 600 pas ne font pas 60
+/// secondes. **Un défaut ne doit pas contraindre une valeur explicitement demandée.** Donc
+/// un plafond donné seul est le seul qui compte, et les 600 pas ne servent que lorsqu'on
+/// n'a rien demandé du tout.
+pub fn caps(args: &Args) -> (usize, Option<f64>) {
+    match (args.max_steps, args.max_time) {
+        (Some(steps), time) => (steps, time),
+        (None, Some(time)) => (usize::MAX, Some(time)),
+        (None, None) => (DEFAULT_MAX_STEPS, None),
+    }
+}
+
+/// Nombre de pas par défaut, quand ni `--max-steps` ni `--max-time` n'est donné.
+const DEFAULT_MAX_STEPS: usize = 600;
+
 /// La configuration du solveur déduite des options.
 pub fn solver_config(args: &Args) -> Result<Config, String> {
     let time_scheme = match args.time_scheme.as_str() {
@@ -352,9 +400,10 @@ pub fn solver_config(args: &Args) -> Result<Config, String> {
     let mut config = Config {
         diffusivity: args.diffusivity,
         dt: args.dt,
-        steps: args.steps,
+        max_steps: caps(args).0,
         output_every: args.every,
-        output_dt: args.frame_dt,
+        output_dt: args.every_dt,
+        max_time: caps(args).1,
         time_scheme,
         ..Config::default()
     };
@@ -391,4 +440,46 @@ pub fn initial_field(mesh: &Mesh, bands: usize) -> Field {
             0.0
         }
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_default_cap_never_constrains_a_requested_one() {
+        let steps_only = Args {
+            max_steps: Some(50),
+            ..Args::default()
+        };
+        assert_eq!(caps(&steps_only), (50, None));
+
+        // Le cas qui motive toute cette fonction : sans elle, `--max-time 60` s'arrêtait
+        // au bout de 600 pas, qui ne font pas 60 secondes.
+        let time_only = Args {
+            max_time: Some(60.0),
+            ..Args::default()
+        };
+        assert_eq!(caps(&time_only), (usize::MAX, Some(60.0)));
+
+        let both = Args {
+            max_steps: Some(50),
+            max_time: Some(60.0),
+            ..Args::default()
+        };
+        assert_eq!(caps(&both), (50, Some(60.0)));
+
+        assert_eq!(caps(&Args::default()), (DEFAULT_MAX_STEPS, None));
+    }
+
+    #[test]
+    fn the_command_line_fills_both_caps() {
+        let parse = |argv: &[&str]| {
+            parse_from(argv.iter().map(|s| s.to_string()))
+                .expect("analyse impossible")
+                .expect("aide demandée")
+        };
+        assert_eq!(caps(&parse(&["m.dom", "--max-time", "60"])).0, usize::MAX);
+        assert_eq!(caps(&parse(&["m.dom", "--max-steps", "50"])), (50, None));
+    }
 }

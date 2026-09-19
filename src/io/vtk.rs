@@ -142,7 +142,7 @@ pub struct Frame<'a> {
 /// VisIt), et `TimeValue` (celui que cherche le lecteur de séries de ParaView). Aucun n'est
 /// garanti par le format lui-même — c'est une convention, pas une spécification — d'où les
 /// trois. Si votre lecteur les ignore, la parade portable est de donner le même pas de temps
-/// aux deux calculs (`--dt`) ou de sortir à cadence de temps fixe (`--frame-dt`) : les images
+/// aux deux calculs (`--dt`) ou de sortir à cadence de temps fixe (`--every-dt`) : les images
 /// de même rang portent alors la même date, et se comparent directement.
 pub fn write_frame(path: impl AsRef<Path>, mesh: &Mesh, frame: &Frame) -> io::Result<()> {
     let mut w = BufWriter::new(File::create(path)?);

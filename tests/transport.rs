@@ -42,7 +42,7 @@ fn the_tracer_stays_within_its_bounds() {
     // signalerait que le champ de débits n'est plus à divergence nulle.
     let (mesh, flow) = case();
     let config = Config {
-        steps: 300,
+        max_steps: 300,
         output_every: 0,
         check_every: 25,
         ..Config::default()
@@ -77,7 +77,7 @@ fn the_smoke_eventually_leaves() {
     // sans injection en amont, le domaine se vide : la masse décroît strictement
     let (mesh, flow) = case();
     let config = Config {
-        steps: 200,
+        max_steps: 200,
         output_every: 0,
         ..Config::default()
     };

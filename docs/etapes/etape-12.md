@@ -85,8 +85,8 @@ faisant rien — vérifiez-le sur le maillage.
 
 ```shell
 cargo test --test stream
-cargo run --release -- domains/square.dom --refine 2 --steps 200                  # analytique
-cargo run --release -- domains/square.dom --refine 2 --steps 200 --flow computed  # calculé
+cargo run --release -- domains/square.dom --refine 2 --max-steps 200                  # analytique
+cargo run --release -- domains/square.dom --refine 2 --max-steps 200 --flow computed  # calculé
 ```
 
 - `walls_are_exact_streamlines` teste `assert_eq!(worst, 0.0)`. Un test d'égalité sur des

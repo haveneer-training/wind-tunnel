@@ -83,7 +83,7 @@ histoire vraie, dans à peu près tous les laboratoires.
 ## Le résultat
 
 ```shell
-cargo run --release -- domains/tunnel.dom --steps 400 --every 20 --circulation 4
+cargo run --release -- domains/tunnel.dom --max-steps 400 --every 20 --circulation 4
 ```
 
 Les filets de fumée se déforment autour du cylindre, dissymétriquement à cause de la
@@ -97,7 +97,7 @@ sortie —, et la masse décroît régulièrement à mesure que la fumée sort p
 - `Centered`, dans `flux.rs`, est déjà implémenté : un schéma d'ordre 2 en espace.
   Essayez `--scheme centered` et lisez les bornes affichées à chaque sortie. Elles
   passent de `[0, 1]` à `[-0,49 ; 1,37]` après 50 pas, `[-2,46 ; 2,28]` après 150 :
-  des concentrations négatives, dont l'amplitude croît. Poussez à `--steps 4000` et le
+  des concentrations négatives, dont l'amplitude croît. Poussez à `--max-steps 4000` et le
   champ atteint 10¹⁶. Le décentrement amont, lui, reste rigoureusement borné. « Ordre
   plus élevé » et « meilleur » sont deux choses différentes, et c'est exactement le
   problème que devra résoudre l'étape 7.

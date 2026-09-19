@@ -74,7 +74,7 @@ limiteur de l'étape 7, pas de l'intégration en temps.
   le schéma temporel. `Field::copy_from` est là pour ça : il recopie dans un tampon
   existant là où `c.clone()` en alloue un neuf. Énoncé complet et solution dans
   [`docs/BONUS-OPTIMISATION.md`](../BONUS-OPTIMISATION.md).
-- Chronométrez un grand maillage (`--refine 8` ou plus, `--steps` élevé) en Euler puis
+- Chronométrez un grand maillage (`--refine 8` ou plus, `--max-steps` élevé) en Euler puis
   en RK2, avec `std::time::Instant`. Le rapport de temps mesuré est-il proche de 2, comme
   attendu du nombre d'évaluations du résidu ?
 - RK2 fait deux fois le travail par pas mais le pas de temps stable (`max_stable_dt`)

@@ -61,8 +61,8 @@ des autres — donc le résultat est déterministe, contrairement à ce qu'on po
 craindre d'un calcul parallèle.
 
 ```shell
-RAYON_NUM_THREADS=1 cargo run --release -- domains/tunnel.dom --refine 8 --steps 300
-cargo run --release -- domains/tunnel.dom --refine 8 --steps 300
+RAYON_NUM_THREADS=1 cargo run --release -- domains/tunnel.dom --refine 8 --max-steps 300
+cargo run --release -- domains/tunnel.dom --refine 8 --max-steps 300
 ```
 
 `RAYON_NUM_THREADS` fixe la taille du pool de threads de rayon. Chronométrez les deux

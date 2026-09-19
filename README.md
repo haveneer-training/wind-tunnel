@@ -10,7 +10,7 @@ l'est pas : c'est celui de n'importe quel code de calcul, en réduction.
 
 ![filets de fumée déviés par un cylindre](docs/apercu.png)
 
-<sub>`cargo run --release -- domains/tunnel.dom --refine 4 --bands 9 --steps 960`</sub>
+<sub>`cargo run --release -- domains/tunnel.dom --refine 4 --bands 9 --max-steps 960`</sub>
 
 ## Démarrage
 
@@ -53,13 +53,14 @@ Quelques options utiles :
 
 ```shell
 cargo run --release -- domains/tunnel.dom \
-    --steps 800 --every 20 \
+    --max-steps 800 --every 20 \
     --refine 4 \             # subdivise chaque case en 4×4 : le vrai raffinement
     --bands 9 \              # densité du rideau de fumée
     --circulation 4 \        # dissymétrie de l'écoulement (effet Magnus)
     --diffusivity 0.02 \     # diffusion physique du traceur
     --flow computed \        # résout l'écoulement sur le maillage (étape 12)
-    --frame-dt 0.5           # une image toutes les 0,5 s de temps physique
+    --max-time 60 \          # plafond en temps simulé, en secondes
+    --every-dt 0.5           # une image toutes les 0,5 s de temps physique
 ```
 
 `--refine` est le seul moyen d'augmenter la résolution : c'est le masque qui fixe le
@@ -106,14 +107,22 @@ redessinez l'obstacle, gardez-le rond — ou calculez l'écoulement sur votre g�
 `--flow computed` (étape 12), et comparez :
 
 ```shell
-cargo run --release -- domains/square.dom --refine 2 --frame-dt 0.5 --steps 200 --out out/ana
-cargo run --release -- domains/square.dom --refine 2 --frame-dt 0.5 --steps 200 --out out/calc --flow computed
+cargo run --release -- domains/square.dom --refine 2 --max-time 60 --every-dt 0.5 --out out/ana
+cargo run --release -- domains/square.dom --refine 2 --max-time 60 --every-dt 0.5 --out out/calc --flow computed
 ```
 
-`--frame-dt` sort les images à **date physique fixe**. Sans elle, les deux calculs n'ont
-pas le même pas de temps — la CFL le déduit du débit maximal, et l'écoulement calculé
-accélère davantage dans les passages — donc leurs images de même rang ne montrent pas le
-même instant et ne se comparent pas.
+Les deux calculs n'ont pas le même pas de temps : la CFL le déduit du débit maximal, et
+l'écoulement calculé accélère davantage dans les passages. Comparer à `--max-steps` égal
+compare donc deux instants différents. D'où les deux options en temps physique :
+
+- **`--max-time <s>`** plafonne la durée simulée. Donné seul, il est le seul plafond — le
+  défaut de `--max-steps` ne s'y substitue pas, sans quoi `--max-time 60` s'arrêterait au
+  bout de 600 pas, qui ne font pas 60 secondes. Donnez les deux et le calcul s'arrête au
+  premier atteint, `--max-steps` servant alors de garde-fou : on ne sait pas d'avance
+  combien de pas coûtera une durée donnée.
+- **`--every-dt <s>`** sort les images à date physique fixe, et non tous les *n* pas.
+
+Les deux séries ont alors le même nombre d'images, aux mêmes dates, à un pas de temps près.
 
 Dans ParaView, **ouvrez `frames.vtk.series`, pas les `frame_*.vtk`** : c'est lui qui porte
 la date de chaque image. Sans lui, ParaView numérote les images 0, 1, 2… et les deux
