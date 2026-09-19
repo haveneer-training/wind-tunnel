@@ -138,13 +138,13 @@ différents ne se superposent pas.
 
 ### Les champs d'un fichier VTK
 
-| Champ | Support | Unité | Ce que c'est |
-|---|---|---|---|
-| `c` | cellules | — | le traceur, la fumée. Part de [0, 1] et y reste avec `--scheme upwind` : c'est une propriété du schéma. `centered` en sort, et c'est tout l'objet de l'étape 6 |
-| `psi` | **sommets** | m²/s | la fonction de courant. Ses isolignes **sont** les lignes de courant, et la différence entre deux points est le débit qui passe entre eux |
-| `u` | cellules | m/s | la vitesse, vecteur 2D (troisième composante nulle, ParaView veut trois) |
-| `speed` | cellules | m/s | la norme de `u`, pour colorier sans passer par un filtre |
-| `TIME`, `TimeValue`, `CYCLE` | fichier | s, s, — | la date de l'image et son numéro de pas |
+| Champ                        | Support     | Unité   | Ce que c'est                                                                                                                                                   |
+|------------------------------|-------------|---------|----------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `c`                          | cellules    | —       | le traceur, la fumée. Part de [0, 1] et y reste avec `--scheme upwind` : c'est une propriété du schéma. `centered` en sort, et c'est tout l'objet de l'étape 6 |
+| `psi`                        | **sommets** | m²/s    | la fonction de courant. Ses isolignes **sont** les lignes de courant, et la différence entre deux points est le débit qui passe entre eux                      |
+| `u`                          | cellules    | m/s     | la vitesse, vecteur 2D (troisième composante nulle, ParaView veut trois)                                                                                       |
+| `speed`                      | cellules    | m/s     | la norme de `u`, pour colorier sans passer par un filtre                                                                                                       |
+| `TIME`, `TimeValue`, `CYCLE` | fichier     | s, s, — | la date de l'image et son numéro de pas                                                                                                                        |
 
 Quatre choses à savoir avant d'en tirer un chiffre :
 
@@ -161,14 +161,52 @@ Quatre choses à savoir avant d'en tirer un chiffre :
   ne se confonde pas avec une valeur faible. Deux images, de deux calculs différents, se
   comparent donc directement, ce qu'une échelle automatique interdirait.
 
-### Trois lectures utiles dans ParaView
+### Trois lectures dans ParaView
 
-- *Contour* sur `psi` — les lignes de courant **exactes** : ce sont les isolignes
-  elles-mêmes, aucune intégration de trajectoire, donc aucune erreur d'intégration. C'est
-  la façon la plus directe de voir en quoi deux écoulements diffèrent ;
-- *Glyph* sur `u` — les flèches, pour le sens et l'intensité au même endroit ;
-- coloration par `speed` — le blocage saute aux yeux : là où l'obstacle resserre le
-  passage, le même débit passe dans moins de place, donc plus vite.
+Recettes vérifiées sur ParaView 6.1.1. Le point à retenir avant tout : **`u` et `speed`
+sont aux cellules, `psi` aux sommets.** La plupart des filtres veulent des données aux
+points, d'où le filtre de conversion en tête de deux des trois recettes.
+
+**Les lignes de courant — `Contour` sur `psi`.** C'est la lecture la plus utile, et la
+seule exacte.
+
+1. *Filters ▸ Common ▸ Contour*, *Contour By* : `psi` ;
+2. donnez des isovaleurs **également espacées** : 4, 8, 12… jusqu'au débit total de la
+   veine, soit `--speed × hauteur` (48 pour le domaine livré à vitesse 1).
+
+Deux raisons de la préférer au *Stream Tracer* :
+
+- ce sont les lignes de courant **exactes** — les isolignes elles-mêmes, sans intégration
+  de trajectoire, donc sans erreur d'intégration ni pas à régler ;
+- à espacement constant en `psi`, **chaque tube transporte le même débit**. Là où les
+  lignes se resserrent, le fluide accélère : la vitesse se lit dans la géométrie du tracé.
+  C'est ce qui rend le blocage évident.
+
+**Les flèches — `Cell Centers` puis `Glyph`.** `Glyph` attend des points ; `Cell Centers`
+en fabrique un par cellule, à l'endroit exact où la valeur a été calculée, sans
+interpolation.
+
+1. *Filters ▸ Alphabetical ▸ Cell Centers* ;
+2. dessus, *Filters ▸ Common ▸ Glyph* : *Glyph Type* `Arrow`, *Orientation Array* `u`,
+   *Scale Array* `u` (longueur ∝ vitesse) ou `No scale array` (flèches égales, souvent
+   plus lisible), *Scale Factor* ≈ 0,5 pour commencer ;
+3. *Glyph Mode* : `Every Nth Point` avec un *Stride* de l'ordre de 40, ou `Uniform Spatial
+   Distribution` — sans quoi vous obtenez une flèche par cellule, soit 22 504 à
+   `--refine 2`, et un écran noir ;
+4. coloriez le `Glyph` par `speed`.
+
+**La texture — `Surface LIC`.** Très parlante en cours, mais elle exige un vecteur aux
+*points* : appliquée directement, elle échoue sur « *Attempt to get an input array for an
+index that has not been specified* ».
+
+1. *Filters ▸ Alphabetical ▸ Cell Data to Point Data* ;
+2. sur ce filtre, *Representation* : **Surface LIC** ;
+3. dans les propriétés, section *Surface LIC*, réglez **Vectors** sur `u`.
+
+Les valeurs y sont interpolées aux sommets : bon pour illustrer, pas pour mesurer.
+
+Enfin, inutile de passer par un *Calculator* pour la norme de la vitesse : `speed` est
+déjà dans le fichier.
 
 ## Organisation
 
@@ -178,34 +216,34 @@ masque ASCII ──▶ mask ──▶ mesh ──▶ field ──▶ solver ─�
                                velocity       flux
 ```
 
-| Fichier | Rôle |
-|---|---|
-| `src/geom.rs` | points, vecteurs, aires, centroïdes |
-| `src/mask.rs` | lecture et validation du domaine |
-| `src/mesh.rs` | cellules, faces, connectivité |
-| `src/field.rs` | un champ scalaire aux cellules |
-| `src/velocity.rs` | écoulements porteurs analytiques |
-| `src/flux.rs` | schémas de flux |
-| `src/solver.rs` | boucle en temps, CFL, conditions aux limites |
-| `src/io/` | sorties VTK et PNG |
-| `src/error.rs` | les deux familles d'erreurs |
-| `src/app.rs` | montage d'un cas, partagé par les deux exécutables |
-| `src/stream.rs` | fonction de courant résolue sur le maillage (étape 12) |
+| Fichier                | Rôle                                                    |
+|------------------------|---------------------------------------------------------|
+| `src/geom.rs`          | points, vecteurs, aires, centroïdes                     |
+| `src/mask.rs`          | lecture et validation du domaine                        |
+| `src/mesh.rs`          | cellules, faces, connectivité                           |
+| `src/field.rs`         | un champ scalaire aux cellules                          |
+| `src/velocity.rs`      | écoulements porteurs analytiques                        |
+| `src/flux.rs`          | schémas de flux                                         |
+| `src/solver.rs`        | boucle en temps, CFL, conditions aux limites            |
+| `src/io/`              | sorties VTK et PNG                                      |
+| `src/error.rs`         | les deux familles d'erreurs                             |
+| `src/app.rs`           | montage d'un cas, partagé par les deux exécutables      |
+| `src/stream.rs`        | fonction de courant résolue sur le maillage (étape 12)  |
 | `src/decomposition.rs` | découpage en bandes pour le calcul distribué (étape 11) |
-| `mpi/` | le pilote MPI, crate à part (étape 11) |
+| `mpi/`                 | le pilote MPI, crate à part (étape 11)                  |
 
 Et à côté du code lui-même :
 
-| Chemin | Rôle |
-|---|---|
-| `ETAPES.md` | le déroulé des étapes |
-| `docs/etapes/` | un énoncé par étape |
-| `domains/` | les masques de domaine |
-| `xtask/` | l'outil qui engendre `travail/` et pilote les étapes |
-| `scripts/` | vérifications automatiques du dispositif d'étapes et du pilote MPI |
-| `docs/BONUS-OPTIMISATION.md` | bonus transversal : mesurer et supprimer les allocations |
-| `examples/alloc_count.rs` | compte les allocations de chaque phase du calcul |
-| `docs/AVANCEMENT.md` | état du projet, ce qui reste, décisions à ne pas défaire |
+| Chemin                       | Rôle                                                               |
+|------------------------------|--------------------------------------------------------------------|
+| `ETAPES.md`                  | le déroulé des étapes                                              |
+| `docs/etapes/`               | un énoncé par étape                                                |
+| `domains/`                   | les masques de domaine                                             |
+| `xtask/`                     | l'outil qui engendre `travail/` et pilote les étapes               |
+| `scripts/`                   | vérifications automatiques du dispositif d'étapes et du pilote MPI |
+| `docs/BONUS-OPTIMISATION.md` | bonus transversal : mesurer et supprimer les allocations           |
+| `examples/alloc_count.rs`    | compte les allocations de chaque phase du calcul                   |
+| `docs/AVANCEMENT.md`         | état du projet, ce qui reste, décisions à ne pas défaire           |
 
 ## Licence
 
