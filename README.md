@@ -124,15 +124,51 @@ compare donc deux instants différents. D'où les deux options en temps physique
 
 Les deux séries ont alors le même nombre d'images, aux mêmes dates, à un pas de temps près.
 
-Dans ParaView, **ouvrez `frames.vtk.series`, pas les `frame_*.vtk`** : c'est lui qui porte
-la date de chaque image. Sans lui, ParaView numérote les images 0, 1, 2… et les deux
-calculs ne se superposent pas.
+## Ce que contient une sortie
 
-Chaque fichier VTK contient, au-delà du traceur `c` : la vitesse `u` et sa norme `speed`
-aux cellules, la fonction de courant `psi` aux **sommets**, et sa date. Un filtre *Contour*
-sur `psi` trace les lignes de courant exactes — ce sont les isolignes elles-mêmes, pas une
-intégration de trajectoires — et c'est le moyen le plus direct de voir en quoi les deux
-écoulements diffèrent.
+Un calcul écrit trois choses dans `--out` :
+
+- `frame_XXXX.vtk` — le maillage et ses champs, une image par sortie ;
+- `frame_XXXX.png` — la même image, en couleurs, sans rien installer ;
+- `frames.vtk.series` — la liste des images et **leur date**.
+
+**Dans ParaView, ouvrez `frames.vtk.series`, pas les `frame_*.vtk`.** C'est lui qui porte
+les dates ; sans lui, ParaView numérote les images 0, 1, 2… et deux calculs de pas de temps
+différents ne se superposent pas.
+
+### Les champs d'un fichier VTK
+
+| Champ | Support | Unité | Ce que c'est |
+|---|---|---|---|
+| `c` | cellules | — | le traceur, la fumée. Part de [0, 1] et y reste avec `--scheme upwind` : c'est une propriété du schéma. `centered` en sort, et c'est tout l'objet de l'étape 6 |
+| `psi` | **sommets** | m²/s | la fonction de courant. Ses isolignes **sont** les lignes de courant, et la différence entre deux points est le débit qui passe entre eux |
+| `u` | cellules | m/s | la vitesse, vecteur 2D (troisième composante nulle, ParaView veut trois) |
+| `speed` | cellules | m/s | la norme de `u`, pour colorier sans passer par un filtre |
+| `TIME`, `TimeValue`, `CYCLE` | fichier | s, s, — | la date de l'image et son numéro de pas |
+
+Quatre choses à savoir avant d'en tirer un chiffre :
+
+- **`u` et `speed` sont reconstruits** à partir des débits de face, pas échantillonnés :
+  c'est une moyenne par cellule, exacte pour un écoulement uniforme et d'ordre 2 sinon. Le
+  solveur, lui, ne manipule que des débits — il n'a jamais besoin d'une vitesse ;
+- **`psi` est définie à une constante près.** Ses valeurs absolues ne veulent rien dire,
+  seules leurs différences en ont un sens. Ici la paroi basse vaut 0, la paroi haute le
+  débit total de la veine ;
+- **le numéro d'image n'est pas un pas de temps** : avec `--every-dt`, ce n'est qu'un rang
+  dans la série. La date est dans le fichier, et dans le `.series` ;
+- **l'échelle de couleur du PNG est fixée à [0, 1]** sur le traceur, et le gris neutre du
+  fond est le solide — une couleur volontairement étrangère à la palette, pour qu'un vide
+  ne se confonde pas avec une valeur faible. Deux images, de deux calculs différents, se
+  comparent donc directement, ce qu'une échelle automatique interdirait.
+
+### Trois lectures utiles dans ParaView
+
+- *Contour* sur `psi` — les lignes de courant **exactes** : ce sont les isolignes
+  elles-mêmes, aucune intégration de trajectoire, donc aucune erreur d'intégration. C'est
+  la façon la plus directe de voir en quoi deux écoulements diffèrent ;
+- *Glyph* sur `u` — les flèches, pour le sens et l'intensité au même endroit ;
+- coloration par `speed` — le blocage saute aux yeux : là où l'obstacle resserre le
+  passage, le même débit passe dans moins de place, donc plus vite.
 
 ## Organisation
 
