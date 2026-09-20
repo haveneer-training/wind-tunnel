@@ -199,8 +199,10 @@ Conventions when adding a new step (full list in `docs/AVANCEMENT.md`):
    that becomes the new last one must move the sentinel up.
 4. Bump `LAST_STEP` in `xtask/src/main.rs`. A step that adds a separate crate must also
    add it to `make_starter`'s copy list **and** to `SOURCE_DIRS`, or xtask never sees its
-   holes. The `// TODO-STEP:<n>` marker must sit within 8 lines above `// SOLUTION-BEGIN`
-   — `step_of` looks no further, and silently attributes the block to step 0.
+   holes. The `// TODO-STEP:<n>` marker must sit in the **contiguous comment block** just
+   above `// SOLUTION-BEGIN` (no blank or code line in between, length free) — `step_of`
+   stops at the first non-comment line, and a block it cannot attribute now panics rather
+   than falling back to step 0.
 5. Add `docs/etapes/etape-NN.md` — a short mandatory core, an optional extension.
 6. **Language convention**: identifiers and filenames in English; prose (comments, doc
    comments, error messages, exercise statements) in French. Test names are code → English.
