@@ -174,7 +174,15 @@ fn find_blocks(text: &str, begin: &str, end: &str) -> Vec<Block> {
         let start = i;
         let indent: String = lines[i].chars().take_while(|c| c.is_whitespace()).collect();
 
-        let step = step_of(&lines, start, begin).unwrap_or(0);
+        let step = step_of(&lines, start, begin).unwrap_or_else(|| {
+            // Bloc sans `TODO-STEP:<n>` lisible juste au-dessus : erreur d'écriture du
+            // corrigé. Mieux vaut s'arrêter que d'attribuer silencieusement l'étape 0.
+            panic!(
+                "bloc {begin} ligne {} sans commentaire TODO-STEP:<n> dans le bloc de \
+                 commentaires qui le précède",
+                start + 1
+            )
+        });
         let Some(stop) = (start + 1..lines.len()).find(|&k| lines[k].trim_start().starts_with(end))
         else {
             break;
@@ -209,13 +217,17 @@ fn step_of(lines: &[&str], start: usize, begin: &str) -> Option<u8> {
             .parse()
             .ok();
     }
-    // dépôt corrigé : on remonte jusqu'au commentaire TODO-STEP le plus proche
-    let floor = start.saturating_sub(8);
-    (floor..start).rev().find_map(|k| {
-        let (_, rest) = lines[k].split_once("TODO-STEP:")?;
-        let digits: String = rest.chars().take_while(char::is_ascii_digit).collect();
-        digits.parse().ok()
-    })
+    // dépôt corrigé : on remonte le bloc de commentaires qui précède le marqueur,
+    // jusqu'au TODO-STEP le plus proche. Pas de limite en nombre de lignes : le bloc
+    // s'arrête de lui-même à la première ligne qui n'est pas un commentaire.
+    (0..start)
+        .rev()
+        .take_while(|&k| lines[k].trim_start().starts_with("//"))
+        .find_map(|k| {
+            let (_, rest) = lines[k].split_once("TODO-STEP:")?;
+            let digits: String = rest.chars().take_while(char::is_ascii_digit).collect();
+            digits.parse().ok()
+        })
 }
 
 /// Reconstruit un fichier en remplaçant le corps de certains blocs.
