@@ -1486,6 +1486,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "wind-tunnel-design"
+version = "0.1.0"
+
+[[package]]
 name = "wind-tunnel-mpi"
 version = "0.1.0"
 dependencies = [

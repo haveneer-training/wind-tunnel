@@ -49,10 +49,39 @@ Trois tests ont été ajoutés à l'étape 4 (`the_uniform_flow_is_constant_ever
 `any_velocity_field_is_already_a_stream_source`, ce dernier passant aussi par un
 `Box<dyn VelocityField>` pour couvrir le `?Sized`).
 
+**Bonus de conception (`design/`), même date.** Le rééquilibrage ci-dessus ne répondait
+qu'à moitié à la question posée : le stagiaire écrit désormais du Rust, mais toujours
+*dans* des types donnés. Concevoir une structure de données — décider ce qui est un type,
+ce qui ne doit pas pouvoir s'écrire — reste ce qu'on ne peut pas apprendre en complétant
+un corps de fonction.
+
+Ce n'est pas faisable sur le fil rouge lui-même, et la raison est structurelle : la forme
+d'un type est un contrat contre lequel tout le reste est déjà compilé. `Side` est utilisé
+dans `mesh.rs`, `solver.rs` et `tests/mesh.rs` ; `MeshError` dans cinq fichiers ; les
+identifiants typés dans quinze. Un squelette qui ferait compiler le reste donnerait la
+réponse, et un trou qui ne compile pas casserait tout le projet.
+
+D'où `design/` : un crate **sans dépendance et dont rien ne dépend**, membre du workspace
+mais hors du groupe par défaut, exactement comme `mpi/`. Son unique fichier source est
+**vide** dans `travail/` : le stagiaire y écrit `CellId`, `VertexId`, `BoundaryKind`,
+`Side`, `Face` et deux fonctions, contre les huit tests donnés de
+`design/tests/connectivity.rs`. Tant que c'est vide, `cargo test -p wind-tunnel-design`
+**ne compile pas** — c'est l'état normal de qui conçoit un type, et il ne gêne rien
+puisque `cargo test` à la racine ne construit jamais ce crate. L'énoncé est
+`docs/etapes/etape-02-conception.md` ; il est rattaché à l'étape 2 et se fait **avant** de
+lire `mesh.rs`.
+
+Deux tests y font le travail que les autres ne peuvent pas faire :
+`every_side_is_either_inner_or_boundary` a un `match` **sans bras `_`**, donc il ne
+compile que si `Side` est bien une énumération à deux cas (la variante « `Option` +
+drapeau » ne passerait pas), et `the_enum_costs_no_more_than_a_flag` vérifie que la
+version sûre est aussi la plus petite.
+
 - 88 tests verts, `cargo clippy --all-targets --all-features -- -D warnings` propre,
-  `cargo fmt` appliqué
-- 36 trous répartis : 4 en étape 0, 3 en 1, 3 en 2, 4 en 3, 3 en 4, 3 en 5, 1 en 6, 2 en 7,
-  1 en 8, 3 en 9, 1 en 10, 5 en 11, 3 en 12
+  `cargo fmt` appliqué ; plus 8 tests dans `design/` (`cargo test -p wind-tunnel-design`)
+- 37 trous répartis : 4 en étape 0, 3 en 1, **4** en 2, 4 en 3, 3 en 4, 3 en 5, 1 en 6,
+  2 en 7, 1 en 8, 3 en 9, 1 en 10, 5 en 11, 3 en 12 — le quatrième de l'étape 2 est le
+  **trou vide** du bonus de conception (voir plus bas)
 - **Étape 11 (bonus)** décompose le domaine en **bandes verticales**, une par rang MPI.
   Chaque rang extrait sa tranche de colonnes du masque (`Mask::columns`, nouveau),
   appelle `Mesh::from_mask` dessus et translate le maillage à sa place (`Mesh::translate`,
@@ -383,6 +412,13 @@ l'étape en cours. Le scan se refait en régénérant `travail/` puis, pour chaq
    Symptôme : `cargo xtask status` compte trop de trous en étape 0 et pas assez dans la
    vôtre. Une consigne plus longue va dans le commentaire de documentation de la
    fonction, que le stagiaire lit de toute façon.
+   **Le trou « vide »**, second type de trou : `// SOLUTION-BEGIN vide` remplace le bloc
+   par **rien du tout** au lieu d'un `todo!()`, et son marqueur dit « à écrire de zéro »
+   dans `travail/`. Il sert quand le stagiaire doit écrire des *définitions* — types,
+   `impl` — puisque `todo!()` est une expression et ne peut pas tenir lieu de `struct`.
+   Conséquence : ce qui dépend de ces définitions **ne compile plus** tant que le trou est
+   vide. Un tel trou n'a donc sa place que dans du code dont rien d'autre ne dépend — en
+   pratique, le crate `design/`. N'en mettez pas dans `src/`.
 2. **Les tests de l'étape n** vont sous `#[cfg(all(test, feature = "stepN"))]`, ou
    `#![cfg(feature = "stepN")]` en tête d'un fichier de `tests/`. Les features sont
    chaînées dans `Cargo.toml` (`stepN = ["stepN-1"]`), ce qui fait que `cargo test` ne
@@ -408,6 +444,12 @@ l'étape en cours. Le scan se refait en régénérant `travail/` puis, pour chaq
 7. Régénérer et vérifier : `cargo xtask starter --force && cd travail && cargo test`.
 
 ## Décisions à ne pas défaire
+
+**`design/` ne doit dépendre de rien, et rien ne doit en dépendre.** C'est la seule chose
+qui rend l'exercice de conception possible : dès qu'un autre fichier utiliserait ses
+types, leur forme cesserait d'être un choix du stagiaire. Ne lui ajoutez pas `wind-tunnel`
+en dépendance « pour factoriser », et ne le faites pas entrer dans le groupe par défaut du
+workspace — son état rouge normal casserait alors `cargo test` à la racine.
 
 **Le trou porte sur le Rust, pas sur la formule.** L'objet de la formation est le
 langage ; recopier une expression déjà imprimée dans l'énoncé n'en apprend rien. Quand
@@ -492,8 +534,10 @@ renvoyant une `String` : un fichier contient de l'ordre du million de nombres, e
 ## Vérifier que tout va bien
 
 ```shell
-cargo test                                   # 83 tests
+cargo test                                   # 88 tests
+cargo test -p wind-tunnel-design             # 8 tests ; hors groupe par défaut
 cargo clippy --all-targets --all-features -- -D warnings
+cargo clippy -p wind-tunnel-design --all-targets -- -D warnings
 cargo clippy -p wind-tunnel-mpi --all-targets -- -D warnings   # nécessite MPI
 cargo fmt --all --check
 cargo run --release -- domains/tunnel.dom --refine 4 --bands 9 --max-steps 960
@@ -507,6 +551,7 @@ cd travail && cargo test                     # 4 tests rouges : étape 0
 cargo xtask goto 12 && cargo xtask solve 12  # ... et tout doit redevenir vert
 
 cd .. && scripts/check-steps.sh              # le même tour, automatisé, étape par étape
+                                             # (et le bonus design/, rouge puis vert)
 scripts/check-mpi.sh                         # étape 11 ; sans effet si mpirun est absent
 cargo run --release --features faer --example stream_faer       # extension de l'étape 12
 ```

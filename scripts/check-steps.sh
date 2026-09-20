@@ -122,5 +122,22 @@ for n in $(seq 0 "$last_step"); do
     fi
 done
 
+# L'exercice de conception (bonus de l'étape 2) vit dans un crate hors du groupe par
+# défaut : la boucle ci-dessus ne l'a donc jamais construit. Ses trous ont pourtant été
+# remplis par `solve 2`, et son corrigé mérite d'être vérifié comme le reste.
+echo "==> bonus conception (design/)"
+cargo test -p wind-tunnel-design >/dev/null 2>&1 \
+    || fail "design/ : cargo test rouge alors que solve 2 est passé"
+ok "cargo test -p wind-tunnel-design vert"
+
+# Et il doit être rouge quand le trou est vide — c'est tout l'exercice. On le rouvre,
+# on vérifie que ça ne compile plus, puis on le remplit de nouveau.
+cargo xtask reset 2 >/dev/null
+if cargo test -p wind-tunnel-design >/dev/null 2>&1; then
+    fail "design/ : cargo test vert alors que le trou vient d'être rouvert"
+fi
+ok "rouge une fois le trou rouvert, comme attendu"
+cargo xtask solve 2 >/dev/null
+
 echo
 echo "${green}==> étapes 0 à ${last_step} toutes vérifiées${reset}"
