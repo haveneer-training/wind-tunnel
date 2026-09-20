@@ -69,7 +69,7 @@ cargo run --release -- domains/tunnel.dom \
 ```
 
 `--refine` est le seul moyen d'augmenter la résolution : c'est le masque qui fixe le
-nombre de cellules. `--h` ne règle que la *taille* d'une cellule, donc la taille physique
+nombre de cellules. `--cell-size` ne règle que la *taille* d'une cellule, donc la taille physique
 du domaine — le diviser par deux redonne exactement la même image, sur un domaine deux
 fois plus petit.
 

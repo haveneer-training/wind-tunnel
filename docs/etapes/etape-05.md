@@ -105,7 +105,7 @@ sortie —, et la masse décroît régulièrement à mesure que la fumée sort p
   90 000 cellules au lieu de 5 600, sur le **même** domaine physique. L'interface entre
   bandes s'affine et le pas de temps stable est divisé par quatre. Chronométrez : c'est
   le sujet des étapes 9 et 10.
-- Attention à ne pas confondre avec `--h`, qui fixe la *taille* d'une cellule et non
+- Attention à ne pas confondre avec `--cell-size`, qui fixe la *taille* d'une cellule et non
   leur nombre : le diviser par deux rétrécit le domaine de moitié et redonne exactement
   la même image. Seul le masque décide de la résolution.
 - `--bands 9` densifie le rideau de fumée. Avec un nombre pair, une bande passe
