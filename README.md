@@ -82,11 +82,21 @@ lecture (voir la fin de l'énoncé de l'étape 5).
 ## Prérequis
 
 - Rust ≥ 1.90 (`rustup update stable`)
-- rien d'autre : deux dépendances, `image` pour encoder les PNG et `rayon` pour
-  l'étape 9
+- rien d'autre pour le cœur du projet : deux dépendances, `image` pour encoder les PNG et
+  `rayon` pour l'étape 9
+- **facultatif, [ParaView](https://www.paraview.org/download/)** : le PNG donne un aperçu
+  immédiat, mais ParaView permet de *manipuler* les résultats — animer les frames avec
+  leur date physique (`frames.vtk.series`), tracer le champ de vitesse `u`, la fonction de
+  courant `psi`, zoomer, comparer deux calculs, extraire des profils (voir « Trois lectures
+  dans ParaView » plus bas)
+- facultatif, pour l'extension de l'étape 12 : `faer` (algèbre linéaire dense/creuse),
+  dépendance *optionnelle* utilisée seulement par `examples/stream_faer.rs`
+  (`cargo run --release --features faer --example stream_faer`). Téléchargée et compilée
+  uniquement avec `--features faer` : `cargo test` n'y touche pas
 - pour l'étape 11 seulement, une implémentation de MPI (`brew install open-mpi`,
-  `apt install libopenmpi-dev`). Elle n'est utilisée que par le crate `mpi/`, exclu du
-  workspace : sans elle, tout le reste se construit et se teste normalement.
+  `apt install libopenmpi-dev`) et le crate `mpi` (v0.8). Il n'est utilisé que par le
+  crate `mpi/`, membre du workspace mais pas par défaut : sans MPI installé, tout le reste
+  se construit et se teste normalement.
 
 En réseau isolé, `cargo vendor` permet de récupérer les dépendances à l'avance.
 
