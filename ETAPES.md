@@ -59,7 +59,9 @@ l'étape 7, on passe la reconstruction spatiale à l'ordre 2 — et l'ordre mesu
 l'ordre 2 avec une intégration Runge-Kutta. On y apprend autant sur la vérification d'un
 code de calcul que sur le langage.
 
-Les étapes 9 et 10 abordent le parallélisme, sur un code dont la structure a été choisie
+Les étapes 9 et 10 abordent le parallélisme **en mémoire partagée** (à distinguer du
+passage à l'échelle en mémoire distribuée de l'étape 11, plus loin), sur un code dont la
+structure a été choisie
 dès le départ pour s'y prêter. L'étape 9 traite le cas facile — chaque cellule écrit sa
 propre case, `rayon` n'a besoin de rien d'autre — et l'étape 10 le cas où ça ne suffit
 plus : plusieurs cellules dessinent dans la même image, il faut un verrou (`Mutex`), et
@@ -70,3 +72,10 @@ mémoire, chacun sa bande du domaine. Le solveur n'y change pas d'une ligne — 
 signe qu'il ne supposait déjà plus que « son » maillage était tout le domaine — et la
 difficulté se déplace là où elle est vraiment dans un code distribué : savoir qui possède
 quoi.
+
+L'étape 12, en bonus elle aussi, revient sur un défaut resté discret depuis l'étape 4 :
+l'écoulement analytique ne voit ni la forme réelle de l'obstacle (réduite à un disque de
+même aire), ni le maillage (une paroi en escalier n'est pas une de ses lignes de courant).
+On calcule `ψ` aux sommets par `∇²ψ = 0`, résolu par balayages de Jacobi — et on vérifie
+que la conservation, elle, ne dépendait jamais de la qualité de cet écoulement : elle vient
+de la forme du schéma, pas de sa convergence.
