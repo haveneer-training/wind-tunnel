@@ -43,13 +43,49 @@ fn neighbour_across(id: CellId, face: &crate::mesh::Face) -> Option<CellId> {
 #[cfg_attr(not(feature = "step7"), allow(unused_variables))] // trou étape 7
 #[cfg_attr(not(feature = "step10"), allow(dead_code))] // collatéral du trou étape 9
 fn least_squares_gradient(mesh: &Mesh, c: &Field, id: CellId) -> Vec2 {
+    let sys = normal_system(mesh, c, id);
+
+    // TODO-STEP:7 Résoudre `[[sxx, sxy], [sxy, syy]] · ∇c = (sxc, syc)` par la règle de
+    // Cramer, en renvoyant le vecteur nul plutôt qu'un quotient par zéro quand le
+    // déterminant est négligeable — moins de deux directions indépendantes, il n'y a
+    // rien à reconstruire.
+    // SOLUTION-BEGIN
+    let det = sys.sxx * sys.syy - sys.sxy * sys.sxy;
+    if det.abs() < 1e-300 {
+        return Vec2::ZERO;
+    }
+    Vec2::new(
+        (sys.syy * sys.sxc - sys.sxy * sys.syc) / det,
+        (sys.sxx * sys.syc - sys.sxy * sys.sxc) / det,
+    )
+    // SOLUTION-END
+}
+
+/// Le système normal `AᵀW A · ∇c = AᵀW b` d'une cellule, réduit à ses cinq coefficients
+/// distincts : la matrice 2×2 symétrique `[[sxx, sxy], [sxy, syy]]` et le second membre
+/// `(sxc, syc)`.
+///
+/// C'est de l'algèbre linéaire recopiée, donnée telle quelle : une somme sur les voisins
+/// intérieurs, pondérée par l'inverse du carré de la distance — un voisin proche compte
+/// plus qu'un voisin lointain.
+// Champs lus seulement depuis le trou de l'étape 7, puis depuis celui de l'étape 9 :
+// jamais lus tant que l'un des deux est vide.
+#[cfg_attr(not(feature = "step10"), allow(dead_code))]
+struct NormalSystem {
+    sxx: f64,
+    sxy: f64,
+    syy: f64,
+    sxc: f64,
+    syc: f64,
+}
+
+// Appelée depuis le trou de l'étape 7, puis collatéral du trou de l'étape 9 : morte
+// tant que l'un des deux est vide.
+#[cfg_attr(not(feature = "step10"), allow(dead_code))]
+fn normal_system(mesh: &Mesh, c: &Field, id: CellId) -> NormalSystem {
     let ci = c[id];
     let xi = mesh.cell(id).centroid;
 
-    // TODO-STEP:7 Assembler le système normal 2×2 pondéré sur les voisins intérieurs
-    // — Σ w·dx·dxᵀ, Σ w·dx·dc — et le résoudre pour (∂c/∂x, ∂c/∂y). Vecteur nul si le
-    // système est singulier.
-    // SOLUTION-BEGIN
     let (mut sxx, mut sxy, mut syy) = (0.0, 0.0, 0.0);
     let (mut sxc, mut syc) = (0.0, 0.0);
 
@@ -69,12 +105,13 @@ fn least_squares_gradient(mesh: &Mesh, c: &Field, id: CellId) -> Vec2 {
         syc += w * dx.y * dc;
     }
 
-    let det = sxx * syy - sxy * sxy;
-    if det.abs() < 1e-300 {
-        return Vec2::ZERO;
+    NormalSystem {
+        sxx,
+        sxy,
+        syy,
+        sxc,
+        syc,
     }
-    Vec2::new((syy * sxc - sxy * syc) / det, (sxx * syc - sxy * sxc) / det)
-    // SOLUTION-END
 }
 
 /// Facteur limiteur de Barth–Jespersen d'une cellule : le plus grand `φ ∈ [0, 1]` tel

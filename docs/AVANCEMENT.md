@@ -3,7 +3,7 @@
 Document de passation. Il dit où en est le fil rouge, ce qui reste à faire, et les
 décisions qu'il ne faut pas défaire sans le savoir. À tenir à jour.
 
-Dernière mise à jour : 2026-09-19 (étape 12 : écoulement calculé sur le maillage).
+Dernière mise à jour : 2026-09-20 (rééquilibrage des trous vers le Rust écrit).
 
 ## Contexte
 
@@ -27,10 +27,32 @@ avec `thread::scope`, `Mutex` et `mpsc` (étape 10), et enfin la décomposition 
 MPI (étape 11, bonus), et l'écoulement calculé sur le maillage (étape 12, bonus). Le code
 tourne et produit l'animation.
 
-- 83 tests verts (76 hors doctests), `cargo clippy --all-targets --all-features -- -D warnings` propre,
+**Rééquilibrage 2026-09-20.** Le découpage des trous a été révisé pour que le temps du
+stagiaire achète du Rust plutôt que de la transcription de formules. Mesuré trou par
+trou, le rendement s'effondrait au milieu du parcours (étapes 4, 7 et 8 : 90 min pour une
+recopie d'algèbre) pendant que trois concepts annoncés dans le tableau d'`ETAPES.md`
+n'étaient jamais écrits — `error.rs` n'avait aucun trou, `Mask::parse` était donnée en
+entier, et l'étape 4 « traits, généricité » ne faisait écrire qu'une formule. Ce qui a
+changé, à budget constant (355 min sur les étapes 0 à 10) :
+
+| # | Avant | Après |
+|---|---|---|
+| 1 | `is_fluid` (4 L) + BFS en extension | `is_fluid` + **`parse_row`** : `match ch`, `Err(InvalidChar)`, `Option<usize>`, `&mut Vec` · 30 → 40 min |
+| 2 | `build_faces` en extension | l'**appariement** passe au socle (`boundary_face` donnée), extension = **`build_cell_faces`** (CSR) · 40 → 45 min |
+| 3 | `write_dataset` entière (34 L) | **`write_cells`** seule (`write_points`/`write_cell_data` données) + **`From<io::Error>`** et **`Error::source`** · 30 → 20 min |
+| 4 | `PotentialCylinder::at` (formule) | **`impl VelocityField for Uniform`** et l'**implémentation couvrante `StreamSource`** (`?Sized`) ; le cylindre est donné · 25 → 20 min |
+| 7 | assemblage + résolution du système 2×2 | **résolution seule** (`normal_system` donnée) · 40 → 30 min |
+| 8, 10 | — | durées seulement : 25 → 20 min, et 30 → **45 min** (71 lignes de `thread::scope`/`Mutex`/`mpsc` ne tenaient pas en 30) |
+
+Trois tests ont été ajoutés à l'étape 4 (`the_uniform_flow_is_constant_everywhere`,
+`the_uniform_stream_function_matches_its_velocity`,
+`any_velocity_field_is_already_a_stream_source`, ce dernier passant aussi par un
+`Box<dyn VelocityField>` pour couvrir le `?Sized`).
+
+- 88 tests verts, `cargo clippy --all-targets --all-features -- -D warnings` propre,
   `cargo fmt` appliqué
-- 30 trous répartis : 5 en étape 0, 2 en 1, 2 en 2, 2 en 3, 1 en 4, 3 en 5, 1 en 6, 2 en 7,
-  1 en 8, 3 en 9, 0 en 10, 5 en 11, 3 en 12
+- 36 trous répartis : 4 en étape 0, 3 en 1, 3 en 2, 4 en 3, 3 en 4, 3 en 5, 1 en 6, 2 en 7,
+  1 en 8, 3 en 9, 1 en 10, 5 en 11, 3 en 12
 - **Étape 11 (bonus)** décompose le domaine en **bandes verticales**, une par rang MPI.
   Chaque rang extrait sa tranche de colonnes du masque (`Mask::columns`, nouveau),
   appelle `Mesh::from_mask` dessus et translate le maillage à sa place (`Mesh::translate`,
@@ -229,11 +251,13 @@ que lorsqu'on n'a rien demandé. Un test couvre les quatre combinaisons.
 
 Deux contraintes de structure ont guidé la mise en œuvre, et ne sont pas à défaire :
 
-- Le corps de `write_vtk` **est le trou de l'étape 3**. Il est devenu `write_dataset`, de
-  contenu identique mais écrivant dans un `&mut impl Write` ; `write_vtk` et `write_frame`
-  l'enveloppent, hors trou. Ajouter `psi` — qui n'existe qu'à l'étape 4 — dans le trou
-  aurait rendu l'étape 3 incompréhensible. Le test correspondant est d'ailleurs conditionné
-  à `step4`, pour que les rouges de l'étape 3 restent au nombre de trois.
+- Le corps de `write_vtk` **était le trou de l'étape 3**. Il est devenu `write_dataset`,
+  de contenu identique mais écrivant dans un `&mut impl Write` ; `write_vtk` et
+  `write_frame` l'enveloppent, hors trou. Ajouter `psi` — qui n'existe qu'à l'étape 4 —
+  dans le trou aurait rendu l'étape 3 incompréhensible. Le test correspondant est
+  d'ailleurs conditionné à `step4`. Depuis le rééquilibrage, `write_dataset` est elle-même
+  hors trou : elle appelle `write_points`, `write_cells` et `write_cell_data`, dont seule
+  la deuxième est trouée — les deux autres servent de modèle de format.
 - Le pilote MPI **refuse `--every-dt`** : la cadence est mise en œuvre dans `Solver::run`,
   que ce pilote n'utilise pas — il a sa propre boucle, celle des halos, et c'est le trou de
   l'étape 11. `--max-time`, lui, passe : il se convertit en nombre de pas dès que le `dt`
@@ -384,6 +408,20 @@ l'étape en cours. Le scan se refait en régénérant `travail/` puis, pour chaq
 7. Régénérer et vérifier : `cargo xtask starter --force && cd travail && cargo test`.
 
 ## Décisions à ne pas défaire
+
+**Le trou porte sur le Rust, pas sur la formule.** L'objet de la formation est le
+langage ; recopier une expression déjà imprimée dans l'énoncé n'en apprend rien. Quand
+une fonction mêle du Rust et de la recopie numérique, la recopie est **extraite dans une
+fonction auxiliaire donnée** et le trou couvre ce qui reste. C'est ce qui a été fait pour
+`normal_system` (étape 7, l'assemblage du système normal), `boundary_face` (étape 2, la
+géométrie d'une face), `write_points`/`write_cell_data` (étape 3, le format déjà montré
+en exemple) ; et c'est pourquoi `PotentialCylinder::at` est *donnée* alors que
+`impl VelocityField for Uniform` est *trouée* (étape 4) : la première est une formule, la
+seconde est une implémentation de trait. Conséquence pratique : ces auxiliaires sont
+appelées depuis un trou, donc mortes tant qu'il est vide — elles portent un
+`#[cfg_attr(not(feature = "stepN+1"), allow(dead_code))]`, **et une `struct` auxiliaire
+doit le porter elle aussi** (le `dead_code` des champs jamais lus est attribué au type,
+pas à la fonction ; `NormalSystem` s'est fait prendre).
 
 **Les débits de face viennent d'une différence de fonction de courant**, pas d'un
 échantillonnage de la vitesse aux faces. C'est ce qui rend la divergence discrète nulle

@@ -1,6 +1,6 @@
 # Étape 7 — Ordre 2 en espace : moindres carrés + limiteur
 
-**Fichiers :** `src/gradient.rs` · `src/flux.rs` · **Vérification :** `cargo xtask goto 7`, `cargo test` · **≈ 40 min**
+**Fichiers :** `src/gradient.rs` · `src/flux.rs` · **Vérification :** `cargo xtask goto 7`, `cargo test` · **≈ 30 min**
 
 L'étape 6 a mesuré la fausse diffusion du décentrement amont : nulle quand l'écoulement
 suit les axes du maillage, maximale à 45°. Sur un maillage non structuré, l'écoulement
@@ -42,8 +42,23 @@ comme `Centered` qui moyenne les deux côtés. C'est ce qui le garde décentré,
 
 | Fonction | Fichier | Ce qu'elle doit faire |
 |---|---|---|
-| `least_squares_gradient` | `gradient.rs` | assembler le système normal 2×2 pondéré sur les voisins intérieurs d'une cellule, et le résoudre |
+| `least_squares_gradient` | `gradient.rs` | résoudre le système normal 2×2 d'une cellule, ou renvoyer le vecteur nul s'il est singulier |
 | `Muscl::interface_value` | `flux.rs` | extrapoler la valeur amont jusqu'à la face à partir de son gradient limité ; sans voisin intérieur de ce côté (un bord), retenir la valeur telle quelle |
+
+L'assemblage du système — la somme pondérée sur les voisins intérieurs — vous est
+**donné** : c'est `normal_system`, de l'algèbre linéaire recopiée, et elle vous rend les
+cinq coefficients distincts `sxx`, `sxy`, `syy`, `sxc`, `syc`. Il reste à résoudre
+
+```text
+[ sxx  sxy ] [ ∂c/∂x ]   [ sxc ]
+[ sxy  syy ] [ ∂c/∂y ] = [ syc ]
+```
+
+par la règle de Cramer. Le point qui compte n'est pas la formule mais le cas dégénéré :
+avec moins de deux directions indépendantes — une cellule sans voisin intérieur, ou dont
+tous les voisins sont alignés — le déterminant s'annule. Renvoyez `Vec2::ZERO` plutôt
+qu'un quotient par zéro : il n'y a rien à reconstruire, et un `NaN` fabriqué ici
+contaminerait tout le champ au pas suivant.
 
 Le limiteur de Barth–Jespersen (`barth_jespersen`, dans `gradient.rs`) est déjà écrit :
 relisez-le, c'est lui qui garantit que `Muscl` reste borné là où `Centered` déborde.

@@ -1,6 +1,6 @@
 # Étape 3 — Écrire les résultats, et les erreurs
 
-**Fichiers :** `src/io/vtk.rs`, `src/error.rs` · **Vérification :** `cargo xtask goto 3` puis `cargo test` · **≈ 30 min**
+**Fichiers :** `src/io/vtk.rs`, `src/error.rs` · **Vérification :** `cargo xtask goto 3` puis `cargo test` · **≈ 20 min**
 
 Un calcul dont on ne voit rien ne sert à rien, et un calcul qui échoue sans le dire est
 pire qu'inutile. Cette étape traite les deux faces de la même pièce : les sorties, et ce
@@ -8,11 +8,21 @@ qu'on raconte quand ça se passe mal.
 
 ## Socle
 
-**`write_dataset`** — le format VTK legacy ASCII, volontairement daté : il tient en
-cinquante lignes, se lit dans un éditeur de texte, et Paraview comme Tecplot l'ouvrent
-sans discuter. La fonction écrit dans un `&mut impl Write`, pas dans un fichier : ouvrir
-le fichier est le travail de `write_vtk`, qui l'appelle, et écrire dans un tampon mémoire
-celui d'un test. Vous n'avez donc à produire que le contenu.
+| Fonction | Fichier | Ce qu'elle doit faire |
+|---|---|---|
+| `write_cells` | `io/vtk.rs` | les sections `CELLS` et `CELL_TYPES` du fichier |
+| `MeshError::source` | `error.rs` | l'erreur d'origine, quand il y en a une sous celle-ci |
+| `From<io::Error> for MeshError` | `error.rs` | la conversion qui fait marcher le `?` |
+
+Le format VTK legacy ASCII est volontairement daté : il tient en cinquante lignes, se lit
+dans un éditeur de texte, et Paraview comme Tecplot l'ouvrent sans discuter.
+`write_dataset` l'écrit en trois temps — `write_points`, `write_cells`,
+`write_cell_data` — dont le premier et le dernier vous sont **donnés** : ils vous servent
+de modèle, il ne reste que la connectivité, où sont les deux pièges du format.
+
+Ces fonctions écrivent dans un `&mut impl Write`, pas dans un fichier : ouvrir le fichier
+est le travail de `write_vtk`, qui les appelle, et écrire dans un tampon mémoire celui
+d'un test. Vous n'avez donc à produire que le contenu.
 
 Le plus court chemin vers le format est un fichier complet. Voici un maillage de deux
 cellules — un quadrangle et un triangle, portant un champ `c` — tel qu'il sort de
@@ -52,11 +62,15 @@ LOOKUP_TABLE default
 0.25                           ← c sur la cellule 1
 ```
 
-Les trois pièges du format sont tous visibles ici : les points sont toujours en 3D (d'où
-le `0` final, ce calcul étant plan) ; le second nombre de la ligne `CELLS` est le total
+Les trois pièges du format sont tous visibles ici, et **les deux qui vous concernent sont
+dans les sections que vous écrivez** : le second nombre de la ligne `CELLS` est le total
 des entiers des lignes qui suivent, nombres de sommets compris — ici
-`(1 + 4) + (1 + 3) = 9` ; et les valeurs de `CELL_DATA` sont dans l'ordre des cellules, une
-par cellule exactement. `cell.kind.vtk_code()` vous donne déjà `9` ou `5`. S'il y a
+`(1 + 4) + (1 + 3) = 9` — et chaque cellule s'annonce par son nombre de sommets avant de
+les lister. `cell.kind.vtk_code()` vous donne déjà le `9` ou le `5` de `CELL_TYPES`.
+
+Le troisième est dans `write_points`, qui vous est donnée : les points sont toujours en
+3D, d'où le `0` final, ce calcul étant plan. Et dans `write_cell_data`, également donnée :
+les valeurs sont dans l'ordre des cellules, une par cellule exactement, et s'il y a
 plusieurs champs, leurs blocs `SCALARS` / `LOOKUP_TABLE` se suivent sous le même
 `CELL_DATA` — c'est le cas d'usage réel, `write_vtk` recevant une liste de champs.
 
@@ -95,11 +109,16 @@ vérifie de surcroît qu'aucun appelant n'oublie de traiter le cas d'échec, pui
 `Result` inutilisé déclenche un avertissement.
 
 **`impl From<io::Error> for MeshError`** est ce qui permet au `?` de convertir tout seul
-une erreur d'entrée-sortie en erreur de maillage. `thiserror` écrirait ces
-implémentations à votre place ; il faut les avoir vues une fois.
+une erreur d'entrée-sortie en erreur de maillage — c'est le deuxième trou de l'étape, et
+il tient en une ligne. Retirez-le, et `fs::read_to_string(path)?` dans `Mask::from_file`
+ne compile plus : le `?` cherche un `From<io::Error>` et ne le trouve pas. `thiserror`
+écrirait cette implémentation à votre place ; il faut l'avoir vue une fois.
 
-**La chaîne des causes.** `Error::source` conserve l'erreur d'origine : `main` la déroule
-et affiche « erreur : … / cause : … ». Rien n'est perdu en route.
+**La chaîne des causes.** `Error::source` — le troisième trou — conserve l'erreur
+d'origine : `main` la déroule et affiche « erreur : … / cause : … ». Le message de haut
+niveau dit ce que le programme essayait de faire, la cause dit ce que le système a
+répondu, et rien n'est recopié de l'un dans l'autre. Le test `a_missing_file` de
+`tests/errors.rs` vérifie les deux bouts de la chaîne.
 
 ## Pour aller plus loin
 

@@ -1,12 +1,14 @@
 # Étape 2 — Maillage et connectivité
 
-**Fichier :** `src/mesh.rs` · **Vérification :** `cargo xtask goto 2` puis `cargo test` · **≈ 40 min**
+**Fichier :** `src/mesh.rs` · **Vérification :** `cargo xtask goto 2` puis `cargo test` · **≈ 45 min**
 
 C'est le cœur de la structure de données. Une cellule ne connaîtra pas ses voisins par
 arithmétique d'indices, mais par ses faces : tout ce qui sera écrit au-dessus
 fonctionnerait donc à l'identique sur un maillage lu depuis un fichier.
 
 ## Socle
+
+Deux trous : la forme d'une cellule, puis l'appariement de leurs arêtes.
 
 **`cell_corners`** — les quatre coins d'une cellule, dans le sens direct, *sauf* quand
 deux parois perpendiculaires se rejoignent : le coin qu'elles encadrent disparaît et la
@@ -20,18 +22,35 @@ exactement.
 Attention à l'orientation : dans le sens direct, avec `y` vers le haut, l'ordre est
 `bl → br → tr → tl`. Retirer un coin de cette liste conserve l'orientation.
 
-## Extension
-
 **`build_faces`** — l'appariement des arêtes. On parcourt toutes les cellules, et pour
 chaque arête `(a, b)` :
 
-- première rencontre : on crée une face, provisoirement de bord, dont la normale est
-  sortante de la cellule courante ;
+- première rencontre : on crée une face, provisoirement de bord — `boundary_face` vous
+  est donnée, elle en calcule la normale, la longueur et le milieu ;
 - deuxième rencontre : la face devient interne, `Side::Inner(cellule)` ;
 - troisième rencontre : le maillage n'est pas une surface, `MeshError::NonManifoldEdge`.
 
 La clé est la paire de sommets **triée**, sans quoi les deux cellules adjacentes ne
 tomberaient pas sur la même entrée du `HashMap`.
+
+Le `match` imbriqué de cette fonction mérite d'être regardé pour lui-même : le premier
+niveau distingue « arête déjà vue » de « arête nouvelle », le second, sur la face déjà
+créée, distingue « elle attend encore son second voisin » de « elle en a déjà deux, donc
+il y en a trois ». Le cas fautif n'est pas un `if` ajouté après coup : il tombe de
+l'énumération des cas possibles.
+
+## Extension
+
+**`Mesh::build_cell_faces`** — la connectivité inverse, cellule → faces, au format CSR
+décrit plus bas. Trois temps, et c'est un schéma qui revient partout en calcul :
+
+1. compter les faces de chaque cellule (une face interne compte pour ses **deux**
+   cellules) ;
+2. cumuler ces compteurs en décalages — `offsets[i]` dit où commencent les faces de la
+   cellule `i` ;
+3. remplir, en avançant un curseur par cellule.
+
+L'étape 12, si vous y allez, reprend exactement ce schéma pour le voisinage des sommets.
 
 ## Ce qu'il y a à remarquer
 

@@ -58,9 +58,21 @@ pub trait StreamSource: Sync {
     fn stream_at(&self, id: VertexId, p: Point) -> f64;
 }
 
+/// Implémentation **couvrante** : elle vaut pour tout type implémentant
+/// [`VelocityField`], présent ou à venir, sans que celui-ci ait un mot à écrire.
+///
+/// Le `?Sized` lui fait accepter aussi les types de taille inconnue à la compilation —
+/// au premier rang desquels `dyn VelocityField`, le schéma choisi à l'exécution par la
+/// ligne de commande. Sans lui, un `&dyn VelocityField` ne serait pas une
+/// [`StreamSource`] et le solveur le refuserait.
+#[cfg_attr(not(feature = "step4"), allow(unused_variables))] // trou étape 4
 impl<F: VelocityField + ?Sized> StreamSource for F {
     fn stream_at(&self, _id: VertexId, p: Point) -> f64 {
+        // TODO-STEP:4 Un écoulement analytique connaît `ψ` partout : ignorer le numéro
+        // de sommet et répondre au point
+        // SOLUTION-BEGIN
         self.stream(p)
+        // SOLUTION-END
     }
 }
 
@@ -71,13 +83,22 @@ pub struct Uniform {
     pub value: Vec2,
 }
 
+#[cfg_attr(not(feature = "step4"), allow(unused_variables))] // trou étape 4
 impl VelocityField for Uniform {
     fn at(&self, _p: Point) -> Vec2 {
+        // TODO-STEP:4 La même vitesse partout
+        // SOLUTION-BEGIN
         self.value
+        // SOLUTION-END
     }
 
     fn stream(&self, p: Point) -> f64 {
+        // TODO-STEP:4 La fonction de courant d'un écoulement uniforme. Elle est imposée
+        // par `u = (∂ψ/∂y, −∂ψ/∂x)` : cherchez le `ψ` dont les deux dérivées partielles
+        // redonnent `value`, et fixez la constante d'intégration à zéro.
+        // SOLUTION-BEGIN
         self.value.x * p.y - self.value.y * p.x
+        // SOLUTION-END
     }
 }
 
@@ -107,11 +128,12 @@ pub struct PotentialCylinder {
 }
 
 impl VelocityField for PotentialCylinder {
-    #[cfg_attr(not(feature = "step4"), allow(unused_variables))] // trou étape 4
+    /// Les formules du commentaire ci-dessus, transcrites telles quelles.
+    ///
+    /// Le seul point qui ne se lit pas dans l'algèbre est le garde-fou : `r⁴` au
+    /// dénominateur ne pardonne pas au voisinage du centre. Les cellules y sont solides,
+    /// donc jamais évaluées par le calcul — mais un test, lui, peut y passer.
     fn at(&self, p: Point) -> Vec2 {
-        // TODO-STEP:4 Évaluer l'écoulement potentiel autour du cylindre (formules ci-dessus),
-        // en renvoyant une vitesse nulle très près du centre pour éviter la division par r⁴
-        // SOLUTION-BEGIN
         let d = p - self.center;
         let r2 = d.dot(d);
         if r2 < 1e-12 * self.radius * self.radius {
@@ -123,7 +145,6 @@ impl VelocityField for PotentialCylinder {
             u * (1.0 - self.radius * self.radius * (d.x * d.x - d.y * d.y) / r4) - v * d.y / r2,
             -u * (2.0 * self.radius * self.radius * d.x * d.y / r4) + v * d.x / r2,
         )
-        // SOLUTION-END
     }
 
     fn stream(&self, p: Point) -> f64 {
@@ -206,5 +227,52 @@ mod tests {
             below.x > above.x + 0.1,
             "above = {above:?}, below = {below:?}"
         );
+    }
+
+    #[test]
+    fn the_uniform_flow_is_constant_everywhere() {
+        let f = Uniform {
+            value: Vec2::new(1.5, -0.5),
+        };
+        for p in [Point::new(0.0, 0.0), Point::new(-7.0, 42.0)] {
+            assert_eq!(f.at(p), f.value);
+        }
+    }
+
+    #[test]
+    fn the_uniform_stream_function_matches_its_velocity() {
+        // Même vérification que pour le cylindre, sur un écoulement oblique : c'est
+        // ainsi qu'on attrape une erreur de signe ou deux composantes échangées, que
+        // `value.x * p.y` seul ne révélerait pas.
+        let f = Uniform {
+            value: Vec2::new(1.5, -0.5),
+        };
+        let h = 1e-6;
+        for p in [Point::new(2.0, 1.3), Point::new(-3.0, 0.7)] {
+            let dpsi_dy = (f.stream(Point::new(p.x, p.y + h)) - f.stream(Point::new(p.x, p.y - h)))
+                / (2.0 * h);
+            let dpsi_dx = (f.stream(Point::new(p.x + h, p.y)) - f.stream(Point::new(p.x - h, p.y)))
+                / (2.0 * h);
+            assert!((f.value.x - dpsi_dy).abs() < 1e-6, "u_x ≠ ∂ψ/∂y en {p:?}");
+            assert!((f.value.y + dpsi_dx).abs() < 1e-6, "u_y ≠ −∂ψ/∂x en {p:?}");
+        }
+    }
+
+    #[test]
+    fn any_velocity_field_is_already_a_stream_source() {
+        // L'implémentation couvrante vaut pour un type concret comme pour un
+        // `dyn VelocityField`, dont la taille est inconnue à la compilation — c'est ce
+        // que le `?Sized` achète, et c'est sous cette forme que le solveur reçoit le
+        // champ choisi par la ligne de commande.
+        let p = Point::new(2.0, 1.3);
+        let v = VertexId(7);
+
+        let f = Uniform {
+            value: Vec2::new(1.5, -0.5),
+        };
+        assert_eq!(f.stream_at(v, p), f.stream(p));
+
+        let boxed: Box<dyn VelocityField> = Box::new(cylinder());
+        assert_eq!(boxed.stream_at(v, p), cylinder().stream(p));
     }
 }

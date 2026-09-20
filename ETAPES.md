@@ -20,22 +20,27 @@ facultative : personne n'attend son voisin.
 
 ## Les étapes
 
-| # | Étape | Jour | ~Durée | Ce qu'on y voit de Rust |
-|---|---|---|---|---|
-| [0](docs/etapes/etape-00.md) | Géométrie de base | J1 | 20 min | types, fonctions, `Vec`, `derive`, tests |
-| [1](docs/etapes/etape-01.md) | Le masque du domaine | J1 | 30 min | propriété, emprunts, slices |
-| [2](docs/etapes/etape-02.md) | Maillage et connectivité | J1 | 40 min | `enum`, filtrage par motif, `HashMap`, `Option` |
-| [3](docs/etapes/etape-03.md) | Écrire les résultats, et les erreurs | J1 | 30 min | `Result`, `?`, `Display`, `Error` |
-| [4](docs/etapes/etape-04.md) | L'écoulement porteur | J2 | 25 min | traits, généricité |
-| [5](docs/etapes/etape-05.md) | Le solveur | J2 | 45 min | itérateurs, erreurs typées, `&`/`&mut` |
-| [6](docs/etapes/etape-06.md) | Qualité : conservation, ordre, `clippy` | J2 | 30 min | tests, documentation, outillage |
-| [7](docs/etapes/etape-07.md) | Passer à l'ordre 2 en espace | J2/J3 | 40 min | généricité, `dyn`, mesure de performance |
-| [8](docs/etapes/etape-08.md) | RK2 : pourquoi l'ordre n'avait pas bougé | J3 | 25 min | `enum` de schéma, relecture critique d'un résultat |
-| [9](docs/etapes/etape-09.md) | Paralléliser avec `rayon` | J3 | 40 min | style fonctionnel, `par_iter`, performance |
-| [10](docs/etapes/etape-10.md) | Threads : écriture recouverte, suivi | J3 | 30 min | `thread::scope`, `mpsc`, `Arc`, `Mutex` |
-| [11](docs/etapes/etape-11.md) | *Bonus* : passage à l'échelle en MPI | J3 | 60 min | processus, messages, réductions |
-| [12](docs/etapes/etape-12.md) | *Bonus* : calculer l'écoulement | J3 | 40 min | algorithme itératif, convergence |
-| — | [*Bonus* : chasse aux allocations](docs/BONUS-OPTIMISATION.md) | — | 45 min | `GlobalAlloc`, tampons réutilisés, emprunts par champ |
+La colonne **« ce que vous écrivez »** est ce qui sort de votre clavier ; la colonne
+**« ce que vous lisez »** est ce que l'étape donne à voir dans du code déjà écrit. Les
+deux comptent, mais elles ne s'apprennent pas de la même façon — et le tableau dit
+laquelle domine à chaque étape.
+
+| # | Étape | Jour | ~Durée | Ce que vous écrivez | Ce que vous lisez |
+|---|---|---|---|---|---|
+| [0](docs/etapes/etape-00.md) | Géométrie de base | J1 | 20 min | types, fonctions, `Vec`, itérateurs | `derive`, doc-tests |
+| [1](docs/etapes/etape-01.md) | Le masque du domaine | J1 | 40 min | `match` sur caractère, `Option`, `&mut`, `Err(...)` | propriété, déplacement, emprunts |
+| [2](docs/etapes/etape-02.md) | Maillage et connectivité | J1 | 45 min | `match` exhaustif, `HashMap`, `enum` `Side`, CSR | indices typés, pointeurs vs indices |
+| [3](docs/etapes/etape-03.md) | Écrire les résultats, et les erreurs | J1 | 20 min | `write!`/`?`, `From`, `Error::source` | `enum` d'erreurs, chaîne des causes |
+| [4](docs/etapes/etape-04.md) | L'écoulement porteur | J2 | 20 min | `impl Trait for`, implémentation couvrante, `?Sized` | `Sync`, un trait comme besoin |
+| [5](docs/etapes/etape-05.md) | Le solveur | J2 | 45 min | itérateurs, `Option`, `&`/`&mut` | *gather* vs *scatter*, CFL vérifiée avant |
+| [6](docs/etapes/etape-06.md) | Qualité : conservation, ordre, `clippy` | J2 | 30 min | `fold` à accumulateur | tests de propriété, `clippy`, `cargo doc` |
+| [7](docs/etapes/etape-07.md) | Passer à l'ordre 2 en espace | J2/J3 | 30 min | `match` sur `Option`, cas dégénéré | moindres carrés, limiteur, `dyn` vs générique |
+| [8](docs/etapes/etape-08.md) | RK2 : pourquoi l'ordre n'avait pas bougé | J3 | 20 min | tampons, `clone`, `zip` | `enum` de schéma, relecture critique d'un résultat |
+| [9](docs/etapes/etape-09.md) | Paralléliser avec `rayon` | J3 | 40 min | `par_iter`, fermetures, `Send`/`Sync` | ce que le compilateur refuse de paralléliser |
+| [10](docs/etapes/etape-10.md) | Threads : écriture recouverte, suivi | J3 | 45 min | `thread::scope`, `Mutex`, `mpsc`, `chunks` | `Arc` et la propriété partagée |
+| [11](docs/etapes/etape-11.md) | *Bonus* : passage à l'échelle en MPI | J3 | 60 min | découpage, possession, échanges immédiats | processus, messages, réductions |
+| [12](docs/etapes/etape-12.md) | *Bonus* : calculer l'écoulement | J3 | 40 min | CSR aux sommets, `Option<f64>`, tampons échangés | algorithme itératif, résidu ≠ erreur |
+| — | [*Bonus* : chasse aux allocations](docs/BONUS-OPTIMISATION.md) | — | 45 min | tampons réutilisés, emprunts par champ | `GlobalAlloc`, mesure |
 
 Les étapes 0 à 5 forment le noyau : à la fin de l'étape 5, le code tourne et produit ses
 premières images. Les suivantes l'améliorent.

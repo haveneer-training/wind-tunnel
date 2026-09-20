@@ -45,6 +45,7 @@ pub fn colormap(t: f64) -> Rgb<u8> {
 
 /// Le point est-il dans le polygone ? (lancer de rayon)
 #[cfg_attr(not(feature = "step3"), allow(unused_variables))] // trou étape 3
+#[cfg_attr(not(feature = "step11"), allow(dead_code))] // collatéral du trou étape 10
 fn contains(polygon: &[Point], p: Point) -> bool {
     // TODO-STEP:3 (pour aller plus loin) Lancer un rayon horizontal depuis `p` et
     // compter les arêtes traversées : un nombre impair signifie « à l'intérieur »
