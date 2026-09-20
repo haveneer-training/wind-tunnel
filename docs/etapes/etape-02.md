@@ -12,9 +12,10 @@ fonctionnerait donc à l'identique sur un maillage lu depuis un fichier.
 deux parois perpendiculaires se rejoignent : le coin qu'elles encadrent disparaît et la
 cellule devient un triangle. Une marche d'escalier devient ainsi une facette à 45°.
 
-Les quatre booléens `left`, `right`, `up`, `down` disent si le voisin correspondant est
-une paroi. Quatre configurations donnent un triangle, toutes les autres un quadrangle ;
-un `match` sur le quadruplet les couvre exactement.
+Les quatre booléens `down`, `right`, `up`, `left` — eux aussi dans le sens direct —
+disent si le voisin correspondant est une paroi. Quatre configurations donnent un
+triangle, toutes les autres un quadrangle ; un `match` sur le quadruplet les couvre
+exactement.
 
 Attention à l'orientation : dans le sens direct, avec `y` vers le haut, l'ordre est
 `bl → br → tr → tl`. Retirer un coin de cette liste conserve l'orientation.

@@ -192,10 +192,11 @@ impl Mesh {
                     continue;
                 }
                 let (r, c) = (row as isize, col as isize);
-                let (left, right) = (mask.is_obstacle(r, c - 1), mask.is_obstacle(r, c + 1));
-                let (up, down) = (mask.is_obstacle(r - 1, c), mask.is_obstacle(r + 1, c));
+                // Voisins dans le sens direct : bas, droite, haut, gauche.
+                let (down, right) = (mask.is_obstacle(r + 1, c), mask.is_obstacle(r, c + 1));
+                let (up, left) = (mask.is_obstacle(r - 1, c), mask.is_obstacle(r, c - 1));
 
-                let corners = cell_corners(row, col, left, right, up, down);
+                let corners = cell_corners(row, col, down, right, up, left);
 
                 let ids: Vec<VertexId> = corners
                     .iter()
@@ -454,10 +455,10 @@ impl Mesh {
 
 /// Sommets de la cellule `(row, col)` du masque, dans le sens direct.
 ///
-/// Les quatre booléens disent si le voisin correspondant est une paroi d'obstacle.
-/// Quand exactement deux parois perpendiculaires se rejoignent, le coin qu'elles
-/// encadrent est retiré : la cellule devient un triangle et la marche d'escalier
-/// devient une facette à 45°.
+/// Les quatre booléens, eux aussi dans le sens direct (bas, droite, haut, gauche),
+/// disent si le voisin correspondant est une paroi d'obstacle. Quand exactement deux
+/// parois perpendiculaires se rejoignent, le coin qu'elles encadrent est retiré : la
+/// cellule devient un triangle et la marche d'escalier devient une facette à 45°.
 ///
 /// Les coordonnées renvoyées sont celles de la grille de sommets, où `(row, col)` est
 /// le coin **haut gauche** de la cellule `(row, col)`.
@@ -465,10 +466,10 @@ impl Mesh {
 fn cell_corners(
     row: usize,
     col: usize,
-    left: bool,
+    down: bool,
     right: bool,
     up: bool,
-    down: bool,
+    left: bool,
 ) -> Vec<(usize, usize)> {
     let bl = (row + 1, col);
     let br = (row + 1, col + 1);
@@ -477,11 +478,11 @@ fn cell_corners(
     // TODO-STEP:2 Renvoyer les quatre coins dans le sens direct (bl, br, tr, tl), en
     // retirant celui qui est coincé entre deux parois perpendiculaires
     // SOLUTION-BEGIN
-    match (left, right, up, down) {
-        (false, true, false, true) => vec![bl, tr, tl],
-        (false, true, true, false) => vec![bl, br, tl],
-        (true, false, true, false) => vec![bl, br, tr],
-        (true, false, false, true) => vec![br, tr, tl],
+    match (down, right, up, left) {
+        (true, true, false, false) => vec![bl, tr, tl], // bas + droite : plus de br
+        (false, true, true, false) => vec![bl, br, tl], // droite + haut : plus de tr
+        (false, false, true, true) => vec![bl, br, tr], // haut + gauche : plus de tl
+        (true, false, false, true) => vec![br, tr, tl], // gauche + bas : plus de bl
         _ => vec![bl, br, tr, tl],
     }
     // SOLUTION-END
