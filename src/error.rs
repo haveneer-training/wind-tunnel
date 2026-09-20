@@ -11,6 +11,7 @@
 use std::fmt;
 use std::io;
 
+use crate::geom::Point;
 use crate::mesh::CellId;
 
 /// Ce qui peut échouer entre le fichier de masque et le maillage construit.
@@ -69,6 +70,12 @@ pub enum MeshError {
         /// Second sommet de l'arête.
         b: u32,
     },
+    /// Un obstacle touche le bord du domaine : le sommet partagé ne peut pas porter à
+    /// la fois la condition de bord et celle de l'obstacle (voir `Mesh::classify_boundaries`).
+    ObstacleTouchesBoundary {
+        /// Coordonnées du sommet partagé.
+        at: Point,
+    },
 }
 
 impl fmt::Display for MeshError {
@@ -105,6 +112,12 @@ impl fmt::Display for MeshError {
             MeshError::NonManifoldEdge { a, b } => write!(
                 f,
                 "l'arête ({a}, {b}) est partagée par plus de deux cellules"
+            ),
+            MeshError::ObstacleTouchesBoundary { at } => write!(
+                f,
+                "l'obstacle touche le bord du domaine en ({:.3}, {:.3}) : \
+                 laissez un jeu d'au moins une cellule entre l'obstacle et le bord",
+                at.x, at.y
             ),
         }
     }

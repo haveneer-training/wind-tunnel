@@ -25,6 +25,7 @@ fn run() -> Result<(), Box<dyn Error>> {
     let mask = args.read_mask()?;
     let h = args.cell_size();
     let mesh = Mesh::from_mask(&mask, h)?;
+    mesh.check_obstacle_clear_of_boundary()?;
     let (tri, quad) = mesh.shape_counts();
     let (xmin, ymin, xmax, ymax) = mesh.bounds();
 

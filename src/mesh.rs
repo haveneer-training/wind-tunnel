@@ -363,6 +363,51 @@ impl Mesh {
         self.groups = groups;
     }
 
+    /// Vérifie qu'aucun sommet n'est partagé entre l'obstacle et le bord du domaine.
+    ///
+    /// Un tel sommet porterait deux natures à la fois : l'écoulement calculé
+    /// (étape 12) impose à chaque sommet de bord une seule valeur de `ψ`, choisie
+    /// selon la nature de ses faces (`ψ₀(y)` pour `Inlet`/`Wall`, une constante pour
+    /// `Obstacle`). L'une des deux valeurs écraserait l'autre — plus une ligne de
+    /// courant, un débit parasite s'installe et grossit sans borne au fil du temps.
+    ///
+    /// Volontairement **pas** appelée par [`Mesh::from_mask`] : une bande de l'étape 11
+    /// ([`crate::decomposition::Layout::build_mesh`]) a pour bord légitime la coupure
+    /// de la bande, qui peut tomber sur l'obstacle sans que cela pose problème (elle
+    /// n'alimente jamais l'écoulement calculé). C'est au masque dessiné à la main —
+    /// donc à l'appelant qui construit le maillage global — de demander cette
+    /// vérification.
+    pub fn check_obstacle_clear_of_boundary(&self) -> Result<(), MeshError> {
+        let mut domain_edge: HashMap<VertexId, Point> = HashMap::new();
+        for face_id in self
+            .groups
+            .get(&BoundaryKind::Inlet)
+            .into_iter()
+            .chain(self.groups.get(&BoundaryKind::Outlet))
+            .chain(self.groups.get(&BoundaryKind::Wall))
+            .flatten()
+        {
+            let face = self.faces[face_id.index()];
+            domain_edge.insert(face.a, self.vertices[face.a.index()]);
+            domain_edge.insert(face.b, self.vertices[face.b.index()]);
+        }
+        for face_id in self
+            .groups
+            .get(&BoundaryKind::Obstacle)
+            .into_iter()
+            .flatten()
+        {
+            let face = self.faces[face_id.index()];
+            if let Some(&at) = domain_edge
+                .get(&face.a)
+                .or_else(|| domain_edge.get(&face.b))
+            {
+                return Err(MeshError::ObstacleTouchesBoundary { at });
+            }
+        }
+        Ok(())
+    }
+
     /// Calcule la distance associée à chaque face, une fois les voisins connus.
     fn finish_geometry(&mut self) {
         for face in &mut self.faces {
@@ -536,6 +581,21 @@ mod tests {
         let (tri, quad) = m.shape_counts();
         assert_eq!((tri, quad), (1, 0));
         assert!((m.total_area() - 0.5).abs() < 1e-12);
+    }
+
+    #[test]
+    fn obstacle_touching_the_boundary_is_rejected() {
+        // le mur haut n'est jamais atteint : cette obstacle-là commence dès la
+        // rangée 0, donc partage un sommet avec lui.
+        let m = mesh_of(".#\n##\n");
+        assert!(m.check_obstacle_clear_of_boundary().is_err());
+    }
+
+    #[test]
+    fn obstacle_clear_of_the_boundary_is_accepted() {
+        // même obstacle en L, mais isolé du bord par une marge d'une cellule.
+        let m = mesh_of("....\n..#.\n.##.\n....\n");
+        assert!(m.check_obstacle_clear_of_boundary().is_ok());
     }
 
     #[test]
