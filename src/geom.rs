@@ -192,7 +192,7 @@ pub fn polygon_centroid(points: &[Point]) -> Point {
     // moyenne des sommets quand l'aire est négligeable
     // SOLUTION-BEGIN
     let area = polygon_area(points);
-    if area.abs() < 1e-300 {
+    if area.abs() < 1e-16 {
         let n = points.len() as f64;
         let sum = points
             .iter()
