@@ -1,6 +1,6 @@
 # Étape 1 — Le masque du domaine
 
-**Fichier :** `src/mask.rs` · **Vérification :** `cargo xtask goto 1` puis `cargo test` · **≈ 40 min**
+**Fichier :** `src/mask.rs` · **Vérification :** `cargo xtask goto 1` puis `cargo test` · **≈ 35 min**
 
 Le domaine de calcul est dessiné à la main dans un fichier texte : `.` pour du fluide,
 `#` pour du solide. C'est confortable pour l'utilisateur, et c'est donc l'endroit exact
@@ -11,40 +11,41 @@ où le programme recevra des données fausses.
 | Fonction | Ce qu'elle doit faire |
 |---|---|
 | `Mask::is_fluid` | lire la bonne case de la grille, stockée à plat ligne par ligne dans un `Vec<bool>` ; `false` hors de la grille |
-| `parse_row` | analyser une ligne du fichier : largeur attendue, caractères admis, cellules empilées |
+| `Mask::refine` | rendre un **nouveau** masque où chaque case est subdivisée en `factor × factor` |
 
 Une case hors grille n'est pas une erreur : c'est l'extérieur de la veine, et il est
 commode de pouvoir interroger les voisins d'une cellule de bord sans précaution
 particulière.
 
-`parse_row` est l'endroit où le format est validé, et il a trois choses à dire :
+`refine` ne redessine rien : le domaine reste le même, seule sa finesse augmente. Chacune
+des `factor × factor` cases nouvelles reprend la valeur de celle dont elle vient — un
+quotient entier suffit à la retrouver. C'est ce que fait l'option `--refine` en ligne de
+commande, et ce dont l'étape 6 se servira pour mesurer un ordre de convergence : deux
+maillages de finesses différentes sur le **même** domaine physique.
 
-- la ligne n'a pas la largeur attendue → `MeshError::RaggedMask { line, expected, got }` ;
-- un caractère n'est ni `.` ni `#` → `MeshError::InvalidChar { line, col, ch }` ;
-- tout va bien → la largeur de la ligne, que l'appelant retient comme référence pour les
-  suivantes.
-
-D'où le paramètre `expected: Option<usize>` : `None` sur la première ligne — c'est elle
-qui fixe la largeur — et `Some(largeur)` ensuite. L'`Option` dit dans le type qu'il n'y a
-pas toujours de référence à comparer, plutôt que de faire passer un `0` pour « pas encore
-de largeur ».
-
-Les numéros de ligne et de colonne sont comptés **à partir de 1** : ce sont des numéros
-destinés à un humain qui ouvrira le fichier dans un éditeur, pas des indices.
+Une seule chose est à décider, et elle n'est pas dans la formule : `refine` reçoit `&self`
+— elle *emprunte* le masque — et doit rendre un `Mask`. Elle ne peut donc pas modifier
+celui qu'on lui donne ; il lui faut en construire un neuf et le rendre.
 
 ## Ce qu'il y a à remarquer
 
-**Le masque est possédé, pas emprunté.** `Mask::parse` construit le `Vec<bool>`, le prête
-en `&mut` à `parse_row` qui le remplit ligne après ligne, puis le *déplace* dans le `Mask`
-rendu à l'appelant — sans copie du tableau. Puis `Mesh::from_mask` prend `&Mask` : il
-*emprunte* le masque le temps de construire le maillage, sans jamais le modifier ni s'en
-approprier. Rien de tout cela n'est écrit à la main — c'est la signature des fonctions qui
-le dit, et le compilateur qui le vérifie.
+**Le masque est possédé, pas emprunté.** `Mask::parse` construit le `Vec<bool>`, puis le
+*déplace* dans le `Mask` rendu à l'appelant — sans copie du tableau. Puis `Mesh::from_mask`
+prend `&Mask` : il *emprunte* le masque le temps de construire le maillage, sans jamais le
+modifier ni s'en approprier. Rien de tout cela n'est écrit à la main — c'est la signature
+des fonctions qui le dit, et le compilateur qui le vérifie.
 
-**Un `&mut Vec<bool>` est un prêt exclusif**, et c'est ce qui rend `parse_row` sûre : tant
-qu'elle le tient, personne d'autre ne peut lire ni écrire le tableau. En C, la même
-fonction recevrait un `bool*` et une capacité, et rien ne garantirait qu'un autre bout du
-programme ne s'en sert pas au même moment.
+**Et c'est exactement ce que dit la signature de `refine`.** `&self` en entrée, `Mask` en
+sortie : le masque d'origine survit à l'appel, intact, et le nouveau appartient à
+l'appelant. `gros.refine(4)` ne consomme pas `gros`. En C, la même fonction rendrait un
+pointeur, et il faudrait un commentaire — ou une convention de nommage — pour dire qui
+doit le libérer, et si le masque d'origine a été touché au passage. Ici les deux réponses
+sont dans le type, et le compilateur les fait respecter.
+
+**`self.clone()` quand il n'y a rien à faire.** Raffiner par 1 ne change rien, mais on ne
+peut pas pour autant « rendre `self` » : il n'est qu'emprunté. `clone()` en fabrique une
+copie possédée, que l'on peut rendre. C'est le genre de détail que le compilateur vous
+apprendra tout seul si vous essayez l'autre version.
 
 **Le rappel qui vaut pour la suite.** En C, la question « qui libère ce tableau, et
 quand ? » se règle par convention, par commentaire, ou par accident. Ici elle a une

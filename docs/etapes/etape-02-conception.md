@@ -3,6 +3,10 @@
 **Fichier :** `design/src/lib.rs` · **Vérification :** `cargo test -p wind-tunnel-design`
 · **≈ 30 min** · *facultatif, à faire au début de l'étape 2*
 
+> Il vient juste après les `struct` et les `enum` du sas de fin de J1 : c'est leur
+> première mise en œuvre sur un vrai sujet, et le seul endroit du fil rouge où la forme
+> des types n'est pas donnée d'avance.
+
 Partout ailleurs dans le fil rouge, les types sont donnés et vous en remplissez les
 fonctions. C'est un choix : il fait tenir le projet en trois jours, mais il escamote la
 moitié du métier. Concevoir une structure de données — décider ce qui est un type, ce qui

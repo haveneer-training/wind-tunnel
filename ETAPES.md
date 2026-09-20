@@ -28,9 +28,9 @@ laquelle domine à chaque étape.
 | # | Étape | Jour | ~Durée | Ce que vous écrivez | Ce que vous lisez |
 |---|---|---|---|---|---|
 | [0](docs/etapes/etape-00.md) | Géométrie de base | J1 | 20 min | types, fonctions, `Vec`, itérateurs | `derive`, doc-tests |
-| [1](docs/etapes/etape-01.md) | Le masque du domaine | J1 | 40 min | `match` sur caractère, `Option`, `&mut`, `Err(...)` | propriété, déplacement, emprunts |
-| [2](docs/etapes/etape-02.md) | Maillage et connectivité | J1 | 45 min | `match` exhaustif, `HashMap`, `enum` `Side`, CSR | indices typés, pointeurs vs indices |
-| [3](docs/etapes/etape-03.md) | Écrire les résultats, et les erreurs | J1 | 20 min | `write!`/`?`, `From`, `Error::source` | `enum` d'erreurs, chaîne des causes |
+| [1](docs/etapes/etape-01.md) | Le masque du domaine | J1 | 35 min | indexation, `Vec`, boucles, `&self -> Mask` | propriété, déplacement, emprunts |
+| [2](docs/etapes/etape-02.md) | Maillage et connectivité | J2 | 45 min | `match` exhaustif, `HashMap`, `enum` `Side`, CSR | indices typés, pointeurs vs indices |
+| [3](docs/etapes/etape-03.md) | Écrire les résultats, et les erreurs | J2 | 25 min | `match` sur caractère, `Option`, `Err(...)`, `write!`/`?`, `From`, `Error::source` | `enum` d'erreurs, chaîne des causes |
 | [4](docs/etapes/etape-04.md) | L'écoulement porteur | J2 | 20 min | `impl Trait for`, implémentation couvrante, `?Sized` | `Sync`, un trait comme besoin |
 | [5](docs/etapes/etape-05.md) | Le solveur | J2 | 45 min | itérateurs, `Option`, `&`/`&mut` | *gather* vs *scatter*, CFL vérifiée avant |
 | [6](docs/etapes/etape-06.md) | Qualité : conservation, ordre, `clippy` | J2 | 30 min | `fold` à accumulateur | tests de propriété, `clippy`, `cargo doc` |
@@ -40,11 +40,17 @@ laquelle domine à chaque étape.
 | [10](docs/etapes/etape-10.md) | Threads : écriture recouverte, suivi | J3 | 45 min | `thread::scope`, `Mutex`, `mpsc`, `chunks` | `Arc` et la propriété partagée |
 | [11](docs/etapes/etape-11.md) | *Bonus* : passage à l'échelle en MPI | J3 | 60 min | découpage, possession, échanges immédiats | processus, messages, réductions |
 | [12](docs/etapes/etape-12.md) | *Bonus* : calculer l'écoulement | J3 | 40 min | CSR aux sommets, `Option<f64>`, tampons échangés | algorithme itératif, résidu ≠ erreur |
-| — | [*Bonus* : concevoir les types soi-même](docs/etapes/etape-02-conception.md) | J1 | 30 min | `struct`, `enum`, dérivations — **tout**, dans un fichier vide | le contrat d'un type, et ce que `mesh.rs` a choisi |
+| — | [*Bonus* : concevoir les types soi-même](docs/etapes/etape-02-conception.md) | J2 | 30 min | `struct`, `enum`, dérivations — **tout**, dans un fichier vide | le contrat d'un type, et ce que `mesh.rs` a choisi |
 | — | [*Bonus* : chasse aux allocations](docs/BONUS-OPTIMISATION.md) | — | 45 min | tampons réutilisés, emprunts par champ | `GlobalAlloc`, mesure |
 
 Les étapes 0 à 5 forment le noyau : à la fin de l'étape 5, le code tourne et produit ses
 premières images. Les suivantes l'améliorent.
+
+La colonne « Jour » suit l'ordre des notions, pas la commodité : les étapes 0 et 1 ne
+demandent que ce que le J1 a vu avant elles — `Vec`, tranches, emprunts, boucles — et
+**aucune** n'y exige d'`enum`, d'`Option` ni de `Result`. Les `struct` et les `enum` sont
+travaillés en fin de J1, `Option` et `Result` ouvrent le J2 : les étapes 2 et 3 les
+appliquent dans la foulée.
 
 Le bonus « chasse aux allocations » ne s'ouvre pas avec `cargo xtask goto` : il est
 transversal, se fait après les étapes 7 et 8, et reprend le code déjà écrit pour lui
@@ -54,7 +60,8 @@ Le bonus « concevoir les types soi-même » est le seul endroit du parcours où
 donné : un fichier vide, des tests, et à vous d'écrire les `struct` et les `enum`. Il
 s'ouvre avec l'étape 2 (`cargo xtask goto 2`) mais vit dans un crate à part, qui ne gêne
 rien tant qu'il n'est pas fini : `cargo test -p wind-tunnel-design`. Il se fait **avant**
-de lire `src/mesh.rs`, faute de quoi il n'y a plus rien à concevoir.
+de lire `src/mesh.rs`, faute de quoi il n'y a plus rien à concevoir — et donc au début du
+J2, une fois les `enum` et `Option` présentés.
 
 ## Fil narratif
 
