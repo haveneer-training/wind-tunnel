@@ -210,7 +210,7 @@ interpolation.
    `--refine 2`, et un écran noir ;
 4. coloriez le `Glyph` par `speed`.
 
-**La texture — `Surface LIC`.** Très parlante en cours, mais elle exige un vecteur aux
+**La texture — `Surface LIC`.** Très parlante, mais elle exige un vecteur aux
 *points* : appliquée directement, elle échoue sur « *Attempt to get an input array for an
 index that has not been specified* ».
 
