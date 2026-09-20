@@ -13,7 +13,7 @@ visqueux, stationnaire — avec **glissement** aux parois et aux obstacles, et u
 passif transporté par cet écoulement. Donc pas de couche limite, pas de sillage, pas de
 traînée : ni pression ni quantité de mouvement n'apparaissent dans le calcul.
 
-![filets de fumée déviés par un cylindre](docs/apercu.png)
+![filets de fumée déviés par un cylindre](docs/render2.png)
 
 <sub>`cargo run --release -- domains/tunnel.dom --refine 4 --bands 9 --max-steps 960`</sub>
 

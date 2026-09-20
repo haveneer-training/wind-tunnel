@@ -2,7 +2,7 @@
 
 Formation **« Découverte du langage Rust pour le calcul scientifique »**.
 
-![filets de fumée déviés par un cylindre](docs/apercu.png)
+![filets de fumée déviés par un cylindre](render2.png)
 
 Voilà ce que vous aurez produit à la fin de l'étape 5
 (`cargo run --release -- domains/tunnel.dom --refine 4 --bands 9 --max-steps 960`).
