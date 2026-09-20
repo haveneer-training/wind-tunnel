@@ -26,7 +26,7 @@ Soufflerie numérique
 Maillage
   --refine <k>         subdivise chaque case en k×k    (défaut : 1 ; le seul moyen
                        d'augmenter la résolution, le masque fixant le nombre de cases)
-  --h <m>              côté d'une cellule              (défaut : 1 ; change la taille
+  --cell-size <m>      côté d'une cellule              (défaut : 1 ; change la taille
                        physique du domaine, pas le nombre de cellules)
 
 Écoulement porteur
@@ -181,7 +181,9 @@ pub fn parse_from(argv: impl IntoIterator<Item = String>) -> Result<Option<Args>
             }
             "--every" => args.every = value()?.parse().map_err(|e| format!("--every : {e}"))?,
             "--width" => args.width = value()?.parse().map_err(|e| format!("--width : {e}"))?,
-            "--h" => args.h = value()?.parse().map_err(|e| format!("--h : {e}"))?,
+            "--cell-size" => {
+                args.h = value()?.parse().map_err(|e| format!("--cell-size : {e}"))?
+            }
             "--refine" => args.refine = value()?.parse().map_err(|e| format!("--refine : {e}"))?,
             "--bands" => args.bands = value()?.parse().map_err(|e| format!("--bands : {e}"))?,
             "--speed" => args.speed = value()?.parse().map_err(|e| format!("--speed : {e}"))?,
