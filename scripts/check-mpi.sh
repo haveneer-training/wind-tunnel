@@ -34,9 +34,11 @@ if ! cargo build --release --quiet -p wind-tunnel-mpi; then
     exit 1
 fi
 
-# Ne garde que les lignes de diagnostic, communes aux deux exécutables.
+# Ne garde que les lignes de diagnostic, à partir de « pas N » : le séquentiel les
+# préfixe de « image N », que le pilote MPI n'imprime pas, donc on l'ignore pour aligner
+# les deux formats.
 diagnostics() {
-    grep -E '^  pas +[0-9]+ ' || true
+    grep -oE 'pas +[0-9]+.*' || true
 }
 
 echo "== référence séquentielle"
