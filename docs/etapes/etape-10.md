@@ -54,7 +54,7 @@ Calculez d'abord, sans toucher à l'image ; ne prenez le verrou que pour la sect
 
 ## Pourquoi pas `Arc<Mutex<...>>` ?
 
-Le titre du cours parle des deux ensemble, et pourtant ce socle n'utilise que `Mutex`.
+Le titre de la formation parle des deux ensemble, et pourtant ce socle n'utilise que `Mutex`.
 `Arc` ne sert qu'à partager la *propriété* d'une valeur entre threads qui vivent
 indépendamment de qui les a lancés — le cas de `std::thread::spawn`, dont la fermeture
 doit être `'static` : elle pourrait survivre à la fonction qui l'a créée, donc elle ne
