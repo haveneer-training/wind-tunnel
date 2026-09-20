@@ -1,6 +1,6 @@
 # Étape 4 — L'écoulement porteur
 
-**Fichier :** `src/velocity.rs` · **Vérification :** `cargo xtask goto 4` puis `cargo test` · **≈ 25 min**
+**Fichier :** `src/velocity.rs` · **Vérification :** `cargo xtask goto 4` puis `cargo test` · **≈ 20 min**
 
 Le traceur ne se déplace pas tout seul : il est transporté. Il nous faut donc un champ de
 vitesse — et, cette fois, un trait pour ne pas dépendre de la façon dont il est obtenu.
@@ -55,26 +55,49 @@ u · n L = u_x d_y − u_y d_x = (∂ψ/∂y) d_y + (∂ψ/∂x) d_x = dψ = ψ(
 
 Inversez la rotation et tout l'écoulement s'inverse — de façon parfaitement conservative,
 donc silencieuse. C'est le genre d'erreur qu'on n'attrape que par un test qui compare deux
-formulations du même objet : c'est ce que fait `la_fonction_de_courant_redonne_la_vitesse`.
+formulations du même objet : c'est ce que fait `stream_function_matches_the_velocity`.
 
 ## Socle
 
-**`PotentialCylinder::at`** — l'écoulement potentiel autour d'un cylindre, solution
-classique de l'écoulement parfait incompressible irrotationnel. En coordonnées
-cartésiennes relatives au centre, avec `r² = x² + y²` :
+| Bloc | Ce qu'il doit faire |
+|---|---|
+| `impl VelocityField for Uniform` | la vitesse et la fonction de courant d'un écoulement uniforme |
+| `impl<F: VelocityField + ?Sized> StreamSource for F` | faire de tout champ de vitesse une source de `ψ` |
+
+**`Uniform`** est l'écoulement le plus simple qui soit — la même vitesse partout — et
+c'est exactement pourquoi il sert ici : sa vitesse s'écrit en un mot, mais sa fonction de
+courant vous oblige à vous servir de `u = (∂ψ/∂y, −∂ψ/∂x)` plutôt qu'à recopier une
+formule. Cherchez le `ψ` dont les deux dérivées partielles redonnent `value`, et fixez la
+constante d'intégration à zéro. Une erreur de signe ou deux composantes échangées passent
+inaperçues sur un écoulement horizontal ; le test prend une vitesse oblique exprès.
+
+**L'implémentation couvrante de `StreamSource`** est le second trou, et il tient en une
+ligne. Elle vaut pour *tout* type implémentant `VelocityField` — présent ou à venir —
+sans que celui-ci ait un mot à écrire. Un écoulement analytique connaît `ψ` partout : le
+numéro de sommet ne lui sert à rien, il répond au point.
+
+Le `?Sized` de sa déclaration mérite un arrêt. Sans lui, la borne implicite `F: Sized`
+exclut les types dont la taille n'est pas connue à la compilation — au premier rang
+desquels `dyn VelocityField`, sous lequel le programme reçoit l'écoulement choisi par la
+ligne de commande. Un `&dyn VelocityField` ne serait alors pas une `StreamSource`, et le
+solveur le refuserait. Le test `any_velocity_field_is_already_a_stream_source` passe les
+deux formes, concrète et `dyn`.
+
+**`PotentialCylinder`, lui, vous est donné** : c'est la solution classique de
+l'écoulement parfait incompressible irrotationnel, et la transcrire n'apprendrait rien
+que l'algèbre ci-dessous ne dise déjà. En coordonnées cartésiennes relatives au centre,
+avec `r² = x² + y²` :
 
 ```text
 u =  U (1 − R²(x² − y²)/r⁴) − Γ y / (2π r²)
 v = −U (2 R² x y / r⁴)      + Γ x / (2π r²)
 ```
 
-`U` est la vitesse à l'infini, `R` le rayon, `Γ` la circulation. Renvoyez une vitesse
-nulle très près du centre : les cellules y sont solides, mais `r⁴` au dénominateur ne
-pardonne pas.
-
-Les tests vérifient les deux propriétés physiques qui comptent : la vitesse tend vers `U`
-loin de l'obstacle, et sa composante normale est nulle sur la paroi du cylindre — le
-fluide glisse le long de l'obstacle sans le traverser.
+`U` est la vitesse à l'infini, `R` le rayon, `Γ` la circulation. Lisez-le pour deux
+choses : le garde-fou près du centre (les cellules y sont solides, mais `r⁴` au
+dénominateur ne pardonne pas), et le fait que ses tests vérifient des propriétés
+*physiques* — la vitesse tend vers `U` loin de l'obstacle, et sa composante normale est
+nulle sur la paroi : le fluide glisse le long de l'obstacle sans le traverser.
 
 ## Ce qu'il y a à remarquer
 
@@ -109,8 +132,9 @@ ensuite.
 
 ## Pour aller plus loin
 
-- Le test `la_fonction_de_courant_redonne_la_vitesse` vérifie par différences finies que
-  `u = (∂ψ/∂y, −∂ψ/∂x)`. C'est ainsi qu'on attrape une erreur de signe : deux
+- Les tests `stream_function_matches_the_velocity` (le cylindre, donné) et
+  `the_uniform_stream_function_matches_its_velocity` (le vôtre) vérifient par différences
+  finies que `u = (∂ψ/∂y, −∂ψ/∂x)`. C'est ainsi qu'on attrape une erreur de signe : deux
   formulations du même objet, comparées l'une à l'autre.
 - Faites varier `--circulation` et regardez la dissymétrie apparaître. Quel signe fait
   passer l'écoulement rapide au-dessus ?

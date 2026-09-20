@@ -421,7 +421,18 @@ impl Mesh {
     }
 
     /// Construit la connectivité cellule → faces au format CSR.
+    ///
+    /// Deux tableaux plats plutôt qu'un `Vec` par cellule : `cell_face_offsets[i]` dit
+    /// où commencent les faces de la cellule `i` dans `cell_face_indices`. On compte
+    /// d'abord les faces de chaque cellule, on cumule les compteurs en décalages, puis
+    /// on remplit en avançant un curseur par cellule. Une face interne compte pour ses
+    /// **deux** cellules.
+    #[cfg_attr(not(feature = "step2"), allow(unused_variables))] // trou étape 2
     fn build_cell_faces(&mut self) {
+        // TODO-STEP:2 (pour aller plus loin) Remplir `cell_face_offsets` et
+        // `cell_face_indices` au format CSR : compter, cumuler, puis remplir avec un
+        // curseur par cellule
+        // SOLUTION-BEGIN
         let mut counts = vec![0u32; self.cells.len() + 1];
         for face in &self.faces {
             counts[face.left.index() + 1] += 1;
@@ -450,6 +461,7 @@ impl Mesh {
 
         self.cell_face_offsets = offsets;
         self.cell_face_indices = indices;
+        // SOLUTION-END
     }
 }
 
@@ -515,10 +527,10 @@ fn vertex_id(
 #[cfg_attr(not(feature = "step2"), allow(unused_variables))] // trou étape 2
 fn build_faces(cells: &[Cell], vertices: &[Point]) -> Result<Vec<Face>, MeshError> {
     // TODO-STEP:2 Apparier les arêtes : première rencontre ⇒ nouvelle face de bord
-    // provisoire dont la normale est sortante de la cellule courante ; seconde
-    // rencontre ⇒ la face devient interne (`Side::Inner`) ; troisième ⇒ `NonManifoldEdge`.
-    // La clé d'une arête est la paire de sommets triée, pour que les deux cellules
-    // adjacentes tombent bien sur la même entrée.
+    // provisoire, construite par `boundary_face` ; seconde rencontre ⇒ la face devient
+    // interne (`Side::Inner`) ; troisième ⇒ `NonManifoldEdge`. La clé d'une arête est
+    // la paire de sommets triée, pour que les deux cellules adjacentes tombent bien sur
+    // la même entrée du `HashMap`.
     // SOLUTION-BEGIN
     let mut faces: Vec<Face> = Vec::new();
     let mut seen: HashMap<(u32, u32), FaceId> = HashMap::new();
@@ -537,19 +549,7 @@ fn build_faces(cells: &[Cell], vertices: &[Point]) -> Result<Vec<Face>, MeshErro
                     Side::Boundary(_) => faces[fid.index()].right = Side::Inner(id),
                 },
                 None => {
-                    let (pa, pb) = (vertices[a.index()], vertices[b.index()]);
-                    let d = pb - pa;
-                    faces.push(Face {
-                        a,
-                        b,
-                        left: id,
-                        // Nature provisoire : `classify_boundaries` tranchera pour de bon.
-                        right: Side::Boundary(BoundaryKind::Wall),
-                        normal: d.perp_cw().normalized(),
-                        length: d.norm(),
-                        midpoint: pa.midpoint(pb),
-                        distance: 0.0,
-                    });
+                    faces.push(boundary_face(a, b, id, vertices));
                     seen.insert(key, FaceId((faces.len() - 1) as u32));
                 }
             }
@@ -557,6 +557,30 @@ fn build_faces(cells: &[Cell], vertices: &[Point]) -> Result<Vec<Face>, MeshErro
     }
     Ok(faces)
     // SOLUTION-END
+}
+
+/// Construit la face de bord provisoire portée par l'arête `a → b` de la cellule `left`.
+///
+/// La normale est `(b − a)` tournée d'un quart de tour horaire : les sommets d'une
+/// cellule étant rangés dans le sens direct, elle est donc **sortante**. Tout le signe
+/// des débits en dépend (étape 4).
+///
+/// Sa nature — `Wall` ici — n'est que provisoire : `classify_boundaries` tranchera une
+/// fois toutes les faces appariées, et `finish_geometry` remplira `distance`.
+#[cfg_attr(not(feature = "step3"), allow(dead_code))] // appelée depuis le trou de l'étape 2
+fn boundary_face(a: VertexId, b: VertexId, left: CellId, vertices: &[Point]) -> Face {
+    let (pa, pb) = (vertices[a.index()], vertices[b.index()]);
+    let d = pb - pa;
+    Face {
+        a,
+        b,
+        left,
+        right: Side::Boundary(BoundaryKind::Wall),
+        normal: d.perp_cw().normalized(),
+        length: d.norm(),
+        midpoint: pa.midpoint(pb),
+        distance: 0.0,
+    }
 }
 
 #[cfg(all(test, feature = "step2"))]

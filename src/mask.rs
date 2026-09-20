@@ -40,6 +40,10 @@ pub struct Mask {
 
 impl Mask {
     /// Analyse un masque depuis son texte.
+    ///
+    /// Le `Vec` des cellules est construit ici, rempli ligne par ligne par
+    /// [`parse_row`] qui l'emprunte en `&mut`, puis **déplacé** dans le `Mask` rendu à
+    /// l'appelant. Personne n'a eu à se demander qui le libère.
     pub fn parse(text: &str) -> Result<Mask, MeshError> {
         let mut fluid = Vec::new();
         let mut cols = 0usize;
@@ -50,29 +54,9 @@ impl Mask {
             if line.is_empty() || line.starts_with(COMMENT) {
                 continue;
             }
-            let width = line.chars().count();
-            if rows == 0 {
-                cols = width;
-            } else if width != cols {
-                return Err(MeshError::RaggedMask {
-                    line: line_no + 1,
-                    expected: cols,
-                    got: width,
-                });
-            }
-            for (col, ch) in line.chars().enumerate() {
-                match ch {
-                    FLUID => fluid.push(true),
-                    SOLID => fluid.push(false),
-                    other => {
-                        return Err(MeshError::InvalidChar {
-                            line: line_no + 1,
-                            col: col + 1,
-                            ch: other,
-                        })
-                    }
-                }
-            }
+            // La première ligne fixe la largeur ; les suivantes doivent s'y tenir.
+            let expected = (rows > 0).then_some(cols);
+            cols = parse_row(line, line_no + 1, expected, &mut fluid)?;
             rows += 1;
         }
 
@@ -247,6 +231,54 @@ impl Mask {
         Ok(())
         // SOLUTION-END
     }
+}
+
+/// Analyse une ligne du masque et empile ses cellules dans `fluid`.
+///
+/// `expected` vaut `None` pour la première ligne — c'est elle qui fixe la largeur du
+/// domaine — et `Some(largeur)` pour toutes les suivantes, qui doivent s'y tenir. La
+/// valeur rendue est la largeur de la ligne analysée.
+///
+/// `line_no` et les colonnes sont comptés **à partir de 1** : ce sont des numéros
+/// destinés à un humain qui ouvrira le fichier dans un éditeur, pas des indices.
+#[cfg_attr(not(feature = "step1"), allow(unused_variables))] // trou étape 1
+fn parse_row(
+    line: &str,
+    line_no: usize,
+    expected: Option<usize>,
+    fluid: &mut Vec<bool>,
+) -> Result<usize, MeshError> {
+    // TODO-STEP:1 Vérifier la largeur de la ligne contre `expected` (`RaggedMask` si
+    // elle diffère), puis empiler `true` pour `FLUID` et `false` pour `SOLID` ; tout
+    // autre caractère est une `InvalidChar`. Renvoyer la largeur.
+    // SOLUTION-BEGIN
+    let width = line.chars().count();
+    if let Some(cols) = expected {
+        if width != cols {
+            return Err(MeshError::RaggedMask {
+                line: line_no,
+                expected: cols,
+                got: width,
+            });
+        }
+    }
+
+    for (col, ch) in line.chars().enumerate() {
+        match ch {
+            FLUID => fluid.push(true),
+            SOLID => fluid.push(false),
+            other => {
+                return Err(MeshError::InvalidChar {
+                    line: line_no,
+                    col: col + 1,
+                    ch: other,
+                })
+            }
+        }
+    }
+
+    Ok(width)
+    // SOLUTION-END
 }
 
 #[cfg(all(test, feature = "step1"))]

@@ -1,7 +1,7 @@
 # Étape 10 — Écriture recouverte : `thread::scope`, `mpsc`, `Mutex`
 
 **Fichier :** `src/io/png.rs` · **Vérification :** `cargo xtask goto 10`, `cargo test`
-· **≈ 30 min**
+· **≈ 45 min**
 
 L'étape 9 a paralléliné trois boucles sans rien changer à leur forme : chaque cellule
 lisait ses voisines et n'écrivait que sa propre case, donc `.iter()` devenait

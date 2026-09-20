@@ -1,6 +1,6 @@
 # Étape 8 — RK2 : pourquoi l'ordre n'avait pas bougé
 
-**Fichiers :** `src/solver.rs` · **Vérification :** `cargo xtask goto 8`, `cargo test` · **≈ 25 min**
+**Fichiers :** `src/solver.rs` · **Vérification :** `cargo xtask goto 8`, `cargo test` · **≈ 20 min**
 
 À l'étape 6, l'ordre mesuré (`tests/order.rs`) valait ≈ 1 : normal, décentrement amont et
 Euler explicite sont tous deux d'ordre 1. À l'étape 7, la reconstruction MUSCL a passé

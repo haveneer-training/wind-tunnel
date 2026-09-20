@@ -124,17 +124,38 @@ impl fmt::Display for MeshError {
 }
 
 impl std::error::Error for MeshError {
+    /// L'erreur d'origine, quand il y en a une sous celle-ci.
+    ///
+    /// `main` déroule cette chaîne et affiche « erreur : … / cause : … » : le message de
+    /// haut niveau dit ce que le programme essayait de faire, la cause dit ce que le
+    /// système a répondu. Rien n'est perdu en route, et rien n'est non plus recopié dans
+    /// le message de `Display`.
+    #[cfg_attr(not(feature = "step3"), allow(unused_variables))] // trou étape 3
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        // TODO-STEP:3 Renvoyer l'erreur sous-jacente pour la variante qui en porte une,
+        // et `None` pour toutes les autres
+        // SOLUTION-BEGIN
         match self {
             MeshError::Io(e) => Some(e),
             _ => None,
         }
+        // SOLUTION-END
     }
 }
 
+/// La conversion qui fait marcher le `?` sur une erreur d'entrée-sortie.
+///
+/// `fs::read_to_string(path)?` dans une fonction qui rend un `Result<_, MeshError>`
+/// cherche un `From<io::Error>` et l'applique tout seul. Sans cette implémentation, le
+/// `?` ne compile pas. `thiserror` l'écrirait à votre place ; il faut l'avoir vue une
+/// fois.
 impl From<io::Error> for MeshError {
+    #[cfg_attr(not(feature = "step3"), allow(unused_variables))] // trou étape 3
     fn from(e: io::Error) -> Self {
+        // TODO-STEP:3 Envelopper l'erreur d'E/S dans la variante qui lui est réservée
+        // SOLUTION-BEGIN
         MeshError::Io(e)
+        // SOLUTION-END
     }
 }
 

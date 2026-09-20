@@ -74,19 +74,39 @@ fn write_header(w: &mut impl Write) -> io::Result<()> {
 /// Écrit dans un `impl Write` plutôt que dans un fichier : c'est ce qui permet à
 /// [`write_frame`] d'intercaler ses propres sections avant et après, sans dupliquer une
 /// ligne de géométrie, et à un test d'écrire dans un `Vec<u8>`.
-#[cfg_attr(not(feature = "step3"), allow(unused_variables))] // trou étape 3
 fn write_dataset(w: &mut impl Write, mesh: &Mesh, fields: &[(&str, &Field)]) -> io::Result<()> {
-    // TODO-STEP:3 Écrire les POINTS, les CELLS (précédées de leur nombre de sommets),
-    // les CELL_TYPES, puis chaque champ en CELL_DATA / SCALARS. Les quatre lignes
-    // d'en-tête sont déjà écrites par l'appelant.
-    // Chaque `?` propage l'erreur d'écriture : rien n'est avalé en silence.
-    // Tout flottant est enveloppé dans `VtkF64` — voir ce type pour la raison.
-    // SOLUTION-BEGIN
+    write_points(w, mesh)?;
+    write_cells(w, mesh)?;
+    write_cell_data(w, mesh, fields)
+}
+
+/// Les sommets, un par ligne, **toujours en 3D** : ce calcul étant plan, le `z` vaut 0.
+///
+/// Chaque `?` propage l'erreur d'écriture : rien n'est avalé en silence. Tout flottant
+/// est enveloppé dans [`VtkF64`] — voir ce type pour la raison, elle n'est pas
+/// cosmétique.
+fn write_points(w: &mut impl Write, mesh: &Mesh) -> io::Result<()> {
     writeln!(w, "POINTS {} double", mesh.n_vertices())?;
     for p in mesh.vertices() {
         writeln!(w, "{} {} 0", VtkF64(p.x), VtkF64(p.y))?;
     }
+    Ok(())
+}
 
+/// La connectivité : la section `CELLS`, puis la section `CELL_TYPES`.
+///
+/// Les deux pièges du format sont ici. Le second nombre de la ligne `CELLS` est le
+/// **total des entiers** des lignes qui suivent, nombres de sommets compris : un
+/// quadrangle et un triangle donnent `(1 + 4) + (1 + 3) = 9`. Et chaque cellule
+/// s'annonce par son nombre de sommets avant de les lister. `cell.kind.vtk_code()`
+/// donne déjà le code VTK du type de cellule (`9` pour un quadrangle, `5` pour un
+/// triangle) attendu par `CELL_TYPES`.
+#[cfg_attr(not(feature = "step3"), allow(unused_variables))] // trou étape 3
+fn write_cells(w: &mut impl Write, mesh: &Mesh) -> io::Result<()> {
+    // TODO-STEP:3 Écrire la section CELLS — l'en-tête `CELLS n_cellules n_entiers`,
+    // puis une ligne par cellule : son nombre de sommets, puis leurs indices — suivie
+    // de la section CELL_TYPES, un code par cellule.
+    // SOLUTION-BEGIN
     let entries: usize = mesh
         .cells()
         .iter()
@@ -106,7 +126,14 @@ fn write_dataset(w: &mut impl Write, mesh: &Mesh, fields: &[(&str, &Field)]) -> 
     for cell in mesh.cells() {
         writeln!(w, "{}", cell.kind.vtk_code())?;
     }
+    Ok(())
+    // SOLUTION-END
+}
 
+/// Les champs aux cellules : un unique `CELL_DATA`, puis un bloc `SCALARS` /
+/// `LOOKUP_TABLE` par champ, chacun dans l'ordre des cellules et une valeur par cellule
+/// exactement.
+fn write_cell_data(w: &mut impl Write, mesh: &Mesh, fields: &[(&str, &Field)]) -> io::Result<()> {
     writeln!(w, "CELL_DATA {}", mesh.n_cells())?;
     for (name, field) in fields {
         writeln!(w, "SCALARS {name} double 1")?;
@@ -116,7 +143,6 @@ fn write_dataset(w: &mut impl Write, mesh: &Mesh, fields: &[(&str, &Field)]) -> 
         }
     }
     Ok(())
-    // SOLUTION-END
 }
 
 /// Ce qu'une image de sortie contient, au-delà du seul traceur.
