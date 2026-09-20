@@ -1,7 +1,9 @@
 //! Export au format VTK legacy ASCII (`UNSTRUCTURED_GRID`).
 //!
 //! Format volontairement daté : il tient en cinquante lignes, se lit dans un éditeur
-//! de texte, et Paraview comme Tecplot l'ouvrent sans discuter.
+//! de texte, et Paraview comme Tecplot l'ouvrent sans discuter. Spécification :
+//! <https://docs.vtk.org/en/latest/design_documents/VTKFileFormats.html> ; un fichier
+//! complet minimal est donné en exemple dans `docs/etapes/etape-03.md`.
 
 use std::fmt;
 use std::fs::File;
