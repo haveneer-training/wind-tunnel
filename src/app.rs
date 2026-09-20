@@ -181,9 +181,7 @@ pub fn parse_from(argv: impl IntoIterator<Item = String>) -> Result<Option<Args>
             }
             "--every" => args.every = value()?.parse().map_err(|e| format!("--every : {e}"))?,
             "--width" => args.width = value()?.parse().map_err(|e| format!("--width : {e}"))?,
-            "--cell-size" => {
-                args.h = value()?.parse().map_err(|e| format!("--cell-size : {e}"))?
-            }
+            "--cell-size" => args.h = value()?.parse().map_err(|e| format!("--cell-size : {e}"))?,
             "--refine" => args.refine = value()?.parse().map_err(|e| format!("--refine : {e}"))?,
             "--bands" => args.bands = value()?.parse().map_err(|e| format!("--bands : {e}"))?,
             "--speed" => args.speed = value()?.parse().map_err(|e| format!("--speed : {e}"))?,
