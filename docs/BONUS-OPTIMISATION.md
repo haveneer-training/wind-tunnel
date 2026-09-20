@@ -229,7 +229,7 @@ c'est que le `Workspace` doit dépendre du schéma, pas qu'il faut réallouer.
 `Mesh::from_mask` alloue trois `Vec` par cellule :
 
 ```rust
-let corners = cell_corners(row, col, left, right, up, down);   // Vec<(usize, usize)>
+let corners = cell_corners(row, col, down, right, up, left);   // Vec<(usize, usize)>
 let ids: Vec<VertexId> = corners.iter().map(…).collect();      // Vec<VertexId>
 let points: Vec<Point> = ids.iter().map(…).collect();          // Vec<Point>
 ```
@@ -274,7 +274,7 @@ impl Corners {
 tl)`. Côté appelant, deux tableaux locaux suffisent :
 
 ```rust
-let corners = cell_corners(row, col, left, right, up, down);
+let corners = cell_corners(row, col, down, right, up, left);
 let n = corners.as_slice().len();
 let mut ids = [VertexId(0); 4];
 let mut points = [Point::new(0.0, 0.0); 4];
