@@ -40,6 +40,7 @@ laquelle domine à chaque étape.
 | [10](docs/etapes/etape-10.md) | Threads : écriture recouverte, suivi | J3 | 45 min | `thread::scope`, `Mutex`, `mpsc`, `chunks` | `Arc` et la propriété partagée |
 | [11](docs/etapes/etape-11.md) | *Bonus* : passage à l'échelle en MPI | J3 | 60 min | découpage, possession, échanges immédiats | processus, messages, réductions |
 | [12](docs/etapes/etape-12.md) | *Bonus* : calculer l'écoulement | J3 | 40 min | CSR aux sommets, `Option<f64>`, tampons échangés | algorithme itératif, résidu ≠ erreur |
+| — | [*Bonus* : concevoir les types soi-même](docs/etapes/etape-02-conception.md) | J1 | 30 min | `struct`, `enum`, dérivations — **tout**, dans un fichier vide | le contrat d'un type, et ce que `mesh.rs` a choisi |
 | — | [*Bonus* : chasse aux allocations](docs/BONUS-OPTIMISATION.md) | — | 45 min | tampons réutilisés, emprunts par champ | `GlobalAlloc`, mesure |
 
 Les étapes 0 à 5 forment le noyau : à la fin de l'étape 5, le code tourne et produit ses
@@ -48,6 +49,12 @@ premières images. Les suivantes l'améliorent.
 Le bonus « chasse aux allocations » ne s'ouvre pas avec `cargo xtask goto` : il est
 transversal, se fait après les étapes 7 et 8, et reprend le code déjà écrit pour lui
 retirer ce qu'il alloue dans sa boucle en temps.
+
+Le bonus « concevoir les types soi-même » est le seul endroit du parcours où rien n'est
+donné : un fichier vide, des tests, et à vous d'écrire les `struct` et les `enum`. Il
+s'ouvre avec l'étape 2 (`cargo xtask goto 2`) mais vit dans un crate à part, qui ne gêne
+rien tant qu'il n'est pas fini : `cargo test -p wind-tunnel-design`. Il se fait **avant**
+de lire `src/mesh.rs`, faute de quoi il n'y a plus rien à concevoir.
 
 ## Fil narratif
 

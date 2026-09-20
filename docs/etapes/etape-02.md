@@ -6,6 +6,12 @@ C'est le cœur de la structure de données. Une cellule ne connaîtra pas ses vo
 arithmétique d'indices, mais par ses faces : tout ce qui sera écrit au-dessus
 fonctionnerait donc à l'identique sur un maillage lu depuis un fichier.
 
+> **Avant de lire ce fichier**, si vous en avez le temps :
+> [étape 2, bonus — concevoir les types soi-même](etape-02-conception.md) vous fait écrire
+> de zéro, dans un crate à part, les types que `mesh.rs` a déjà choisis. C'est le seul
+> endroit du fil rouge où l'on conçoit au lieu de compléter, et il perd tout son sel une
+> fois qu'on a lu la réponse.
+
 ## Socle
 
 Deux trous : la forme d'une cellule, puis l'appariement de leurs arêtes.

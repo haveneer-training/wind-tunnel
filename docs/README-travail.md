@@ -75,6 +75,23 @@ pub fn dot(self, other: Vec2) -> f64 {
 Écrivez entre les deux marqueurs `>>>` et `<<<`, et laissez-les en place : c'est ainsi
 que `goto`, `solve` et `reset` s'y retrouvent. Le reste du fichier vous appartient.
 
+Un trou porte parfois la mention **« à écrire de zéro »** au lieu de « à compléter », et
+n'a alors pas de `todo!()` :
+
+```rust
+// À FAIRE (étape 2) (conception, facultatif) Écrire ici les types de la connectivité…
+// >>> ÉTAPE 2 — à écrire de zéro
+// <<< ÉTAPE 2
+```
+
+C'est qu'il attend des **définitions** — des `struct`, des `enum`, des `impl` — et non le
+corps d'une fonction qui existe déjà : `todo!()` est une expression, il ne pourrait pas y
+tenir lieu de type. Il n'y en a qu'un, celui du bonus de conception
+([`docs/etapes/etape-02-conception.md`](docs/etapes/etape-02-conception.md)), et il vit
+dans le crate `design/`, à part. Tant qu'il est vide, `cargo test -p wind-tunnel-design`
+ne **compile pas** — c'est normal, c'est l'exercice, et cela ne gêne ni `cargo test` ni
+`cargo run`, qui ne touchent jamais ce crate.
+
 ## Prérequis
 
 - Rust ≥ 1.90 (`rustup update stable`)

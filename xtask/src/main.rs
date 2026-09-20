@@ -37,6 +37,15 @@ const SOLUTION_END: &str = "// SOLUTION-END";
 const REGION_BEGIN: &str = "// >>> ÉTAPE ";
 /// Préfixe du marqueur fermant dans le dépôt de travail.
 const REGION_END: &str = "// <<< ÉTAPE ";
+/// Ce que dit un marqueur ouvrant ordinaire, dans le dépôt de travail.
+const FILL_NOTE: &str = "à compléter";
+/// Ce que dit le marqueur ouvrant d'un trou **vide**, dans le dépôt de travail.
+///
+/// Un trou vide n'a pas de `todo!()` : le stagiaire y écrit des *définitions* — des
+/// types, des `impl` — et non le corps d'une fonction qui existe déjà. `todo!()` est une
+/// expression : il ne peut pas tenir lieu de `struct` ni d'`enum`, d'où cette seconde
+/// forme de trou. Dans le corrigé, le marqueur ouvrant porte alors `vide`.
+const BLANK_NOTE: &str = "à écrire de zéro";
 /// Où sont rangés les blocs de référence, dans le dépôt de travail.
 const REFERENCE: &str = "xtask/reference.txt";
 /// Dernière étape couverte par le code actuel.
@@ -47,6 +56,8 @@ const WORKDIR: &str = "travail";
 /// Un bloc à compléter, repéré dans un fichier source.
 struct Block {
     step: u8,
+    /// Trou **vide** : remplacé par rien du tout, et non par un `todo!()`.
+    blank: bool,
     /// Indentation à réutiliser pour le `todo!()`.
     indent: String,
     /// Lignes du corps, marqueurs exclus.
@@ -128,8 +139,12 @@ fn repository_root() -> PathBuf {
 /// `mpi/src` en fait partie depuis l'étape 11 : le pilote MPI est un crate à part, membre
 /// du workspace mais pas du groupe par défaut (le reste se construit sans MPI) — ses
 /// trous sont des trous comme les autres, et `goto`/`solve`/`reset`/`status` doivent les
-/// voir.
-const SOURCE_DIRS: [&str; 2] = ["src", "mpi/src"];
+/// voir. `design/src` est là pour la même raison : l'exercice de conception de l'étape 2
+/// est un crate à part, lui aussi hors du groupe par défaut.
+///
+/// Les répertoires `tests/` n'y sont pas : leurs fichiers sont copiés tels quels, ce qui
+/// garantit qu'aucun test ne se fait trouer par mégarde.
+const SOURCE_DIRS: [&str; 3] = ["src", "mpi/src", "design/src"];
 
 /// Liste les fichiers `.rs` de toutes les sources du dépôt.
 fn source_files(root: &Path) -> Vec<PathBuf> {
@@ -190,6 +205,7 @@ fn find_blocks(text: &str, begin: &str, end: &str) -> Vec<Block> {
 
         blocks.push(Block {
             step,
+            blank: is_blank_marker(lines[start]),
             indent,
             body: lines[start + 1..stop]
                 .iter()
@@ -203,6 +219,14 @@ fn find_blocks(text: &str, begin: &str, end: &str) -> Vec<Block> {
         i = stop + 1;
     }
     blocks
+}
+
+/// Le marqueur ouvrant annonce-t-il un trou vide ?
+///
+/// `// SOLUTION-BEGIN vide` dans le corrigé, la mention correspondante dans le dépôt de
+/// travail — les deux dépôts sont relus par le même code.
+fn is_blank_marker(line: &str) -> bool {
+    line.trim_end().ends_with(" vide") || line.contains(BLANK_NOTE)
 }
 
 /// Numéro d'étape associé à un bloc.
@@ -273,6 +297,16 @@ fn todo_line(indent: &str, step: u8) -> String {
     format!("{indent}todo!(\"étape {step} — voir le commentaire ci-dessus\")")
 }
 
+/// Ce qui tient lieu de travail à faire dans le dépôt de travail : un `todo!()`, ou
+/// rien du tout pour un trou vide.
+fn hole_body(block: &Block) -> Vec<String> {
+    if block.blank {
+        Vec::new()
+    } else {
+        vec![todo_line(&block.indent, block.step)]
+    }
+}
+
 // ---------------------------------------------------------------- dépôt de travail
 
 /// Charge les blocs de référence : `(chemin relatif, numéro d'ordre) → corps`.
@@ -321,9 +355,11 @@ fn relative(root: &Path, path: &Path) -> String {
         .replace('\\', "/")
 }
 
-/// Un bloc est « vide » tant qu'il contient encore son `todo!()`.
+/// Un bloc est « vide » tant qu'il contient encore son `todo!()` — ou, pour un trou
+/// vide, tant que le stagiaire n'y a rien écrit du tout.
 fn is_empty(block: &Block) -> bool {
     block.body.iter().any(|l| l.contains("todo!("))
+        || block.body.iter().all(|l| l.trim().is_empty())
 }
 
 /// Remplit les trous d'une étape ; `force` écrase même ce que le stagiaire a écrit.
@@ -363,7 +399,7 @@ fn reset(root: &Path, step: u8) -> Result<(), String> {
         let text = fs::read_to_string(&path).map_err(|e| e.to_string())?;
         let blocks = find_blocks(&text, REGION_BEGIN, REGION_END);
         let (new_text, changed) = rewrite(&text, &blocks, |b| {
-            (b.step == step && !is_empty(b)).then(|| vec![todo_line(&b.indent, b.step)])
+            (b.step == step && !is_empty(b)).then(|| hole_body(b))
         });
         if changed > 0 {
             fs::write(&path, new_text).map_err(|e| e.to_string())?;
@@ -521,6 +557,9 @@ fn make_starter(root: &Path, out: &Path, force: bool) -> Result<(), String> {
         "xtask/src",
         "mpi/Cargo.toml",
         "mpi/src",
+        "design/Cargo.toml",
+        "design/src",
+        "design/tests",
         ".cargo",
     ] {
         copy_tree(&root.join(entry), &out.join(entry))?;
@@ -553,11 +592,12 @@ fn make_starter(root: &Path, out: &Path, force: bool) -> Result<(), String> {
         while i < lines.len() {
             match blocks.iter().find(|b| b.start == i) {
                 Some(block) => {
+                    let note = if block.blank { BLANK_NOTE } else { FILL_NOTE };
                     new_lines.push(format!(
-                        "{}{REGION_BEGIN}{} — à compléter",
+                        "{}{REGION_BEGIN}{} — {note}",
                         block.indent, block.step
                     ));
-                    new_lines.push(todo_line(&block.indent, block.step));
+                    new_lines.extend(hole_body(block));
                     new_lines.push(format!("{}{REGION_END}{}", block.indent, block.step));
                     holes += 1;
                     i = block.end + 1;

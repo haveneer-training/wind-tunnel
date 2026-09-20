@@ -37,16 +37,22 @@ step12 = ["step11"]
 step13 = ["step12"]
 
 [workspace]
-members = ["xtask", "mpi"]
+members = ["xtask", "mpi", "design"]
 # Le dossier de travail engendré est un projet à part entière : cargo doit
 # l'ignorer tant qu'on travaille depuis la racine du corrigé.
 #
-# `mpi` reste dans les *membres* pour partager Cargo.lock et être visible de
-# `cargo metadata` / rust-analyzer, mais un workspace non virtuel comme celui-ci ne
+# `mpi` et `design` restent dans les *membres* pour partager Cargo.lock et être visibles
+# de `cargo metadata` / rust-analyzer, mais un workspace non virtuel comme celui-ci ne
 # construit par défaut que le paquet racine (`workspace_default_members`) : `cargo build`,
 # `cargo test` et `cargo clippy --all-features` sans `-p`/`--workspace` ne touchent donc
 # jamais `mpi/` et restent verts sur une machine sans MPI. Le bâtir explicitement :
 # `cargo build -p wind-tunnel-mpi` (ou `--manifest-path mpi/Cargo.toml`).
+#
+# `design` profite de la même propriété pour une autre raison : c'est l'exercice de
+# conception (bonus de l'étape 2), dont le fichier source est **vide** dans un dossier de
+# travail. Ses tests ne compilent donc pas tant que le stagiaire n'a pas écrit les types,
+# et c'est voulu — hors du groupe par défaut, cet état rouge ne gêne rien.
+# `cargo test -p wind-tunnel-design` pour le lancer.
 exclude = ["travail"]
 
 [dependencies]

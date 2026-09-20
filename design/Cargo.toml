@@ -1,0 +1,14 @@
+[package]
+name = "wind-tunnel-design"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.90"
+description = "Exercice de conception : écrire soi-même les types de la connectivité (bonus de l'étape 2)"
+license = "CC-BY-NC-SA-4.0"
+
+# Aucune dépendance, et surtout pas `wind-tunnel` : c'est tout l'intérêt de l'exercice.
+# Les types y sont écrits de zéro, donc rien ne peut imposer leur forme — ni le solveur,
+# ni les sorties, ni les tests du fil rouge. Membre du workspace mais pas du groupe par
+# défaut : `cargo test` à la racine ne le construit jamais, et ce crate peut donc rester
+# cassé aussi longtemps que le stagiaire n'a pas fini, sans gêner le reste du projet.
+[dependencies]
