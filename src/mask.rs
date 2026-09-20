@@ -129,7 +129,13 @@ impl Mask {
     /// assert_eq!((fin.rows(), fin.cols()), (6, 6));
     /// assert_eq!(fin.fluid_count(), 9 * gros.fluid_count());
     /// ```
+    #[cfg_attr(not(feature = "step1"), allow(unused_variables))] // trou étape 1
     pub fn refine(&self, factor: usize) -> Mask {
+        // TODO-STEP:1 Construire le masque subdivisé : `factor × factor` cases à la
+        // place de chaque case, chacune reprenant la valeur de celle dont elle vient.
+        // Un `factor` de 0 ou 1 ne change rien, et le masque courant est seulement
+        // *emprunté* : il faut donc en rendre un nouveau.
+        // SOLUTION-BEGIN
         if factor <= 1 {
             return self.clone();
         }
@@ -141,6 +147,7 @@ impl Mask {
             }
         }
         Mask { rows, cols, fluid }
+        // SOLUTION-END
     }
 
     /// Extrait la tranche de colonnes `range`, sur toute la hauteur du masque.
@@ -241,14 +248,56 @@ impl Mask {
 ///
 /// `line_no` et les colonnes sont comptés **à partir de 1** : ce sont des numéros
 /// destinés à un humain qui ouvrira le fichier dans un éditeur, pas des indices.
-#[cfg_attr(not(feature = "step1"), allow(unused_variables))] // trou étape 1
+///
+/// Deux définitions, selon la convention du dispositif d'étapes : celle-ci, complète,
+/// vaut jusqu'à l'étape 2, sans quoi *aucun* masque ne se lirait et les tests des étapes
+/// 1 et 2 paniqueraient tous. L'étape 3 — celle des erreurs typées — la remplace par la
+/// version à trou, juste en dessous.
+#[cfg(not(feature = "step3"))]
 fn parse_row(
     line: &str,
     line_no: usize,
     expected: Option<usize>,
     fluid: &mut Vec<bool>,
 ) -> Result<usize, MeshError> {
-    // TODO-STEP:1 Vérifier la largeur de la ligne contre `expected` (`RaggedMask` si
+    let width = line.chars().count();
+    if let Some(cols) = expected {
+        if width != cols {
+            return Err(MeshError::RaggedMask {
+                line: line_no,
+                expected: cols,
+                got: width,
+            });
+        }
+    }
+
+    for (col, ch) in line.chars().enumerate() {
+        match ch {
+            FLUID => fluid.push(true),
+            SOLID => fluid.push(false),
+            other => {
+                return Err(MeshError::InvalidChar {
+                    line: line_no,
+                    col: col + 1,
+                    ch: other,
+                })
+            }
+        }
+    }
+
+    Ok(width)
+}
+
+/// Analyse une ligne du masque et empile ses cellules dans `fluid` — version de l'étape
+/// 3. Voir la documentation de l'autre définition, juste au-dessus.
+#[cfg(feature = "step3")]
+fn parse_row(
+    line: &str,
+    line_no: usize,
+    expected: Option<usize>,
+    fluid: &mut Vec<bool>,
+) -> Result<usize, MeshError> {
+    // TODO-STEP:3 Vérifier la largeur de la ligne contre `expected` (`RaggedMask` si
     // elle diffère), puis empiler `true` pour `FLUID` et `false` pour `SOLID` ; tout
     // autre caractère est une `InvalidChar`. Renvoyer la largeur.
     // SOLUTION-BEGIN

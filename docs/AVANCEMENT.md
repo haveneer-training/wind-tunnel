@@ -3,7 +3,8 @@
 Document de passation. Il dit où en est le fil rouge, ce qui reste à faire, et les
 décisions qu'il ne faut pas défaire sans le savoir. À tenir à jour.
 
-Dernière mise à jour : 2026-09-20 (rééquilibrage des trous vers le Rust écrit).
+Dernière mise à jour : 2026-09-21 (contrôle de chronologie : un trou n'exige que des
+notions déjà enseignées).
 
 ## Contexte
 
@@ -37,9 +38,9 @@ changé, à budget constant (355 min sur les étapes 0 à 10) :
 
 | # | Avant | Après |
 |---|---|---|
-| 1 | `is_fluid` (4 L) + BFS en extension | `is_fluid` + **`parse_row`** : `match ch`, `Err(InvalidChar)`, `Option<usize>`, `&mut Vec` · 30 → 40 min |
+| 1 | `is_fluid` (4 L) + BFS en extension | `is_fluid` + **`Mask::refine`** : `&self -> Mask`, `Vec::with_capacity`, boucles · 30 → 35 min |
 | 2 | `build_faces` en extension | l'**appariement** passe au socle (`boundary_face` donnée), extension = **`build_cell_faces`** (CSR) · 40 → 45 min |
-| 3 | `write_dataset` entière (34 L) | **`write_cells`** seule (`write_points`/`write_cell_data` données) + **`From<io::Error>`** et **`Error::source`** · 30 → 20 min |
+| 3 | `write_dataset` entière (34 L) | **`write_cells`** seule (`write_points`/`write_cell_data` données) + **`parse_row`**, **`From<io::Error>`** et **`Error::source`** · 30 → 25 min |
 | 4 | `PotentialCylinder::at` (formule) | **`impl VelocityField for Uniform`** et l'**implémentation couvrante `StreamSource`** (`?Sized`) ; le cylindre est donné · 25 → 20 min |
 | 7 | assemblage + résolution du système 2×2 | **résolution seule** (`normal_system` donnée) · 40 → 30 min |
 | 8, 10 | — | durées seulement : 25 → 20 min, et 30 → **45 min** (71 lignes de `thread::scope`/`Mutex`/`mpsc` ne tenaient pas en 30) |
@@ -70,6 +71,9 @@ mais hors du groupe par défaut, exactement comme `mpi/`. Son unique fichier sou
 puisque `cargo test` à la racine ne construit jamais ce crate. L'énoncé est
 `docs/etapes/etape-02-conception.md` ; il est rattaché à l'étape 2 et se fait **avant** de
 lire `mesh.rs`.
+
+Ce bonus étant rattaché à l'étape 2, il se place lui aussi au **J2 matin** : il demande
+`enum`, `match` et `Option`.
 
 Deux tests y font le travail que les autres ne peuvent pas faire :
 `every_side_is_either_inner_or_boundary` a un `match` **sans bras `_`**, donc il ne
@@ -444,6 +448,55 @@ l'étape en cours. Le scan se refait en régénérant `travail/` puis, pour chaq
 7. Régénérer et vérifier : `cargo xtask starter --force && cd travail && cargo test`.
 
 ## Décisions à ne pas défaire
+
+**Un trou ne doit exiger que des notions déjà enseignées à sa date.** C'est la contrainte
+la plus facile à casser sans s'en apercevoir, parce qu'elle ne se voit ni dans les tests
+ni dans `clippy` : le code compile, il est juste infaisable pour le stagiaire. Le
+calendrier fait foi (`Program.md`, symlink vers le document de formation), et il donne :
+
+| Disponible à partir de | Notions |
+|---|---|
+| J1 matin | `let`/`let mut`, expressions, `if`, tuples, `[T; N]`, pile/tas |
+| J1 aprem (sas 01–06) | fonctions, tranches `&[T]`, `&str`, `Vec<T>`, `Copy` vs move, `&`/`&mut` |
+| ↳ **étapes 0 et 1** s'insèrent **ici** | |
+| J1 fin de journée (sas 07, 08) | `struct`, `impl`, `enum`, `match` |
+| **J2 matin** | **`Option`, `Result`, `?`, `if let`**, exhaustivité (slides) |
+| J2 aprem | modules, génériques, **traits**, `#[derive]`, durées de vie (léger), tests |
+| **J3 matin** | **itérateurs et adaptateurs** (`map`, `filter`, `fold`, `collect`), puis `rayon` |
+| J3 aprem | `thread::spawn`, `move`, `Send`/`Sync`, `Arc`, `Mutex` |
+
+Les sas `07_structs` et `08_enums` sont placés en **fin de J1**, après les étapes 0 et 1
+et avant l'étape 2 : c'est ce qui prépare la connectivité (`Side`, indices typés) et le
+bonus de conception, tous deux au J2 matin.
+
+Deux conséquences qui ont déjà coûté un aller-retour :
+
+- **Les étapes 0 et 1 ne peuvent contenir ni `enum`, ni `Option`, ni `Result`** : elles
+  tournent avant le sas `08_enums`, et `Option`/`Result` n'arrivent que le lendemain
+  matin. Un trou qui demande de construire une variante d'erreur appartient à l'étape 3,
+  pas à l'étape 1 — c'est pour cela que `parse_row` a une double définition `#[cfg]` et
+  que le socle de l'étape 1 est `is_fluid` + `Mask::refine`, qui ne parlent que de
+  propriété et d'emprunts.
+- **Un trou sur le chemin de lecture du masque rend rouge tout ce qui lit un masque.**
+  `parse_row`, troué à l'étape 3, fait échouer une dizaine de tests des étapes 1 et 2 en
+  plus des siens. C'est assumé : les dix pointent la **même** ligne et portent tous le
+  message « étape 3 », donc la cause est lisible d'un coup d'œil, et les deux erreurs
+  qu'on y écrit (`RaggedMask`, `InvalidChar`) sont le contenu annoncé de l'étape 3. Mais
+  c'est la limite du procédé — ne pas trouer une seconde fonction de ce chemin.
+- **Les adaptateurs d'itérateur sont enseignés au J3**, alors que le corrigé en écrit dès
+  l'étape 0 (`edges(...).map(...).sum()`, `fold`). Tolérable parce que **tout cela
+  s'écrit avec un `for`**, que le stagiaire connaît : un trou peut se résoudre sans
+  adaptateur, il ne doit jamais l'*exiger*. Vérifier ce point avant d'écrire un trou dont
+  la seule solution raisonnable serait un `filter_map`/`reduce`.
+
+Hors programme mais introduits en situation, chacun expliqué dans son énoncé :
+`?Sized` (étape 4), `thread::scope` et `mpsc` (étape 10), `&dyn Fn` (étape 12).
+
+Une exception assumée : l'extension de l'étape 1 (`Mask::check_connected`, J1) construit
+un `Err(MeshError::Disconnected { components })` alors que `Result` n'arrive qu'au J2.
+Elle reste acceptable parce qu'elle est **facultative**, que son travail réel est un
+parcours en largeur — de l'algorithmique — et que l'énoncé donne l'expression fautive
+telle quelle, à recopier. Ne pas élargir ce précédent.
 
 **`design/` ne doit dépendre de rien, et rien ne doit en dépendre.** C'est la seule chose
 qui rend l'exercice de conception possible : dès qu'un autre fichier utiliserait ses

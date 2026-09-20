@@ -1,18 +1,51 @@
 # Étape 3 — Écrire les résultats, et les erreurs
 
-**Fichiers :** `src/io/vtk.rs`, `src/error.rs` · **Vérification :** `cargo xtask goto 3` puis `cargo test` · **≈ 20 min**
+**Fichiers :** `src/mask.rs`, `src/io/vtk.rs`, `src/error.rs` · **Vérification :** `cargo xtask goto 3` puis `cargo test` · **≈ 25 min**
 
 Un calcul dont on ne voit rien ne sert à rien, et un calcul qui échoue sans le dire est
 pire qu'inutile. Cette étape traite les deux faces de la même pièce : les sorties, et ce
-qu'on raconte quand ça se passe mal.
+qu'on raconte quand ça se passe mal — à l'entrée du programme comme à sa sortie.
+
+Elle vient donc juste après les `enum`, `Option`, `Result` et l'opérateur `?` : c'est leur
+première application sur de vraies erreurs métier. Vous reviendrez pour cela dans
+`mask.rs`, dont la lecture était restée fonctionnelle mais muette jusqu'ici.
+
+Un test rouge de l'étape 1 qui reparaît à l'ouverture de cette étape n'est donc pas une
+régression : `Mask::parse` passe par la fonction que vous allez écrire.
 
 ## Socle
 
 | Fonction | Fichier | Ce qu'elle doit faire |
 |---|---|---|
+| `parse_row` | `mask.rs` | valider une ligne du masque, et **nommer** ce qui cloche |
 | `write_cells` | `io/vtk.rs` | les sections `CELLS` et `CELL_TYPES` du fichier |
 | `MeshError::source` | `error.rs` | l'erreur d'origine, quand il y en a une sous celle-ci |
 | `From<io::Error> for MeshError` | `error.rs` | la conversion qui fait marcher le `?` |
+
+### Les erreurs de lecture du masque
+
+`parse_row` est l'endroit où le format dessiné à la main est validé — donc l'endroit
+exact où le programme reçoit des données fausses. Elle a trois choses à dire :
+
+- la ligne n'a pas la largeur attendue → `MeshError::RaggedMask { line, expected, got }` ;
+- un caractère n'est ni `.` ni `#` → `MeshError::InvalidChar { line, col, ch }` ;
+- tout va bien → la largeur de la ligne, que `Mask::parse` retient comme référence pour
+  les suivantes.
+
+D'où le paramètre `expected: Option<usize>` : `None` sur la première ligne — c'est elle
+qui fixe la largeur — et `Some(largeur)` ensuite. L'`Option` dit **dans le type** qu'il
+n'y a pas toujours de référence à comparer, plutôt que de faire passer un `0` pour « pas
+encore de largeur ». C'est la même idée que les variantes ci-dessous : l'information est
+portée par le type, pas par une valeur convenue.
+
+Les numéros de ligne et de colonne sont comptés **à partir de 1** : ils sont destinés à un
+humain qui ouvrira le fichier dans un éditeur, pas à indexer un tableau.
+
+Le `Vec<bool>` arrive en `&mut` : un prêt **exclusif**. Tant que `parse_row` le tient,
+personne d'autre ne peut ni le lire ni l'écrire. En C, la fonction recevrait un `bool*` et
+une capacité, et rien ne garantirait le contraire.
+
+### Les sorties
 
 Le format VTK legacy ASCII est volontairement daté : il tient en cinquante lignes, se lit
 dans un éditeur de texte, et Paraview comme Tecplot l'ouvrent sans discuter.
