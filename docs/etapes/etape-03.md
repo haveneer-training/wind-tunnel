@@ -14,28 +14,55 @@ sans discuter. La fonction écrit dans un `&mut impl Write`, pas dans un fichier
 le fichier est le travail de `write_vtk`, qui l'appelle, et écrire dans un tampon mémoire
 celui d'un test. Vous n'avez donc à produire que le contenu.
 
+Le plus court chemin vers le format est un fichier complet. Voici un maillage de deux
+cellules — un quadrangle et un triangle, portant un champ `c` — tel qu'il sort de
+`write_header` puis `write_dataset` ; ParaView l'ouvre tel quel :
+
 ```text
-# vtk DataFile Version 3.0
-wind-tunnel
-ASCII
-DATASET UNSTRUCTURED_GRID
-POINTS <n> double
-<x> <y> 0
-...
-CELLS <nb_cellules> <nb_entiers_total>
-4 <v0> <v1> <v2> <v3>          ← chaque cellule précédée de son nombre de sommets
-3 <v0> <v1> <v2>
-...
-CELL_TYPES <nb_cellules>
-9                              ← 9 = quadrangle, 5 = triangle
-CELL_DATA <nb_cellules>
-SCALARS c double 1
-LOOKUP_TABLE default
-<valeur>
-...
+            3             2                4
+            +-------------+----------------+     cellule 0 : quadrangle 0 1 2 3
+  y         |             |            /         cellule 1 : triangle   1 4 2
+  ^         |     (0)     |   (1)  /             (sens direct dans les deux cas)
+  |         |             |    /
+  +--> x    +-------------+
+            0             1
 ```
 
-`cell.kind.vtk_code()` vous donne déjà le code de type.
+```text
+# vtk DataFile Version 3.0
+wind-tunnel                    ⎫
+ASCII                          ⎬ les quatre lignes de `write_header`
+DATASET UNSTRUCTURED_GRID      ⎭
+POINTS 5 double
+0 0 0                          ← sommet 0, toujours en 3D : x y z
+1 0 0                          ← sommet 1
+1 1 0
+0 1 0
+2 1 0                          ← sommet 4
+CELLS 2 9                      ← 2 cellules, 9 entiers dans les lignes qui suivent
+4 0 1 2 3                      ← nombre de sommets, puis leurs indices
+3 1 4 2                        ← le triangle : 3 sommets
+CELL_TYPES 2
+9                              ← 9 = quadrangle
+5                              ← 5 = triangle
+CELL_DATA 2
+SCALARS c double 1
+LOOKUP_TABLE default
+0.5                            ← c sur la cellule 0
+0.25                           ← c sur la cellule 1
+```
+
+Les trois pièges du format sont tous visibles ici : les points sont toujours en 3D (d'où
+le `0` final, ce calcul étant plan) ; le second nombre de la ligne `CELLS` est le total
+des entiers des lignes qui suivent, nombres de sommets compris — ici
+`(1 + 4) + (1 + 3) = 9` ; et les valeurs de `CELL_DATA` sont dans l'ordre des cellules, une
+par cellule exactement. `cell.kind.vtk_code()` vous donne déjà `9` ou `5`. S'il y a
+plusieurs champs, leurs blocs `SCALARS` / `LOOKUP_TABLE` se suivent sous le même
+`CELL_DATA` — c'est le cas d'usage réel, `write_vtk` recevant une liste de champs.
+
+La spécification complète du format legacy — les autres types de cellules, les sections
+`POINT_DATA`, `VECTORS`, `FIELD` — est dans la documentation VTK :
+<https://docs.vtk.org/en/latest/design_documents/VTKFileFormats.html>.
 
 Ce que vous écrivez ici est le squelette du fichier : la géométrie, et un champ par
 cellule. Les images d'un calcul complet en portent davantage — la vitesse, la fonction de
