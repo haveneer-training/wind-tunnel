@@ -135,6 +135,7 @@ impl Mask {
         // place de chaque case, chacune reprenant la valeur de celle dont elle vient.
         // Un `factor` de 0 ou 1 ne change rien, et le masque courant est seulement
         // *emprunté* : il faut donc en rendre un nouveau.
+        // HINT: Un cellule "refined" réduite d'un facteur `factor` retombe sur une cellule originale
         // SOLUTION-BEGIN
         if factor <= 1 {
             return self.clone();
@@ -200,6 +201,7 @@ impl Mask {
     fn check_connected(&self) -> Result<(), MeshError> {
         // TODO-STEP:1 (pour aller plus loin) Compter les composantes connexes du fluide
         // par parcours en largeur, et signaler `Disconnected` s'il y en a plus d'une
+        // HINT: Utiliser une queue pour y mettre les cellules à explorer et une marque des cellules visitées
         // SOLUTION-BEGIN
         let mut seen = vec![false; self.fluid.len()];
         let mut components = 0usize;
@@ -215,9 +217,9 @@ impl Mask {
             while let Some(k) = queue.pop() {
                 let (row, col) = (k / self.cols, k % self.cols);
                 let neighbors = [
-                    (row.wrapping_sub(1), col),
+                    (row.saturating_sub(1), col),
                     (row + 1, col),
-                    (row, col.wrapping_sub(1)),
+                    (row, col.saturating_sub(1)),
                     (row, col + 1),
                 ];
                 for (r, c) in neighbors {
