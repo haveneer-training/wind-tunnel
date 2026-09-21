@@ -7,7 +7,7 @@
 use std::error::Error;
 use std::process::ExitCode;
 
-use wind_tunnel::app::{self, USAGE};
+use wind_tunnel::app;
 use wind_tunnel::error::SolverError;
 use wind_tunnel::geom::Vec2;
 use wind_tunnel::io::vtk::Frame;
@@ -17,8 +17,8 @@ use wind_tunnel::solver::Solver;
 use wind_tunnel::velocity::StreamSource;
 
 fn run() -> Result<(), Box<dyn Error>> {
-    let Some(args) = app::parse_args().map_err(|e| format!("{e}\n\n{USAGE}"))? else {
-        print!("{USAGE}");
+    let Some(args) = app::parse_args()? else {
+        print!("{}", app::help_text());
         return Ok(());
     };
 

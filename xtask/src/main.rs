@@ -70,6 +70,10 @@ struct Block {
     end: usize,
 }
 
+// Analyse d'argv à la main, volontairement : `xtask` a quatre sous-commandes à un seul
+// argument positionnel chacune, pas d'options à combiner — une dépendance comme `clap`
+// (utilisée dans `src/app.rs` pour la ligne de commande, bien plus riche, des deux
+// binaires) n'y apporterait rien. `xtask` reste sans dépendance.
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
     let command = args.first().map(String::as_str).unwrap_or("help");

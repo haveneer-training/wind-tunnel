@@ -127,11 +127,18 @@ version sûre est aussi la plus petite.
     halos échangés par mémoire, et compare au calcul monolithique cellule par cellule.
     `scripts/check-mpi.sh` lance ensuite le vrai binaire à 1, 2, 3 et 4 rangs et compare
     au binaire séquentiel ; il sort proprement en code 0 si `mpirun` est introuvable.
-- **`src/app.rs` (nouveau, sans trou)** : `Args`, `parse_args`, `USAGE`, `obstacle`,
+- **`src/app.rs` (nouveau, sans trou)** : `Args`, `parse_args`, `help_text`, `obstacle`,
   `velocity_for`, `flux_scheme`, `solver_config`, `initial_field` — tout le montage d'un
   cas, autrefois dans `src/main.rs`, désormais partagé mot pour mot par le binaire
   séquentiel et le binaire MPI. `src/main.rs` n'avait aucun trou : le déplacement ne
   perturbe aucune étape.
+- **`Args` analyse ses options avec `clap` (derive)** plutôt qu'un désassemblage d'argv
+  écrit à la main : nom d'option, valeur par défaut et aide vivent sur l'attribut du
+  champ qu'ils décrivent, `--help` et les messages d'erreur sur une valeur invalide en
+  découlent. `help_text()` rend l'aide longue de `clap` — c'est elle qu'affichent les
+  deux binaires, `USAGE` a disparu. `xtask`, lui, reste volontairement sans dépendance :
+  quatre sous-commandes à un seul argument positionnel n'ont rien à gagner de `clap`,
+  voir le commentaire au-dessus de `xtask::main`.
 - **Le halo fait trois colonnes, et c'est une découverte de cette étape.** Une pour la
   valeur de la voisine, deux parce que MUSCL lit le *gradient* de la voisine, trois parce
   que ce gradient est un moindres carrés sur les **centroïdes** de la deuxième couche —

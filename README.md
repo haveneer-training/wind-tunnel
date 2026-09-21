@@ -83,7 +83,7 @@ lecture (voir la fin de l'énoncé de l'étape 5).
 
 - Rust ≥ 1.90 (`rustup update stable`)
 - rien d'autre pour le cœur du projet : deux dépendances, `image` pour encoder les PNG et
-  `rayon` pour l'étape 9
+  `rayon` pour l'étape 9 (et `clap` pour gérer les arguments CLI)
 - **facultatif, [ParaView](https://www.paraview.org/download/)** : le PNG donne un aperçu
   immédiat, mais ParaView permet de *manipuler* les résultats — animer les frames avec
   leur date physique (`frames.vtk.series`), tracer le champ de vitesse `u`, la fonction de
