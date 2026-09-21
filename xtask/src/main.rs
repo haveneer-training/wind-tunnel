@@ -49,6 +49,10 @@ const FILL_NOTE: &str = "à compléter";
 const BLANK_NOTE: &str = "à écrire de zéro";
 /// Où sont rangés les blocs de référence, dans le dépôt de travail.
 const REFERENCE: &str = "xtask/reference.txt";
+/// Marqueur ouvrant d'un passage Markdown qui ne vaut que dans le dépôt corrigé.
+const CORRIGE_BEGIN: &str = "<!-- CORRIGE-ONLY-BEGIN -->";
+/// Marqueur fermant d'un passage Markdown qui ne vaut que dans le dépôt corrigé.
+const CORRIGE_END: &str = "<!-- CORRIGE-ONLY-END -->";
 /// Dernière étape couverte par le code actuel.
 const LAST_STEP: u8 = 12;
 /// Nom du dossier de travail engendré, à la racine du dépôt.
@@ -178,6 +182,25 @@ fn rust_files(dir: &Path, out: &mut Vec<PathBuf>) {
         if path.is_dir() {
             rust_files(&path, out);
         } else if path.extension().is_some_and(|e| e == "rs") {
+            out.push(path);
+        }
+    }
+}
+
+/// Liste récursivement les fichiers `.md` d'un répertoire.
+///
+/// Sert à retirer les blocs `CORRIGE-ONLY` de la documentation copiée dans le dossier de
+/// travail — pas seulement du README, de n'importe quel fichier Markdown du dépôt.
+fn markdown_files(dir: &Path, out: &mut Vec<PathBuf>) {
+    let Ok(entries) = fs::read_dir(dir) else {
+        return;
+    };
+    let mut paths: Vec<PathBuf> = entries.flatten().map(|e| e.path()).collect();
+    paths.sort();
+    for path in paths {
+        if path.is_dir() {
+            markdown_files(&path, out);
+        } else if path.extension().is_some_and(|e| e == "md") {
             out.push(path);
         }
     }
@@ -577,6 +600,20 @@ fn make_starter(root: &Path, out: &Path, force: bool) -> Result<(), String> {
         copy_tree(&root.join(entry), &out.join(entry))?;
     }
 
+    // Les blocs CORRIGE-ONLY (« comment engendrer travail/ », par exemple, dans le
+    // README) ne valent que dans ce dépôt-ci : on les retire de la documentation copiée
+    // avant de la livrer au dossier de travail.
+    let mut docs = Vec::new();
+    markdown_files(out, &mut docs);
+    for path in docs {
+        let text = fs::read_to_string(&path).map_err(|e| e.to_string())?;
+        if !text.contains(CORRIGE_BEGIN) {
+            continue;
+        }
+        let stripped = strip_corrige_blocks(&text, &path)?;
+        fs::write(&path, stripped).map_err(|e| e.to_string())?;
+    }
+
     // Trouer les sources et mettre les corps de côté.
     for path in source_files(out) {
         let text = fs::read_to_string(&path).map_err(|e| e.to_string())?;
@@ -633,9 +670,6 @@ fn make_starter(root: &Path, out: &Path, force: bool) -> Result<(), String> {
     // Un dossier de travail ne doit jamais l'activer, sinon ces avertissements
     // resteraient éteints alors même que le trou est encore ouvert.
     rewrite_default(&out.join("mpi/Cargo.toml"), "[]")?;
-    if let Ok(readme) = fs::read_to_string(root.join("docs/README-travail.md")) {
-        fs::write(out.join("README.md"), readme).map_err(|e| e.to_string())?;
-    }
 
     let shown = out.strip_prefix(root).unwrap_or(out);
     println!(
@@ -645,8 +679,49 @@ fn make_starter(root: &Path, out: &Path, force: bool) -> Result<(), String> {
     println!("  cd {}", shown.display());
     println!("  cargo test           # quatre tests rouges : l'étape 0 vous attend");
     println!("  cargo xtask status   # à tout moment, pour savoir où vous en êtes\n");
-    println!("L'énoncé de la première étape est dans docs/etapes/etape-00.md.");
+    println!("Le déroulement d'une étape est expliqué dans ETAPES.md ; l'énoncé de la");
+    println!("première étape est dans docs/etapes/etape-00.md.");
     Ok(())
+}
+
+/// Retire les blocs `CORRIGE_BEGIN`/`CORRIGE_END` d'un texte Markdown.
+///
+/// Ces blocs ne valent que dans le dépôt corrigé (« comment engendrer `travail/` », par
+/// exemple, dans le README) : le dossier de travail ne doit jamais les voir. Un marqueur
+/// ouvrant sans fermant est une erreur d'écriture du corrigé — on s'arrête plutôt que de
+/// publier un fichier tronqué en silence, même discipline que [`find_blocks`].
+fn strip_corrige_blocks(text: &str, path: &Path) -> Result<String, String> {
+    let lines: Vec<&str> = text.lines().collect();
+    let mut kept: Vec<&str> = Vec::new();
+    let mut i = 0;
+    while i < lines.len() {
+        if lines[i].trim() == CORRIGE_BEGIN {
+            let start = i;
+            let Some(end) = (start + 1..lines.len()).find(|&k| lines[k].trim() == CORRIGE_END)
+            else {
+                return Err(format!(
+                    "{} : {CORRIGE_BEGIN} sans {CORRIGE_END} (ligne {})",
+                    path.display(),
+                    start + 1
+                ));
+            };
+            i = end + 1;
+            continue;
+        }
+        kept.push(lines[i]);
+        i += 1;
+    }
+
+    // Fusionner les lignes vides laissées par un bloc retiré, pour ne pas publier de
+    // double blanc à sa place.
+    let mut merged: Vec<&str> = Vec::new();
+    for line in kept {
+        if line.is_empty() && merged.last() == Some(&"") {
+            continue;
+        }
+        merged.push(line);
+    }
+    Ok(merged.join("\n") + "\n")
 }
 
 /// Transforme le marqueur machine du corrigé en consigne lisible.
@@ -670,7 +745,7 @@ fn copy_tree(from: &Path, to: &Path) -> Result<(), String> {
         fs::create_dir_all(to).map_err(|e| e.to_string())?;
         for entry in fs::read_dir(from).map_err(|e| e.to_string())?.flatten() {
             let name = entry.file_name();
-            if name == "target" || name == "reference.txt" || name == "README-travail.md" {
+            if name == "target" || name == "reference.txt" {
                 continue;
             }
             copy_tree(&entry.path(), &to.join(name))?;

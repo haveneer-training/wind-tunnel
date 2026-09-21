@@ -19,11 +19,10 @@ Which doc is which:
 | File | Audience / content |
 |---|---|
 | `docs/AVANCEMENT.md` | handoff doc — state, remaining work, conventions, rationale. The authority |
-| `README.md` | trainee entry point: what the project is, the `start` → `goto` → `solve` loop |
-| `ETAPES.md` | the 11 steps + bonuses in one page, trainee-facing |
+| `README.md` | project entry point, served verbatim as `travail/README.md` by `make_starter` — corrigé-only passages (e.g. "how to run `cargo xtask start`") sit inside `<!-- CORRIGE-ONLY-BEGIN/END -->` markers that `make_starter` strips |
+| `ETAPES.md` | the 13 steps (0-12) + bonuses, and how a step unfolds (the `goto`/`test` loop, commands, where to write) — trainee-facing |
 | `docs/etapes/etape-NN.md` | one step's statement: mandatory core + optional extension |
 | `docs/BONUS-OPTIMISATION.md` | the allocation thread — measurements and the solutions to steps 7/8's "pour aller plus loin" |
-| `docs/README-travail.md` | `make_starter` writes it as `travail/README.md`, and skips it when copying `docs/` |
 
 ## Commands
 

@@ -19,6 +19,7 @@ traînée : ni pression ni quantité de mouvement n'apparaissent dans le calcul.
 
 ## Démarrage
 
+<!-- CORRIGE-ONLY-BEGIN -->
 Ce dépôt contient le **code complet**. Pour le construire vous-même, engendrez votre
 dossier de travail : les passages à écrire y deviennent des `todo!()`, tout le reste est
 fourni.
@@ -28,24 +29,13 @@ cargo xtask start      # crée travail/ (30 trous à combler)
 cd travail
 cargo test             # quatre tests rouges : l'étape 0 vous attend
 ```
+<!-- CORRIGE-ONLY-END -->
 
-À partir de là, la boucle est toujours la même :
+Le déroulement d'une étape — la boucle `cargo test` / `goto`, les commandes, où écrire —
+est dans [`ETAPES.md`](ETAPES.md), les énoncés dans [`docs/etapes/`](docs/etapes/).
+Commencez toujours par lire celui de l'étape en cours.
 
-```shell
-cargo test             # rouge : chaque échec nomme le fichier et la ligne
-#   ... lire docs/etapes/etape-00.md, remplacer le todo!() entre >>> et <<< ...
-cargo test             # vert
-cargo xtask goto 1     # étape suivante
-```
-
-`cargo test` ne montre que les étapes déjà ouvertes : quatre tests rouges au démarrage,
-pas quarante. `cargo xtask status` dit où vous en êtes ; `cargo xtask solve <n>` remplit
-une étape à votre place si vous décrochez, `reset <n>` la rouvre. `goto` **n'écrase
-jamais** ce que vous avez écrit : il ne complète que les blocs restés vides.
-
-Le déroulé complet est dans [`ETAPES.md`](ETAPES.md), les énoncés dans
-[`docs/etapes/`](docs/etapes/) — commencez toujours par lire celui de l'étape en cours.
-
+<!-- CORRIGE-ONLY-BEGIN -->
 Et si vous voulez seulement voir tourner la version finie, depuis ce dépôt-ci :
 
 ```shell
@@ -53,6 +43,7 @@ cargo test                                # tout est vert
 cargo run --release -- domains/tunnel.dom # écrit out/frame_XXXX.png et .vtk
 open out/frame_0010.png                   # ou paraview out/frames.vtk.series
 ```
+<!-- CORRIGE-ONLY-END -->
 
 Quelques options utiles :
 
