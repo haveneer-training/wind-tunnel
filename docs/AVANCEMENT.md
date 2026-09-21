@@ -453,6 +453,11 @@ l'étape en cours. Le scan se refait en régénérant `travail/` puis, pour chaq
    sans quoi les `not(feature = "step{N+1}")` du collatéral resteraient vrais dans le
    corrigé et y cacheraient de vrais avertissements.
 7. Régénérer et vérifier : `cargo xtask start --force && cd travail && cargo test`.
+8. **Un lien ou un chemin dans un `.md` trainee-facing** (`README.md`, `ETAPES.md`,
+   `docs/etapes/`) **doit valoir des deux côtés** — dans ce dépôt et une fois copié dans
+   `travail/`. Un chemin racine-relatif (`docs/etapes/etape-00.md`) tient des deux côtés ;
+   un chemin relatif au dossier du fichier (`etapes/etape-00.md` écrit depuis `docs/`) ne
+   tient que d'un seul.
 
 ## Décisions à ne pas défaire
 
@@ -510,6 +515,17 @@ qui rend l'exercice de conception possible : dès qu'un autre fichier utiliserai
 types, leur forme cesserait d'être un choix du stagiaire. Ne lui ajoutez pas `wind-tunnel`
 en dépendance « pour factoriser », et ne le faites pas entrer dans le groupe par défaut du
 workspace — son état rouge normal casserait alors `cargo test` à la racine.
+
+**Un seul `README.md`, servi tel quel au stagiaire.** `make_starter` le copie sans jamais
+le remplacer (`xtask/src/main.rs`) : les passages qui ne valent que pour le dépôt corrigé
+(« comment engendrer `travail/` », par exemple) sont encadrés par
+`<!-- CORRIGE-ONLY-BEGIN/END -->`, que `make_starter` retire de tout fichier Markdown
+copié avant de le livrer. `ETAPES.md` porte la mécanique des étapes — la boucle
+`goto`/`test`, les commandes, où écrire, les avertissements — et n'a donc rien à dupliquer
+dans le README. Avant ce dispositif, une seconde source (`docs/README-travail.md`) faisait
+double emploi et divergeait silencieusement : son image de démonstration ne résolvait
+plus une fois copiée dans `travail/`, et un renvoi d'`etape-03.md` vers une section du
+README pointait dans le vide côté stagiaire.
 
 **Le trou porte sur le Rust, pas sur la formule.** L'objet de la formation est le
 langage ; recopier une expression déjà imprimée dans l'énoncé n'en apprend rien. Quand
