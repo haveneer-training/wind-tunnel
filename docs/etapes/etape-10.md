@@ -1,4 +1,4 @@
-# Étape 10 — Écriture recouverte : `thread::scope`, `mpsc`, `Mutex`
+# Étape 10 — Écriture concurrente : `thread::scope`, `mpsc`, `Mutex`
 
 **Fichier :** `src/io/png.rs` · **Vérification :** `cargo xtask goto 10`, `cargo test`
 · **≈ 45 min**
@@ -7,7 +7,7 @@ L'étape 9 a paralléliné trois boucles sans rien changer à leur forme : chaqu
 lisait ses voisines et n'écrivait que sa propre case, donc `.iter()` devenait
 `.par_iter()` et le compilateur laissait faire. Le rendu PNG est différent : toutes les
 cellules dessinent dans **la même image**. Ce n'est plus de l'écriture disjointe, c'est
-de l'écriture *recouverte* — et le compilateur ne peut pas prouver que deux cellules
+de l'écriture *concurrente* — et le compilateur ne peut pas prouver que deux cellules
 n'écriront jamais le même pixel (leurs boîtes englobantes peuvent se toucher au bord),
 donc il refuse tout simplement l'accès concurrent tant qu'il n'est pas protégé. Aucune
 restructuration en *gather* ne fait disparaître ce problème : ici, il faut un verrou.

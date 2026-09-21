@@ -587,6 +587,23 @@ fn compute_face_flux<S: StreamSource + ?Sized>(mesh: &Mesh, velocity: &S) -> Vec
 
 /// Pas de temps maximal admissible : `min_i |Ωi| / Σ_f (|débit| + 2D L_f/d_f)`.
 ///
+/// Les unités se vérifient d'un coup d'œil : un débit est en m²/s (étape 4), `D L/d`
+/// aussi, l'aire en m² — le rapport est donc bien un temps.
+///
+/// **Ce que la borne garantit.** Un pas d'Euler explicite avec décentrement amont
+/// s'écrit `cᵢⁿ⁺¹ = a cᵢ + Σ_f b_f c_voisin`, avec des `b_f` positifs et
+/// `a = 1 − (dt/|Ωi|) Σ_f (débit sortant + D L/d)`. Comme `Σ_f débit = 0` sur une
+/// cellule fermée — la propriété télescopique de l'étape 4 — ces coefficients somment à
+/// `1` : dès que `a ≥ 0`, la nouvelle valeur est une moyenne pondérée des anciennes,
+/// donc encadrée par elles. Le schéma est borné, et un champ dans `[0, 1]` y reste.
+///
+/// La formule ci-dessus est deux fois plus sévère que ce `a ≥ 0` : puisque
+/// `Σ débit = 0`, la somme des `|débit|` vaut le double de celle des débits sortants, et
+/// le facteur `2` fait de même sur le terme diffusif. C'est une marge, et c'est aussi ce
+/// qui rend la borne valable sans rien supposer de `Σ débit` — utile sur une cellule de
+/// bord dont une face en `NoFlux` est comptée ici mais ignorée par
+/// [`Solver::residual`].
+///
 /// `None` si *aucune* cellule n'a de débit sortant ni de diffusion : il n'y a alors rien
 /// à transporter, et le minimum porterait sur un ensemble vide.
 #[cfg_attr(not(feature = "step5"), allow(unused_variables))] // trou étape 5

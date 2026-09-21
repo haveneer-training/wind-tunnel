@@ -10,18 +10,92 @@ traceur — et, à la fin de cette étape, à regarder l'image.
 Sur chaque cellule, on écrit le bilan de ce qui entre et sort :
 
 ```text
-|Ωi| · dcᵢ/dt = − Σ_faces [ débit · c_face − D (c_voisin − cᵢ) L / d ]
+|Ωi| · dcᵢ/dt = − Σ_f [ q_f · c_face − D (c_voisin − cᵢ) L_f / d_f ]
 ```
 
-`c_face` est la valeur transportée à travers la face. Le décentrement amont la prend du
-côté d'où vient le fluide : simple, jamais oscillant, et diffusif — un front net s'étale
-en traversant le domaine. C'est précisément le défaut que l'étape 7 corrigera.
+La somme porte sur les faces de la cellule `i`, et chaque symbole a son pendant dans le
+code :
 
-La stabilité impose un pas de temps maximal :
+| Symbole | Ce que c'est | Dans `residual` |
+|---|---|---|
+| `\|Ωi\|` | aire de la cellule (le calcul est plan, tout est par unité de profondeur) | `cell.area` |
+| `q_f` | le débit de la face, **compté sortant de la cellule `i`** — celui de l'étape 4, `ψ(b) − ψ(a)`, en m²/s | `self.face_flux[fid] * outward` |
+| `c_face` | la valeur du traceur emportée à travers la face | `self.scheme.interface_value(…)` |
+| `c_voisin` | la valeur de l'autre côté : celle de la cellule voisine, ou celle qu'impose la condition de bord | `c[neighbour]` ou `self.bc(kind)` |
+| `D` | la diffusivité (`--diffusivity`, nulle par défaut) | `self.config.diffusivity` |
+| `L_f`, `d_f` | longueur de la face, distance entre les deux centres de cellules | `face.length`, `face.distance` |
+
+Deux termes de natures différentes : `q_f · c_face` est l'**advection** — le fluide
+emporte ce qu'il contient —, et `D (c_voisin − cᵢ) L_f / d_f` la **diffusion**, le
+gradient normal approché par une différence entre deux centres. Le tout est sommé face
+par face dans `sum`, puis `out[id] = -sum / cell.area` : le signe `−` et la division par
+l'aire sont ceux de la formule.
+
+Le signe de `q_f` se règle une fois pour toutes : `face_flux` est orienté sortant de
+`face.left` (étape 4), donc la cellule qui se trouve de l'autre côté le retourne —
+c'est tout le rôle de `outward`. Une face vue des deux cellules donne ainsi deux débits
+exactement opposés : ce qui sort de l'une entre dans l'autre, à la précision machine.
+
+`c_face`, lui, est la seule chose que le schéma décide, et c'est le trou de `flux.rs`.
+Le décentrement amont prend la valeur du côté d'où vient le fluide — le signe de
+`un = q_f / L_f`, la vitesse normale que `FaceState` transporte. Simple, jamais
+oscillant, et diffusif : un front net s'étale en traversant le domaine. C'est
+précisément le défaut que l'étape 7 corrigera.
+
+## Le pas de temps maximal
+
+L'intégration est explicite : `c` à l'instant suivant ne se lit que sur l'instant
+courant, sans système à résoudre — mais au prix d'un pas de temps borné.
 
 ```text
-dt ≤ min_i  |Ωi| / Σ_faces ( |débit| + 2·D·L/d )
+dt ≤ min_i  |Ωi| / Σ_f ( |q_f| + 2·D·L_f/d_f )
 ```
+
+Vérification d'unités d'abord : `q_f` est en m²/s (étape 4), `D L/d` aussi (des m²/s
+fois un rapport de longueurs sans dimension). La somme est donc en m²/s, l'aire en m²,
+et le rapport en **secondes**.
+
+D'où vient la borne ? Écrivons un pas d'Euler explicite avec le décentrement amont, en
+regroupant les termes sur `cᵢ`. En notant `q⁺` la part sortante d'un débit et `q⁻` sa
+part entrante (`q = q⁺ − q⁻`, toutes deux positives) :
+
+```text
+cᵢⁿ⁺¹ = cᵢ [ 1 − (dt/|Ωi|) Σ_f (q⁺_f + D L/d) ] + (dt/|Ωi|) Σ_f (q⁻_f + D L/d) c_voisin
+```
+
+Tous les coefficients des voisins sont positifs, et leur somme avec celui de `cᵢ` vaut
+exactement `1` — parce que `Σ_f q_f = 0` sur une cellule fermée, la propriété
+télescopique de l'étape 4. La nouvelle valeur est donc une **moyenne pondérée** des
+anciennes, donc comprise entre leur minimum et leur maximum — le champ reste dans
+`[0, 1]` — **à la condition** que le coefficient de `cᵢ` soit lui aussi positif :
+
+```text
+dt ≤ |Ωi| / ( Σ_f q⁺_f + D Σ_f L/d )
+```
+
+C'est le vrai critère. Celui qu'implémente `max_stable_dt` est **deux fois plus
+sévère** : comme `Σ q_f = 0`, on a `Σ|q_f| = 2 Σ q⁺_f`, et le `2·D` fait de même sur le
+terme diffusif. Cette marge d'un facteur 2 se vérifie à la main sur la veine vide, où
+une cellule intérieure est un carré de côté `h` traversé par `U` : deux faces portent
+`|q| = U h`, les deux autres rien, donc `dt_max = h² / (2 U h) = h / 2U`. Avec les
+valeurs par défaut (`h = 1`, `U = 1`), le programme annonce bien `maximum stable
+5.0000e-1 s` — la moitié de la limite de positivité.
+
+Écrire la somme avec `|q_f|` plutôt qu'avec `q⁺_f` a un second avantage : la formule ne
+suppose plus rien sur `Σ q_f`. Elle reste donc valable — conservative — sur une cellule
+de bord dont une face est en `NoFlux`, que `residual` ignore mais que cette somme compte
+quand même.
+
+Restent deux mots sur la forme de l'expression :
+
+- **`min_i`** : le pas de temps est global, le même pour toutes les cellules. C'est donc
+  la plus contraignante qui l'impose. Avec de la diffusion, ce sont les cellules de coin :
+  sur une face de bord, `d` est la distance du centre au *milieu de la face*
+  (`finish_geometry`), soit deux fois moins qu'entre deux centres voisins — et un coin en
+  a deux.
+- **`Solver::new` en fait deux choses** : sans `--dt`, il prend `config.cfl * dt_max`
+  (`cfl = 0,4` par défaut, donc un cinquième de la limite de positivité) ; avec `--dt`,
+  il compare et refuse par `SolverError::Cfl` plutôt que de laisser diverger.
 
 ## Socle
 
@@ -40,7 +114,7 @@ reste en musique.
 ses faces pour accumuler *son* résidu. Personne n'écrit chez le voisin. La formulation
 duale, en *scatter* — boucler sur les faces et ajouter le flux aux deux cellules
 adjacentes — est plus naturelle à écrire et fait moitié moins de calculs. Elle devient
-aussi une course de données dès qu'on la parallélise : deux threads traitant deux faces
+aussi une collision de données dès qu'on la parallélise : deux threads traitant deux faces
 d'une même cellule s'écrasent mutuellement. En C ou en Fortran avec OpenMP, cette
 parallélisation se fait en une ligne, tourne, et donne un résultat faux de façon non
 reproductible. En Rust, elle ne compile pas. Nous y reviendrons à l'étape 9, ce qui
