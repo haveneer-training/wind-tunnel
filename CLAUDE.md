@@ -19,7 +19,7 @@ Which doc is which:
 | File | Audience / content |
 |---|---|
 | `docs/AVANCEMENT.md` | handoff doc — state, remaining work, conventions, rationale. The authority |
-| `README.md` | trainee entry point: what the project is, the `starter` → `goto` → `solve` loop |
+| `README.md` | trainee entry point: what the project is, the `start` → `goto` → `solve` loop |
 | `ETAPES.md` | the 11 steps + bonuses in one page, trainee-facing |
 | `docs/etapes/etape-NN.md` | one step's statement: mandatory core + optional extension |
 | `docs/BONUS-OPTIMISATION.md` | the allocation thread — measurements and the solutions to steps 7/8's "pour aller plus loin" |
@@ -41,7 +41,7 @@ xtask (drives the step-by-step exercise machinery, used from the repo root on th
 and from `travail/` by trainees; `cargo xtask` is an alias defined in `.cargo/config.toml`):
 
 ```shell
-cargo xtask starter [--force]   # generate travail/ (holes punched in, from the repo root)
+cargo xtask start [--force] [--dir <path>]   # generate travail/ (holes punched in, from the repo root)
 cargo xtask status              # which steps are done, from travail/
 cargo xtask goto <n>            # open step n (fills earlier steps' empty holes, sets default feature)
 cargo xtask solve <n>           # fill step n's holes for the trainee
@@ -55,7 +55,7 @@ va bien"):
 cargo test
 cargo clippy --all-targets --all-features -- -D warnings
 cargo fmt --all --check
-cargo xtask starter --force && cd travail && cargo test   # 4 red tests expected: step 0
+cargo xtask start --force && cd travail && cargo test   # 4 red tests expected: step 0
 cargo xtask goto 12 && cargo xtask solve 12                # ... and back to green
 
 scripts/check-steps.sh   # same round-trip, automated, step by step from 0 to LAST_STEP
@@ -178,7 +178,7 @@ Each training step is a Cargo feature (`step0` … `step12` currently, chained: 
 so `cargo test` in `travail/` only shows tests for steps already opened. `LAST_STEP` in
 `xtask/src/main.rs` must track the highest implemented step. In this corrigé, source blocks
 between `// SOLUTION-BEGIN` / `// SOLUTION-END` (preceded by a `// TODO-STEP:<n>` comment)
-mark what `xtask starter` turns into a `todo!()` in `travail/`; test files for step N are
+mark what `xtask start` turns into a `todo!()` in `travail/`; test files for step N are
 gated with `#[cfg(all(test, feature = "stepN"))]` or `#![cfg(feature = "stepN")]`.
 
 Conventions when adding a new step (full list in `docs/AVANCEMENT.md`):
@@ -206,7 +206,7 @@ Conventions when adding a new step (full list in `docs/AVANCEMENT.md`):
 5. Add `docs/etapes/etape-NN.md` — a short mandatory core, an optional extension.
 6. **Language convention**: identifiers and filenames in English; prose (comments, doc
    comments, error messages, exercise statements) in French. Test names are code → English.
-7. Regenerate and check: `cargo xtask starter --force && cd travail && cargo test`.
+7. Regenerate and check: `cargo xtask start --force && cd travail && cargo test`.
 
 `travail/` is gitignored and excluded from the workspace (`Cargo.toml` `[workspace] exclude`)
 — it's a full standalone project a trainee can `git init` themselves.

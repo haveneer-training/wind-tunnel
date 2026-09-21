@@ -179,7 +179,7 @@ version sûre est aussi la plus petite.
   de l'étape 5 est inchangé, déplacé tel quel dans `step_euler` ; `step_rk2` (le trou)
   alloue son prédicteur et son second résidu à chaque appel, comme `residual` alloue son
   tampon de gradients depuis l'étape 7 — même choix, même renvoi en extension
-- le dispositif de travail (`cargo xtask starter` puis `goto` / `solve` / `reset` /
+- le dispositif de travail (`cargo xtask start` puis `goto` / `solve` / `reset` /
   `status`) est en place et vérifié depuis un clone neuf, `LAST_STEP` à jour dans
   `xtask/src/main.rs`
 - **Étape 9** parallélise trois boucles en *gather* avec `rayon` : le calcul des débits
@@ -201,7 +201,7 @@ version sûre est aussi la plus petite.
   `stepN` déjà présentes (`#[cfg(feature = "step9")]` pour la version `rayon` — avec son
   trou — et `#[cfg(not(feature = "step9"))]` pour la version séquentielle d'avant,
   toujours complète, jamais un trou). Vérifié par un tour complet
-  `starter --force` → `goto 3/5/7/8/9/10` → `cargo run` à chaque étape intermédiaire.
+  `start --force` → `goto 3/5/7/8/9/10` → `cargo run` à chaque étape intermédiaire.
   Cette convention est ajoutée à la liste ci-dessous.
 - **Correction (2026-09-02, bis) : `residual` avait le même défaut envers l'étape 7.**
   Trouvé par `scripts/check-steps.sh` (nouveau, voir plus bas) : aux étapes 5 et 6,
@@ -213,7 +213,7 @@ version sûre est aussi la plus petite.
   `#[cfg(feature = "step9")]` (parallèle, inchangée). Les étapes 7, 9 et 10 sont
   aujourd'hui les cas connus (`residual` ; `face_flux`/`limited_gradients` ;
   `write_png`).
-- **`scripts/check-steps.sh`** rejoue `starter --force` puis `goto`/`solve` de 0 à
+- **`scripts/check-steps.sh`** rejoue `start --force` puis `goto`/`solve` de 0 à
   `LAST_STEP` dans l'ordre croissant, et échoue si `cargo run` panique sur une étape
   antérieure à celle en cours (avant `solve`) ou déjà résolue (après) — exactement la
   classe de bug ci-dessus. À relancer après toute étape qui touche du code déjà
@@ -436,7 +436,7 @@ l'étape en cours. Le scan se refait en régénérant `travail/` puis, pour chaq
    montre au stagiaire que les étapes déjà ouvertes.
 3. **Relever `LAST_STEP`** dans `xtask/src/main.rs`. Si l'étape ajoute un crate à part,
    l'ajouter aussi à la liste de copie de `make_starter` **et** à `SOURCE_DIRS` — sans
-   quoi `starter`/`goto`/`solve`/`reset`/`status` ne verront jamais ses trous (c'est ce
+   quoi `start`/`goto`/`solve`/`reset`/`status` ne verront jamais ses trous (c'est ce
    qu'a demandé `mpi/src` à l'étape 11).
 4. **Un énoncé** `docs/etapes/etape-NN.md`, avec un socle court et une extension
    facultative — l'écart de niveau dans le groupe va de 6 à 9 sur 17 au quiz d'entrée.
@@ -452,7 +452,7 @@ l'étape en cours. Le scan se refait en régénérant `travail/` puis, pour chaq
    `step{N+1} = ["stepN"]` dans `Cargo.toml` et y mettre `default = ["step{N+1}"]`,
    sans quoi les `not(feature = "step{N+1}")` du collatéral resteraient vrais dans le
    corrigé et y cacheraient de vrais avertissements.
-7. Régénérer et vérifier : `cargo xtask starter --force && cd travail && cargo test`.
+7. Régénérer et vérifier : `cargo xtask start --force && cd travail && cargo test`.
 
 ## Décisions à ne pas défaire
 
@@ -606,7 +606,7 @@ cargo run --release -- domains/tunnel.dom --refine 4 --bands 9 --max-steps 960
 # prouve que les `cfg_attr` conditionnels n'y cachent rien
 for n in $(seq 0 13); do cargo check --no-default-features --features "step$n" --all-targets; done
 
-cargo xtask starter --force                  # régénère travail/
+cargo xtask start --force                    # régénère travail/
 cd travail && cargo test                     # 4 tests rouges : étape 0
 cargo xtask goto 12 && cargo xtask solve 12  # ... et tout doit redevenir vert
 

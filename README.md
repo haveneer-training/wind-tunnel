@@ -24,7 +24,7 @@ dossier de travail : les passages à écrire y deviennent des `todo!()`, tout le
 fourni.
 
 ```shell
-cargo xtask starter    # crée travail/ (30 trous à combler)
+cargo xtask start      # crée travail/ (30 trous à combler)
 cd travail
 cargo test             # quatre tests rouges : l'étape 0 vous attend
 ```

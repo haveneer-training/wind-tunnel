@@ -4,7 +4,7 @@
 //! travail, où les passages à écrire sont remplacés par des `todo!()` :
 //!
 //! ```shell
-//! cargo xtask starter                 # crée travail/
+//! cargo xtask start                   # crée travail/
 //! cd travail
 //! ```
 //!
@@ -22,8 +22,9 @@
 //! ```
 //!
 //! Deux garde-fous, parce que ces commandes sont lancées par quelqu'un qui découvre le
-//! projet : `goto` ne remplit que les trous **restés vides**, et `starter` refuse
-//! d'écraser un dossier de travail existant sans `--force`.
+//! projet : `goto` ne remplit que les trous **restés vides**, et `start` refuse
+//! d'écraser un dossier de travail existant sans `--force`. `start` écrit dans
+//! `travail/` par défaut ; `--dir <chemin>` en choisit un autre.
 
 use std::collections::BTreeMap;
 use std::fs;
@@ -70,25 +71,20 @@ struct Block {
     end: usize,
 }
 
-// Analyse d'argv à la main, volontairement : `xtask` a quatre sous-commandes à un seul
-// argument positionnel chacune, pas d'options à combiner — une dépendance comme `clap`
-// (utilisée dans `src/app.rs` pour la ligne de commande, bien plus riche, des deux
-// binaires) n'y apporterait rien. `xtask` reste sans dépendance.
+// Analyse d'argv à la main, volontairement : `xtask` a cinq sous-commandes, chacune
+// avec au plus un argument positionnel et un ou deux drapeaux (`--force`, `--dir`), pas
+// d'options à combiner — une dépendance comme `clap` (utilisée dans `src/app.rs` pour la
+// ligne de commande, bien plus riche, des deux binaires) n'y apporterait rien. `xtask`
+// reste sans dépendance.
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
     let command = args.first().map(String::as_str).unwrap_or("help");
     let root = repository_root();
 
     let result = match command {
-        "starter" => {
+        "start" => {
             let force = args.iter().any(|a| a == "--force");
-            let out = args
-                .iter()
-                .skip(1)
-                .find(|a| !a.starts_with("--"))
-                .map(PathBuf::from)
-                .unwrap_or_else(|| root.join(WORKDIR));
-            make_starter(&root, &out, force)
+            starter_dir(&args, &root).and_then(|out| make_starter(&root, &out, force))
         }
         "status" => status(&root),
         "goto" => parse_step(args.get(1)).and_then(|n| goto(&root, n)),
@@ -110,15 +106,27 @@ fn usage() -> String {
     format!(
         "Outillage du fil rouge « soufflerie numérique »\n\
          \n\
-           cargo xtask status        où en est le projet, étape par étape\n\
-           cargo xtask goto <n>      passer à l'étape n (0 à {LAST_STEP})\n\
-           cargo xtask solve <n>     remplir les trous de l'étape n\n\
-           cargo xtask reset <n>     rouvrir les trous de l'étape n\n\
-           cargo xtask starter       créer le dossier de travail (par défaut : {WORKDIR}/)\n\
+           cargo xtask status                où en est le projet, étape par étape\n\
+           cargo xtask goto <n>               passer à l'étape n (0 à {LAST_STEP})\n\
+           cargo xtask solve <n>              remplir les trous de l'étape n\n\
+           cargo xtask reset <n>              rouvrir les trous de l'étape n\n\
+           cargo xtask start [--dir <p>]      créer le dossier de travail \
+(par défaut : {WORKDIR}/)\n\
          \n\
          Les quatre premières commandes s'utilisent depuis le dossier de travail,\n\
-         `starter` depuis le dépôt du corrigé.\n"
+         `start` depuis le dépôt du corrigé.\n"
     )
+}
+
+/// Dossier de travail visé par `start` : `--dir <chemin>`, ou `{WORKDIR}/` par défaut.
+fn starter_dir(args: &[String], root: &Path) -> Result<PathBuf, String> {
+    match args.iter().position(|a| a == "--dir") {
+        Some(i) => args
+            .get(i + 1)
+            .map(PathBuf::from)
+            .ok_or_else(|| "--dir attend une valeur".to_string()),
+        None => Ok(root.join(WORKDIR)),
+    }
 }
 
 fn parse_step(arg: Option<&String>) -> Result<u8, String> {
@@ -490,7 +498,7 @@ fn status(root: &Path) -> Result<(), String> {
 
     if corrected {
         println!("Ce dépôt est le corrigé : il n'y a rien à compléter.");
-        println!("Engendrez le dépôt de travail avec `cargo xtask starter`.");
+        println!("Engendrez le dépôt de travail avec `cargo xtask start`.");
         return Ok(());
     }
 
@@ -525,7 +533,7 @@ fn make_starter(root: &Path, out: &Path, force: bool) -> Result<(), String> {
     if !is_reference {
         return Err(format!(
             "ce dépôt ne contient aucun bloc de référence : c'est déjà un dossier de \
-             travail.\nLancez `cargo xtask starter` depuis le dépôt du corrigé, ou \
+             travail.\nLancez `cargo xtask start` depuis le dépôt du corrigé, ou \
              `cargo xtask status` pour voir où vous en êtes."
         ));
     }

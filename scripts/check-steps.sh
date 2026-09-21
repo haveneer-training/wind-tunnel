@@ -40,8 +40,8 @@ cleanup() {
 trap cleanup EXIT
 
 echo "==> étapes 0 à ${last_step}"
-echo "==> cargo xtask starter --force"
-cargo xtask starter --force >/dev/null
+echo "==> cargo xtask start --force"
+cargo xtask start --force >/dev/null
 cd "$root/travail"
 
 echo "==> état initial : 4 tests rouges attendus (étape 0)"

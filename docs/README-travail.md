@@ -13,7 +13,7 @@ d'un obstacle, écriture des résultats en VTK et en PNG.
 
 Le squelette est là, les tests aussi. Ce qui manque, ce sont **30 `todo!()`**, répartis
 sur treize étapes (0 à 12). Le code complet, lui, se trouve dans le répertoire parent, celui d'où
-vous avez lancé `cargo xtask starter` : consultez-le quand vous voulez, mais essayez
+vous avez lancé `cargo xtask start` : consultez-le quand vous voulez, mais essayez
 d'abord.
 
 Tout ce qui suit se passe **dans ce dossier-ci**.
