@@ -32,6 +32,73 @@ c ← c + dt/2 · (k1 + k2)
 Deux résidus par pas au lieu d'un : le coût double, en échange d'un ordre en temps qui
 passe de 1 à 2.
 
+<details>
+<summary>D'où viennent les noms <code>k1</code> et <code>k2</code> — le tableau de Butcher</summary>
+
+Les trois quantités du calcul ci-dessus ne sont pas de même espèce, et c'est ce que les
+noms cachent :
+
+| nom | ce que c'est | unité |
+|---|---|---|
+| `k1` | `résidu(c)` — la **pente** au début du pas | champ / seconde |
+| `prédicteur` | `c + dt·k1` — un **état**, l'estimation d'Euler de l'arrivée | comme `c` |
+| `k2` | `résidu(prédicteur)` — la **pente** estimée en fin de pas | champ / seconde |
+
+`prédicteur` dit ce que la chose *est* ; `k1` et `k2` disent seulement *où ils tombent
+dans le tableau de Butcher*. Rien dans le type ne les distingue — les trois sont des
+`Field`.
+
+Le tableau de Butcher (John C. Butcher, 1963) est la notation compacte qui décrit
+n'importe quelle méthode de Runge-Kutta. Pour `y' = f(t, y)`, une méthode explicite à `s`
+étages s'écrit :
+
+```text
+k_i     = f(t_n + c_i·h,  y_n + h·Σ_{j<i} a_ij·k_j)
+y_{n+1} = y_n + h·Σ_i b_i·k_i
+```
+
+Trois jeux de coefficients : `c` (quand on évalue), `A` (avec quel mélange des pentes
+déjà connues), `b` (comment on les recombine). On les range ainsi :
+
+```text
+c │ A
+──┼───
+  │ b
+```
+
+Les trois méthodes les plus courantes :
+
+```text
+Euler              Heun (Rk2)              RK4 classique
+
+0 │                0   │                   0   │
+──┼───             1   │ 1                 1/2 │ 1/2
+  │ 1              ────┼─────────          1/2 │ 0    1/2
+                       │ 1/2  1/2          1   │ 0    0    1
+                                           ────┼───────────────────
+                                               │ 1/6  1/3  1/3  1/6
+```
+
+Heun se relit alors ligne à ligne sur le calcul de `step_rk2` :
+
+| tableau | code |
+|---|---|
+| `c₁ = 0`, ligne vide → `k₁ = f(y_n)` | `k1 = résidu(c)` |
+| `c₂ = 1`, `a₂₁ = 1` → évaluer en `y_n + h·k₁` | `prédicteur = c + dt·k1` |
+| `k₂ = f(…)` | `k2 = résidu(prédicteur)` |
+| `b = (1/2, 1/2)` | `c ← c + dt/2 · (k1 + k2)` |
+
+Deux remarques :
+
+- **La colonne `c` est inerte ici.** L'écoulement est stationnaire, le résidu ne dépend
+  pas explicitement du temps — c'est pourquoi `Solver::residual(c, out)` n'a pas
+  d'argument temps. Les `c_i` ne serviraient que pour un terme source variable en temps.
+- **Le nombre d'étages est le nombre d'évaluations du résidu par pas** : Euler 1, Heun 2,
+  RK4 4. C'est tout le coût de la méthode, et en MPI (étape 11) c'est aussi le nombre
+  d'échanges de halo par pas de temps.
+
+</details>
+
 ## Socle
 
 | Fonction | Fichier | Ce qu'elle doit faire |
