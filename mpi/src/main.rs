@@ -18,7 +18,7 @@ use std::process::ExitCode;
 use mpi::topology::SimpleCommunicator;
 use mpi::traits::*;
 
-use wind_tunnel::app::{self, USAGE};
+use wind_tunnel::app;
 use wind_tunnel::decomposition::{owned_mass, owned_min_max, Bands, Layout, HALO};
 use wind_tunnel::field::Field;
 use wind_tunnel::flux::FluxScheme;
@@ -114,9 +114,9 @@ fn run() -> Result<(), Box<dyn Error>> {
     let parts = world.size() as usize;
     let root = rank == 0;
 
-    let Some(args) = app::parse_args().map_err(|e| format!("{e}\n\n{USAGE}"))? else {
+    let Some(args) = app::parse_args()? else {
         if root {
-            print!("{USAGE}");
+            print!("{}", app::help_text());
         }
         return Ok(());
     };

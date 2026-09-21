@@ -7,6 +7,8 @@
 
 use std::path::PathBuf;
 
+use clap::Parser;
+
 use crate::field::Field;
 use crate::flux::{Centered, FluxScheme, Muscl, Upwind};
 use crate::geom::{Point, Vec2};
@@ -17,101 +19,107 @@ use crate::solver::{Bc, Config, TimeScheme};
 use crate::stream::{ComputedStream, StreamOptions};
 use crate::velocity::{PotentialCylinder, StreamSource, Uniform, VelocityField};
 
-/// Aide en ligne, commune aux deux exécutables.
-pub const USAGE: &str = "\
-Soufflerie numérique
-
-  wind-tunnel <masque.dom> [options]
-
-Maillage
-  --refine <k>         subdivise chaque case en k×k    (défaut : 1 ; le seul moyen
-                       d'augmenter la résolution, le masque fixant le nombre de cases)
-  --cell-size <m>      côté d'une cellule              (défaut : 1 ; change la taille
-                       physique du domaine, pas le nombre de cellules)
-
-Écoulement porteur
-  --flow <nom>         analytic | computed             (défaut : analytic ; « computed »
-                       résout ∇²ψ = 0 sur le maillage — étape 12 — et respecte alors la
-                       forme dessinée et les parois)
-  --speed <m/s>        vitesse à l'infini              (défaut : 1)
-  --angle <deg>        incline l'écoulement uniforme   (défaut : 0 ; sans obstacle et
-                       sans --flow computed uniquement)
-  --circulation <m2/s> circulation autour du cylindre  (défaut : 0 ; analytique seul)
-  --stream-tol <r>     résidu visé, --flow computed    (défaut : 1e-6)
-  --stream-iters <n>   balayages au plus, idem         (défaut : 200000)
-
-Transport du traceur
-  --bands <n>          nombre de bandes de fumée       (défaut : 4)
-  --scheme <nom>       upwind | centered | muscl       (défaut : upwind)
-  --time-scheme <nom>  euler | rk2                     (défaut : euler)
-  --diffusivity <m2/s> diffusivité du traceur          (défaut : 0)
-  --dt <s>             pas de temps imposé             (défaut : déduit de la CFL)
-
-Durée du calcul — il s'arrête au premier plafond atteint
-  --max-steps <n>      plafond en pas de temps         (défaut : 600, sauf si
-                       --max-time est donné — auquel cas il n'y a pas de plafond en pas)
-  --max-time <s>       plafond en temps simulé         (défaut : aucun ; c'est la durée,
-                       pas le nombre de pas, qui se compare d'un calcul à l'autre — le
-                       pas de temps vient de la CFL et dépend de l'écoulement)
-
-Sorties
-  --out <dir>          répertoire de sortie            (défaut : out ; ouvrir le
-                       frames.vtk.series qui s'y trouve, pas les frame_*.vtk)
-  --every <n>          période de sortie, en pas       (défaut : 10)
-  --every-dt <s>       période de sortie, en secondes  (défaut : aucune ; remplace
-                       --every et donne aux images des dates comparables d'un calcul
-                       à l'autre)
-  --width <px>         largeur des images PNG          (défaut : 900)
-
-Divers
-  -h, --help           cette aide
-
-Sous MPI (wind-tunnel-mpi) : --flow computed et --every-dt sont indisponibles — aucun
-rang ne détient le maillage complet, et la boucle en temps y est distincte.
-";
-
+// Décrites une seule fois, ici, via les attributs `clap` : nom de l'option, valeur par
+// défaut et texte d'aide vivent côte à côte sur le champ qu'ils concernent, plutôt que
+// dupliqués entre une structure et un désassemblage d'argv écrit à la main. `--help`,
+// les valeurs par défaut affichées et les erreurs sur une valeur invalide (`--refine
+// abc`, une option manquante, une option inconnue) en découlent tous, gratuitement.
 /// Les options de la ligne de commande, une fois analysées.
-#[derive(Clone, Debug)]
+#[derive(Parser, Clone, Debug)]
+#[command(
+    name = "wind-tunnel",
+    about = "Soufflerie numérique",
+    long_about = None,
+    after_help = "Sous MPI (wind-tunnel-mpi) : --flow computed et --every-dt sont \
+                  indisponibles — aucun rang ne détient le maillage complet, et la \
+                  boucle en temps y est distincte."
+)]
 pub struct Args {
     /// Fichier de masque du domaine.
     pub mask: PathBuf,
-    /// Répertoire où écrire les images et les fichiers VTK.
+
+    /// Répertoire de sortie ; ouvrir le frames.vtk.series qui s'y trouve, pas les
+    /// frame_*.vtk.
+    #[arg(long, default_value = "out", help_heading = "Sorties")]
     pub out: PathBuf,
-    /// Plafond en pas de temps ; `None` tant que l'option n'est pas donnée.
+
+    /// Plafond en pas de temps (défaut : 600, sauf si --max-time est donné — auquel cas
+    /// il n'y a pas de plafond en pas).
+    #[arg(long, help_heading = "Durée du calcul")]
     pub max_steps: Option<usize>,
+
     /// Période de sortie, en pas de temps.
+    #[arg(long, default_value_t = 10, help_heading = "Sorties")]
     pub every: usize,
-    /// Largeur des images produites, en pixels.
+
+    /// Largeur des images PNG, en pixels.
+    #[arg(long, default_value_t = 900, help_heading = "Sorties")]
     pub width: u32,
-    /// Côté d'une cellule du masque, avant raffinement.
+
+    /// Côté d'une cellule, en m, avant raffinement ; change la taille physique du
+    /// domaine, pas le nombre de cellules.
+    #[arg(long = "cell-size", default_value_t = 1.0, help_heading = "Maillage")]
     pub h: f64,
-    /// Facteur de subdivision de chaque case du masque.
+
+    /// Subdivise chaque case du masque en k×k ; seul moyen d'augmenter la résolution, le
+    /// masque fixant le nombre de cases.
+    #[arg(long, default_value_t = 1, help_heading = "Maillage")]
     pub refine: usize,
+
     /// Nombre de bandes de fumée du rideau initial.
+    #[arg(long, default_value_t = 4, help_heading = "Transport du traceur")]
     pub bands: usize,
-    /// Vitesse de l'écoulement à l'infini.
+
+    /// Vitesse de l'écoulement à l'infini, en m/s.
+    #[arg(long, default_value_t = 1.0, help_heading = "Écoulement porteur")]
     pub speed: f64,
-    /// Inclinaison de l'écoulement uniforme, en degrés.
+
+    /// Inclinaison de l'écoulement uniforme, en degrés ; sans obstacle et sans --flow
+    /// computed uniquement.
+    #[arg(long, default_value_t = 0.0, help_heading = "Écoulement porteur")]
     pub angle: f64,
-    /// Circulation autour du cylindre.
+
+    /// Circulation autour du cylindre, en m²/s ; écoulement analytique seul.
+    #[arg(long, default_value_t = 0.0, help_heading = "Écoulement porteur")]
     pub circulation: f64,
-    /// Diffusivité du traceur.
+
+    /// Diffusivité du traceur, en m²/s.
+    #[arg(long, default_value_t = 0.0, help_heading = "Transport du traceur")]
     pub diffusivity: f64,
-    /// Pas de temps imposé ; déduit de la CFL s'il est absent.
+
+    /// Pas de temps imposé, en s ; déduit de la CFL si absent.
+    #[arg(long, help_heading = "Transport du traceur")]
     pub dt: Option<f64>,
-    /// Nom du schéma de flux.
+
+    /// Schéma de flux : upwind, centered ou muscl.
+    #[arg(long, default_value = "upwind", help_heading = "Transport du traceur")]
     pub scheme: String,
-    /// Nom du schéma en temps.
+
+    /// Schéma en temps : euler ou rk2.
+    #[arg(long, default_value = "euler", help_heading = "Transport du traceur")]
     pub time_scheme: String,
-    /// Nom de l'écoulement porteur : `analytic` ou `computed`.
+
+    /// Écoulement porteur : analytic ou computed (« computed » résout ∇²ψ = 0 sur le
+    /// maillage — étape 12 — et respecte alors la forme dessinée et les parois).
+    #[arg(long, default_value = "analytic", help_heading = "Écoulement porteur")]
     pub flow: String,
-    /// Résidu visé par la résolution de la fonction de courant.
+
+    /// Résidu visé par la résolution de la fonction de courant (--flow computed).
+    #[arg(long, default_value_t = 1e-6, help_heading = "Écoulement porteur")]
     pub stream_tol: f64,
-    /// Nombre maximal de balayages de la résolution de la fonction de courant.
+
+    /// Nombre maximal de balayages de la résolution de la fonction de courant, idem.
+    #[arg(long, default_value_t = 200_000, help_heading = "Écoulement porteur")]
     pub stream_iters: usize,
-    /// Période de sortie en temps physique ; remplace `every` si elle est donnée.
+
+    /// Période de sortie en temps physique, en s ; remplace --every si elle est donnée,
+    /// et donne aux images des dates comparables d'un calcul à l'autre.
+    #[arg(long, help_heading = "Sorties")]
     pub every_dt: Option<f64>,
-    /// Durée simulée, en secondes ; remplace `steps` si elle est donnée.
+
+    /// Durée simulée, en s ; remplace le plafond en pas si elle est donnée — c'est la
+    /// durée, pas le nombre de pas, qui se compare d'un calcul à l'autre.
+    #[arg(long, help_heading = "Durée du calcul")]
     pub max_time: Option<f64>,
 }
 
@@ -157,77 +165,30 @@ impl Args {
     }
 }
 
+/// Aide en ligne, commune aux deux exécutables — le rendu `clap` de [`Args`].
+pub fn help_text() -> String {
+    <Args as clap::CommandFactory>::command()
+        .render_long_help()
+        .to_string()
+}
+
 /// Analyse les arguments du processus ; `Ok(None)` signifie « afficher l'aide ».
 pub fn parse_args() -> Result<Option<Args>, String> {
     parse_from(std::env::args().skip(1))
 }
 
 /// Analyse une suite d'arguments quelconque — c'est ce que teste la suite de tests.
+///
+/// `argv` ne porte pas le nom du programme (comme `std::env::args().skip(1)`) : `clap`
+/// en attend un en tête de son entrée, `parse_args` le lui fournit donc ici plutôt que
+/// d'imposer aux appelants de le fabriquer eux-mêmes.
 pub fn parse_from(argv: impl IntoIterator<Item = String>) -> Result<Option<Args>, String> {
-    let mut args = Args::default();
-    let mut argv = argv.into_iter();
-    let mut mask_seen = false;
-
-    while let Some(arg) = argv.next() {
-        let mut value = || {
-            argv.next()
-                .ok_or_else(|| format!("l'option {arg} attend une valeur"))
-        };
-        match arg.as_str() {
-            "-h" | "--help" => return Ok(None),
-            "--out" => args.out = PathBuf::from(value()?),
-            "--max-steps" => {
-                args.max_steps = Some(value()?.parse().map_err(|e| format!("--max-steps : {e}"))?)
-            }
-            "--every" => args.every = value()?.parse().map_err(|e| format!("--every : {e}"))?,
-            "--width" => args.width = value()?.parse().map_err(|e| format!("--width : {e}"))?,
-            "--cell-size" => args.h = value()?.parse().map_err(|e| format!("--cell-size : {e}"))?,
-            "--refine" => args.refine = value()?.parse().map_err(|e| format!("--refine : {e}"))?,
-            "--bands" => args.bands = value()?.parse().map_err(|e| format!("--bands : {e}"))?,
-            "--speed" => args.speed = value()?.parse().map_err(|e| format!("--speed : {e}"))?,
-            "--angle" => args.angle = value()?.parse().map_err(|e| format!("--angle : {e}"))?,
-            "--circulation" => {
-                args.circulation = value()?
-                    .parse()
-                    .map_err(|e| format!("--circulation : {e}"))?
-            }
-            "--diffusivity" => {
-                args.diffusivity = value()?
-                    .parse()
-                    .map_err(|e| format!("--diffusivity : {e}"))?
-            }
-            "--dt" => args.dt = Some(value()?.parse().map_err(|e| format!("--dt : {e}"))?),
-            "--scheme" => args.scheme = value()?,
-            "--time-scheme" => args.time_scheme = value()?,
-            "--flow" => args.flow = value()?,
-            "--stream-tol" => {
-                args.stream_tol = value()?
-                    .parse()
-                    .map_err(|e| format!("--stream-tol : {e}"))?
-            }
-            "--stream-iters" => {
-                args.stream_iters = value()?
-                    .parse()
-                    .map_err(|e| format!("--stream-iters : {e}"))?
-            }
-            "--every-dt" => {
-                args.every_dt = Some(value()?.parse().map_err(|e| format!("--every-dt : {e}"))?)
-            }
-            "--max-time" => {
-                args.max_time = Some(value()?.parse().map_err(|e| format!("--max-time : {e}"))?)
-            }
-            other if other.starts_with('-') => return Err(format!("option inconnue : {other}")),
-            other => {
-                args.mask = PathBuf::from(other);
-                mask_seen = true;
-            }
-        }
+    let argv = std::iter::once("wind-tunnel".to_string()).chain(argv);
+    match Args::try_parse_from(argv) {
+        Ok(args) => Ok(Some(args)),
+        Err(e) if e.kind() == clap::error::ErrorKind::DisplayHelp => Ok(None),
+        Err(e) => Err(e.to_string()),
     }
-
-    if !mask_seen {
-        return Err("il manque le fichier de masque".to_string());
-    }
-    Ok(Some(args))
 }
 
 /// Centre et rayon équivalents de l'obstacle dessiné dans le masque, s'il y en a un.
