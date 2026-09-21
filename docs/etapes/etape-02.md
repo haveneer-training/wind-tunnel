@@ -90,5 +90,25 @@ le cache.
 - `cargo test` vérifie une identité géométrique : la somme des normales
   orientées d'une cellule, pondérées par les longueurs, est nulle. Pourquoi est-ce vrai
   pour *tout* polygone fermé ?
+
+  <details>
+  <summary>Réponse</summary>
+
+  Soit un polygone fermé de sommets `v_0, …, v_{n-1}` (et `v_n = v_0`). L'arête `i` porte
+  le vecteur `e_i = v_{i+1} - v_i`. La normale sortante pondérée par la longueur de cette
+  arête est `e_i` tourné de 90°.
+
+  La somme des arêtes d'un polygone fermé est toujours nulle : `Σ e_i = Σ (v_{i+1} - v_i)`
+  télescope, chaque sommet apparaissant une fois `+` et une fois `-`, jusqu'à revenir à
+  `v_0`. Reste `v_n - v_0 = 0`.
+
+  La rotation de 90° est une application linéaire, donc elle commute avec la somme :
+  `Σ rot(e_i) = rot(Σ e_i) = rot(0) = 0`.
+
+  Le résultat ne dépend ni de la forme du polygone, ni de sa convexité — seulement du fait
+  qu'il est fermé. C'est la même identité qui, à l'étape 12, garantit que le flux net à
+  travers une cellule fermée telescope à zéro.
+
+  </details>
 - Combien de triangles produit `domains/tunnel.dom` ? Changez le rayon du cylindre et
   observez.

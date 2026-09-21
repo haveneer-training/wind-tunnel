@@ -432,6 +432,7 @@ impl Mesh {
         // TODO-STEP:2 (pour aller plus loin) Remplir `cell_face_offsets` et
         // `cell_face_indices` au format CSR : compter, cumuler, puis remplir avec un
         // curseur par cellule
+        // HINT: c'est beaucoup de machinerie en "bonus"; n'hésitez pas à le passer
         // SOLUTION-BEGIN
         let mut counts = vec![0u32; self.cells.len() + 1];
         for face in &self.faces {
@@ -528,9 +529,12 @@ fn vertex_id(
 fn build_faces(cells: &[Cell], vertices: &[Point]) -> Result<Vec<Face>, MeshError> {
     // TODO-STEP:2 Apparier les arêtes : première rencontre ⇒ nouvelle face de bord
     // provisoire, construite par `boundary_face` ; seconde rencontre ⇒ la face devient
-    // interne (`Side::Inner`) ; troisième ⇒ `NonManifoldEdge`. La clé d'une arête est
-    // la paire de sommets triée, pour que les deux cellules adjacentes tombent bien sur
-    // la même entrée du `HashMap`.
+    // interne (`Side::Inner`) ; troisième ⇒ `NonManifoldEdge`.
+    // La clé d'une arête est la paire de sommets triée, pour que les deux cellules adjacentes
+    // tombent bien sur la même entrée du `HashMap`.
+    // HINT: * n'oubliez pas de définir une relation d'équivalence sur les arêtes (vu des deux côtés)
+    //       * commencez par ajouter des "boundary_face" qui évolue au fil des cellules appairées
+    //       * vous pouvez utiliser un tableau annexe "face_seen" pour accélérer l'appariement
     // SOLUTION-BEGIN
     let mut faces: Vec<Face> = Vec::new();
     let mut seen: HashMap<(u32, u32), FaceId> = HashMap::new();

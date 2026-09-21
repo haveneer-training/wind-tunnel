@@ -8,20 +8,17 @@
 > des types n'est pas donnée d'avance.
 
 Partout ailleurs dans le fil rouge, les types sont donnés et vous en remplissez les
-fonctions. C'est un choix : il fait tenir le projet en trois jours, mais il escamote la
-moitié du métier. Concevoir une structure de données — décider ce qui est un type, ce qui
+fonctions. Concevoir une structure de données — décider ce qui est un type, ce qui
 est une valeur, ce qui ne doit pas pouvoir s'écrire — est ce qui distingue le plus
-nettement Rust du C, et c'est précisément ce qu'on ne peut pas apprendre en complétant un
-corps de fonction.
+nettement Rust du C.
 
 Cet exercice inverse donc la consigne : **le fichier est vide, et tout est à écrire.**
 
 ## Pourquoi un crate à part
 
-Parce que la forme d'un type est un contrat. Dès que le solveur, les sorties et vingt
-tests sont écrits contre `Side`, on ne peut plus vous demander de l'inventer : la
-moindre différence casserait la compilation de tout le projet, et le seul « exercice »
-possible serait de retrouver la réponse à la lettre.
+Parce que la forme d'un type ou d'une interface est un contrat. La machinerie du 
+fil-rouge impose que le code compile à chaque étape et l'absence d'un type casserait
+la compilation vous donnant peu de matière pour vous guider. 
 
 `design/` ne dépend de rien et rien ne dépend de lui. Il est membre du workspace mais pas
 du groupe par défaut — exactement comme `mpi/` — si bien que `cargo test` à la racine ne
@@ -30,7 +27,9 @@ gêner le fil rouge, et vous pouvez y écrire ce que vous voulez.
 
 ## Le sujet
 
-Une miniature de `src/mesh.rs` : dire qui se trouve de chaque côté d'une face.
+On vous demande ici de concevoir un type `Side` qui représente les deux côtés d'une face. 
+C'est une reproduction miniature de `src/mesh.rs` que vous retrouvez dans le projet principale.
+Ce type doit respecter un contrat imposé par des tests (à la TDD).
 
 Le domaine est fait de **cellules**, séparées par des **faces**. Une face est portée par
 deux **sommets**. Elle a toujours une cellule d'un côté ; de l'autre, il y a soit une
@@ -38,15 +37,15 @@ seconde cellule, soit une frontière du domaine — une paroi, une entrée, une 
 
 Écrivez les types qui décrivent cela, avec le contrat suivant :
 
-| Nom | Ce que c'est |
-|---|---|
-| `CellId`, `VertexId` | deux identifiants **distincts**, chacun autour d'un `u32`, comparables, copiables, affichables en mise au point, utilisables comme clé de `HashMap`, et sachant rendre leur `index() -> usize` |
-| `BoundaryKind` | la nature d'une frontière : `Wall`, `Inlet`, `Outlet` |
-| `Side` | ce qu'il y a de l'autre côté d'une face : une cellule, **ou** une frontière |
-| `Face` | ses deux sommets `a` et `b`, sa cellule `left`, et son `right` |
-| `Face::is_boundary` | la face est-elle sur une frontière ? |
-| `Face::neighbour(from)` | la cellule de l'autre côté, vue depuis `from` — et rien si `from` n'est pas une cellule de cette face, ou si la face est au bord |
-| `neighbours(faces, cell)` | les voisines d'une cellule, dans l'ordre des faces |
+| Nom                       | Ce que c'est                                                                                                                                                                                   |
+|---------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `CellId`, `VertexId`      | deux identifiants **distincts**, chacun autour d'un `u32`, comparables, copiables, affichables en mise au point, utilisables comme clé de `HashMap`, et sachant rendre leur `index() -> usize` |
+| `BoundaryKind`            | la nature d'une frontière : `Wall`, `Inlet`, `Outlet`                                                                                                                                          |
+| `Side`                    | ce qu'il y a de l'autre côté d'une face : une cellule, **ou** une frontière                                                                                                                    |
+| `Face`                    | ses deux sommets `a` et `b`, sa cellule `left`, et son `right`                                                                                                                                 |
+| `Face::is_boundary`       | la face est-elle sur une frontière ?                                                                                                                                                           |
+| `Face::neighbour(from)`   | la cellule de l'autre côté, vue depuis `from` — et rien si `from` n'est pas une cellule de cette face, ou si la face est au bord                                                               |
+| `neighbours(faces, cell)` | les voisines d'une cellule, dans l'ordre des faces                                                                                                                                             |
 
 Les tests de `design/tests/connectivity.rs` sont donnés et fixent ces noms. Ils ne
 compilent pas tant qu'il manque une définition : la première erreur les nomme toutes d'un
