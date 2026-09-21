@@ -44,18 +44,44 @@ Trois propriétés en découlent, et ce sont les trois dont le projet se sert :
   c'est elle qui répartit le débit entre le dessus et le dessous. Elle ne se déduit d'aucun
   calcul local, et l'étape 12 devra la choisir.
 
-**La convention de signe n'est pas arbitraire, elle se démontre.** Les sommets d'une
-cellule sont rangés dans le sens direct (`CellKind`), et la normale d'une face `a → b` est
-`(b − a)` tournée d'un quart de tour horaire (`Vec2::perp_cw`), donc sortante. Avec
-`d = b − a`, il vient `n · longueur = (d_y, −d_x)`, et le débit sortant vaut
+**La convention de signe n'est pas arbitraire.** Reprenons les notations du maillage. Une
+face porte une arête `a → b` d'une cellule ; posons `d = b − a`. Sa longueur est
+`L = ‖d‖` (`Face::length`) et sa normale **unitaire** est `n` (`Face::normal`). Les
+sommets d'une cellule étant rangés dans le sens direct (`CellKind`), cette normale est `d`
+tournée d'un quart de tour horaire puis normalisée (`Vec2::perp_cw`), donc sortante :
 
 ```text
-u · n L = u_x d_y − u_y d_x = (∂ψ/∂y) d_y + (∂ψ/∂x) d_x = dψ = ψ(b) − ψ(a)
+n = perp_cw(d) / L        d'où      n L = perp_cw(d) = (d_y, −d_x)
 ```
 
-Inversez la rotation et tout l'écoulement s'inverse — de façon parfaitement conservative,
-donc silencieuse. C'est le genre d'erreur qu'on n'attrape que par un test qui compare deux
-formulations du même objet : c'est ce que fait `stream_function_matches_the_velocity`.
+Le débit sortant de la face — une vitesse fois une longueur, des m²/s, l'unité de `ψ` —
+est le flux de `u` à travers elle, `u · n L` :
+
+```text
+u · n L = u_x d_y − u_y d_x             (car n L = (d_y, −d_x))
+        = (∂ψ/∂y) d_y + (∂ψ/∂x) d_x     (car u = (∂ψ/∂y, −∂ψ/∂x))
+        = ∇ψ · d = ψ(b) − ψ(a)
+```
+
+La dernière égalité est exacte dès que `ψ` varie linéairement le long de l'arête. Et c'est
+de toute façon `ψ(b) − ψ(a)` que le solveur calcule : `compute_face_flux` ne fait qu'une
+soustraction de `ψ` aux deux sommets, la vitesse n'apparaît nulle part.
+
+Sur les deux écoulements de cette étape, la vérification est à la main :
+
+- **`Uniform`** — avec `ψ(p) = u_x p_y − u_y p_x`, la différence `ψ(b) − ψ(a)` vaut
+  `u_x d_y − u_y d_x`, soit exactement `u · n L`. Cas concret : une face verticale
+  `d = (0, h)` traversée par `u = (U, 0)` donne un débit `U h > 0` — positif, donc
+  sortant vers la droite, ce qu'on attend. Prenez `ψ` de signe opposé et tous les débits
+  s'inversent.
+- **`PotentialCylinder`** — sur la paroi `r = R`, `ψ` est constante, donc
+  `ψ(b) − ψ(a) = 0` sur toute arête qui la suit : aucun débit ne traverse l'obstacle.
+  C'est la même propriété que le « `u · n = 0` sur la paroi » que vérifie
+  `flow_slips_along_the_cylinder_wall`, vue depuis `ψ` au lieu de `u`.
+
+Inversez la rotation — un quart de tour trigonométrique au lieu d'horaire — et tout
+l'écoulement s'inverse, de façon parfaitement conservative, donc silencieuse (mais le test 
+`stream_function_matches_the_velocity` veille).
 
 ## Socle
 

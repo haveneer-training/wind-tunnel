@@ -128,11 +128,16 @@ pub struct PotentialCylinder {
 }
 
 impl VelocityField for PotentialCylinder {
-    /// Les formules du commentaire ci-dessus, transcrites telles quelles.
+    /// Les deux formules du commentaire de la structure, transcrites telles quelles —
+    /// à une protection près, qui ne vient pas de l'algèbre mais de l'arithmétique
+    /// flottante.
     ///
-    /// Le seul point qui ne se lit pas dans l'algèbre est le garde-fou : `r⁴` au
-    /// dénominateur ne pardonne pas au voisinage du centre. Les cellules y sont solides,
-    /// donc jamais évaluées par le calcul — mais un test, lui, peut y passer.
+    /// Les dénominateurs `r²` et `r⁴` s'annulent au centre du cylindre : la formule y
+    /// donne `0/0`, donc `NaN`, et un `NaN` contamine ensuite tout ce qu'il touche sans
+    /// jamais déclencher d'erreur. Le solveur n'évalue jamais le champ là — les cellules
+    /// au centre de l'obstacle sont solides, donc absentes du maillage — mais un test,
+    /// lui, peut y passer. D'où le premier `if` : sous `r < 10⁻⁶ R`, on est à l'intérieur
+    /// du solide et on renvoie une vitesse nulle.
     fn at(&self, p: Point) -> Vec2 {
         let d = p - self.center;
         let r2 = d.dot(d);
@@ -147,8 +152,25 @@ impl VelocityField for PotentialCylinder {
         )
     }
 
+    /// La fonction de courant du même écoulement :
+    ///
+    /// ```text
+    /// ψ = U y (1 − R²/r²) − (Γ/2π) ln(r/R)
+    /// ```
+    ///
+    /// Dériver cette expression redonne bien les deux formules de [`Self::at`] via
+    /// `u = (∂ψ/∂y, −∂ψ/∂x)` ; le test `stream_function_matches_the_velocity` le
+    /// vérifie par différences finies.
+    ///
+    /// Deux lectures utiles. Sur la paroi `r = R`, les deux termes s'annulent — `1 − R²/R²`
+    /// et `ln 1` — donc `ψ = 0` quelle que soit la circulation : le cylindre est une ligne
+    /// de courant, et aucun débit ne le traverse. Et c'est le terme en `ln r` qui, avec
+    /// `Γ ≠ 0`, rend `ψ` dissymétrique entre le dessus et le dessous de l'obstacle.
+    ///
+    /// Même protection que [`Self::at`] près du centre, où le `ln r` diverge : la valeur
+    /// renvoyée y est `0`, c'est-à-dire celle de la paroi — tout l'intérieur du solide est
+    /// à la même ligne de courant.
     fn stream(&self, p: Point) -> f64 {
-        // ψ = U y (1 − R²/r²) − (Γ/2π) ln(r/R)
         let d = p - self.center;
         let r2 = d.dot(d);
         if r2 < 1e-12 * self.radius * self.radius {

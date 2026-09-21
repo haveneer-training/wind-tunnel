@@ -63,10 +63,10 @@ impl Halo {
         pack_into(c, &layout.send_left, &mut self.to_left);
         pack_into(c, &layout.send_right, &mut self.to_right);
 
-        // Les emprunts sont pris ici, une bonne fois : la fermeture ci-dessous emprunte
-        // `from_left`/`from_right` en écriture et `to_left`/`to_right` en lecture, ce
-        // que le compilateur n'accepte pas à travers `self` (deux emprunts de `self`,
-        // dont un mutable). Déstructurer les champs lève l'ambiguïté sans rien copier.
+        // Les emprunts sont pris ici en une fois : la fermeture ci-dessous emprunte
+        // `from_left`/`from_right` en écriture et `to_left`/`to_right` en lecture.
+        // Avec du Rust ≥ 2021, l'emprunt partiel de champs de self fonctionne
+        // et les intermédiaires ne sont pas indispensables.
         let (to_left, to_right) = (&self.to_left, &self.to_right);
         let (from_left, from_right) = (&mut self.from_left, &mut self.from_right);
 

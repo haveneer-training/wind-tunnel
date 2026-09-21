@@ -6,12 +6,13 @@
 
 Les étapes 9 et 10 ont fait travailler plusieurs cœurs sur **une seule** mémoire :
 `par_iter()` et `thread::scope` supposent tous les deux que n'importe quel thread peut
-lire n'importe quelle cellule. Au-delà d'une machine, cette hypothèse tombe. Plusieurs
-processus, chacun sa mémoire, chacun sa part du domaine, et rien de commun sauf ce qu'ils
-s'envoient : c'est MPI, et c'est ainsi que tournent les codes de calcul sur cluster.
+lire n'importe quelle cellule. Au-delà d'une machine, il faut passer par le réseau,
+avec pour chaque noeud, sa mémoire, sa part du domaine, et rien de commun sauf ce qu'ils
+s'envoient : c'est MPI, et c'est ainsi que tournent les codes de calcul sur cluster. (une variante plus `std::net` est
+possible mais moins commune dans le monde du calcul numérique)
 
-Le point important n'est pas l'API de MPI — trois fonctions suffisent ici. C'est que
-**personne ne détient le domaine complet**. Un rang qui maillerait toute la soufflerie
+Le point important n'est pas l'API de MPI — trois fonctions suffisent ici. C'est que **personne ne détient le domaine
+complet**. Un rang qui maillerait toute la soufflerie
 pour n'en calculer qu'un morceau n'aurait rien décomposé du tout : il aurait juste
 gaspillé de la mémoire et gagné le droit de faire dix fois le même travail.
 
@@ -36,8 +37,8 @@ ce que le rang 1 construit vraiment :
        ^^^ fantômes       ^^^ fantômes
 ```
 
-Les colonnes en trop de chaque côté sont les **cellules fantômes** : le rang les maille
-et les calcule comme les autres, mais leur valeur ne lui appartient pas. Avant chaque
+De chaque côté du domaine de calcul se trouvent des **cellules fantômes** : chaque rang les maille
+et les calcule comme les autres, mais leurs valeurs associées ne lui appartiennent pas. Avant chaque
 évaluation de résidu, il la redemande à son voisin — c'est l'*échange de halo*, la seule
 communication du calcul.
 
@@ -56,8 +57,8 @@ chacun poste d'abord un envoi **bloquant**, chacun attend que l'autre reçoive, 
 calcul s'arrête là. Sur des petits messages cela passe — l'implémentation les met dans un
 tampon et rend la main — puis un jour le maillage grossit, le message dépasse le seuil de
 bufferisation, et le code se fige sans rien dire. Postez les réceptions d'abord, avec des
-primitives **immédiates** (`immediate_receive_into`, `immediate_send`), et attendez tout
-le monde d'un coup avec `wait_all`.
+primitives **immédiates** (`immediate_receive_into` *aka* `MPI_Irecv`, `immediate_send` *aka* `MPI_Isend`),
+et attendez tout le monde d'un coup avec `wait_all` *aka* `MPI_Waitall`.
 
 ## Prérequis
 
@@ -80,13 +81,13 @@ cargo build --release -p wind-tunnel-mpi
 
 ## Socle
 
-| Bloc | Fichier | Ce qu'il doit devenir |
-|---|---|---|
-| `Bands::owned` | `src/decomposition.rs` | la répartition des colonnes en bandes aussi égales que possible, le reste sur les premières |
-| `Layout::new` | `src/decomposition.rs` | le tri des cellules de la bande : possédées, à envoyer à gauche/droite, à recevoir de gauche/droite |
-| `Halo::exchange` | `mpi/src/exchange.rs` | `pack_into`, réceptions immédiates puis envois immédiats dans un `multiple_scope`, `wait_all`, `unpack` |
-| `global_dt_max` | `mpi/src/exchange.rs` | `all_reduce_into` avec `SystemOperation::min()` |
-| `time_loop` | `mpi/src/main.rs` | la boucle en temps du pilote : un `halo.exchange` avant **chaque** `residual` |
+| Bloc             | Fichier                | Ce qu'il doit devenir                                                                                   |
+|------------------|------------------------|---------------------------------------------------------------------------------------------------------|
+| `Bands::owned`   | `src/decomposition.rs` | la répartition des colonnes en bandes aussi égales que possible, le reste sur les premières             |
+| `Layout::new`    | `src/decomposition.rs` | le tri des cellules de la bande : possédées, à envoyer à gauche/droite, à recevoir de gauche/droite     |
+| `Halo::exchange` | `mpi/src/exchange.rs`  | `pack_into`, réceptions immédiates puis envois immédiats dans un `multiple_scope`, `wait_all`, `unpack` |
+| `global_dt_max`  | `mpi/src/exchange.rs`  | `all_reduce_into` avec `SystemOperation::min()`                                                         |
+| `time_loop`      | `mpi/src/main.rs`      | la boucle en temps du pilote : un `halo.exchange` avant **chaque** `residual`                           |
 
 Les quatre tampons d'un échange — deux à envoyer, deux à recevoir — vivent dans une
 structure `Halo` créée une fois par rang, et non dans `exchange` : leur taille ne dépend

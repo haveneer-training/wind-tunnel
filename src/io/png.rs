@@ -93,7 +93,7 @@ pub fn write_png(
     let to_pixel = |p: Point| ((p.x - xmin) * scale, (ymax - p.y) * scale);
 
     // TODO-STEP:10 Toutes les cellules dessinent dans la même image : une écriture
-    // recouverte, pas disjointe comme à l'étape 9. Répartissez `mesh.cells()` en
+    // concurrente, pas indépendante comme à l'étape 9. Répartissez `mesh.cells()` en
     // tranches, un `std::thread::scope` avec un thread par tranche (il peut emprunter
     // `mesh`/`field`/`image`, pas d'`Arc`), un `Mutex<RgbImage>` verrouillé juste pour
     // recopier les pixels déjà calculés, et un `mpsc::channel` cloné par thread pour
