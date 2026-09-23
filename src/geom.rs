@@ -148,10 +148,7 @@ impl Neg for Vec2 {
 /// Itère sur les arêtes `(sommet, sommet suivant)` d'un polygone fermé.
 #[cfg_attr(not(feature = "step1"), allow(dead_code))] // collatéral du trou étape 0
 fn edges(points: &[Point]) -> impl Iterator<Item = (&Point, &Point)> {
-    points
-        .iter()
-        .zip(points.iter().cycle().skip(1))
-        .take(points.len())
+    points.iter().zip(points.iter().cycle().skip(1))
 }
 
 /// Aire signée d'un polygone simple (formule du lacet).
