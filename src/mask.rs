@@ -197,13 +197,24 @@ impl Mask {
         self.fluid.iter().filter(|&&f| f).count()
     }
 
+    /// Vérifie que le fluide est d'un seul tenant — version provisoire.
+    ///
+    /// Deux définitions, selon la convention du dispositif d'étapes : celle-ci ne vérifie
+    /// rien et vaut jusqu'à l'étape 1, qui n'a pas encore vu `Result`. L'étape 2 la
+    /// remplace par la version à trou, juste en dessous.
+    #[cfg(not(feature = "step2"))]
+    fn check_connected(&self) -> Result<(), MeshError> {
+        Ok(())
+    }
+
     /// Vérifie que le fluide est d'un seul tenant.
     ///
     /// On compte les composantes : chaque cellule fluide qu'aucun parcours n'a encore
-    /// atteinte en démarre un nouveau (en largeur, voir `explore`). Plus d'une, et le
-    /// domaine est coupé — leur nombre va dans le message d'erreur.
+    /// atteinte en démarre un nouveau (voir `explore`). Plus d'une, et le domaine est
+    /// coupé — leur nombre va dans le message d'erreur.
+    #[cfg(feature = "step2")]
     fn check_connected(&self) -> Result<(), MeshError> {
-        // TODO-STEP:1 Compter les composantes : chaque cellule fluide encore non visitée
+        // TODO-STEP:2 Compter les composantes : chaque cellule fluide encore non visitée
         // démarre une exploration ; renvoyer `Disconnected` si le compte dépasse un.
         // HINT : `seen` vaut `vec![false; self.fluid.len()]`, puis :
         //     composantes = 0
@@ -227,17 +238,17 @@ impl Mask {
     }
 
     /// Indices des voisines fluides à quatre connexités.
-    #[cfg_attr(not(feature = "step2"), allow(dead_code))] // appelée depuis l'exploration
+    #[cfg_attr(not(feature = "step3"), allow(dead_code))] // appelée depuis l'exploration
     fn fluid_neighbours(&self, k: usize) -> Vec<usize> {
-        // TODO-STEP:1 Convertir l'indice à plat en ligne/colonne et collecter les
+        // TODO-STEP:2 Convertir l'indice à plat en ligne/colonne et collecter les
         // voisines fluides situées dans la grille, sans diagonales.
         // HINT : piège — `row - 1` sur un `usize` nul panique (débordement). Le plus simple :
         // tester avant de soustraire, voisine par voisine, dans un `Vec` que l'on remplit :
         //     si row > 0 et is_fluid(row - 1, col) → pousser (row - 1)·cols + col
         //     si is_fluid(row + 1, col)            → pousser (row + 1)·cols + col
         //     (idem à gauche avec col > 0, et à droite)
-        // `is_fluid` répond déjà `false` au-delà du bord bas ou droit. Variante (J2, avec
-        // `Option`) : `row.checked_sub(1)` rend `None` au lieu de paniquer, et
+        // `is_fluid` répond déjà `false` au-delà du bord bas ou droit. Variante, avec
+        // `Option` : `row.checked_sub(1)` rend `None` au lieu de paniquer, et
         // `filter_map(|(r, c)| Some((r?, c?)))` écarte les candidats hors grille.
         // SOLUTION-BEGIN
         let (row, col) = (k / self.cols, k % self.cols);
@@ -256,9 +267,9 @@ impl Mask {
     }
 
     /// Marque et explore toute la composante contenant `start`.
-    #[cfg_attr(not(feature = "step2"), allow(dead_code))] // appelée depuis check_connected
+    #[cfg_attr(not(feature = "step3"), allow(dead_code))] // appelée depuis check_connected
     fn explore(&self, start: usize, seen: &mut [bool]) {
-        // TODO-STEP:1 Parcourir la composante avec une file ; marquer chaque cellule
+        // TODO-STEP:2 Parcourir la composante avec une file ; marquer chaque cellule
         // avant de l'ajouter afin qu'elle ne soit mise en file qu'une seule fois.
         // HINT : un simple `Vec` sert de pile — `vec![start]`, `push`, `pop` :
         //     marquer start ; pile = [start]
@@ -427,6 +438,7 @@ mod tests {
         assert!(!m.is_obstacle(0, 0));
     }
 
+    #[cfg(feature = "step2")]
     #[test]
     fn fluid_neighbours_are_four_connected_and_stay_in_bounds() {
         let m = Mask {
@@ -438,6 +450,7 @@ mod tests {
         assert!(m.fluid_neighbours(3).is_empty());
     }
 
+    #[cfg(feature = "step2")]
     #[test]
     fn explore_marks_only_the_starting_component() {
         let m = Mask {

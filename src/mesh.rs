@@ -420,6 +420,30 @@ impl Mesh {
         }
     }
 
+    /// Construit la connectivité cellule → faces — version provisoire.
+    ///
+    /// Deux définitions, selon la convention du dispositif d'étapes : celle-ci, complète,
+    /// vaut jusqu'à l'étape 5. Elle remplit d'abord un `Vec` par cellule, puis les met
+    /// bout à bout : simple, mais une allocation par cellule. L'étape 6 la remplace par la
+    /// version à trou, juste en dessous, qui obtient le même résultat sans aucun `Vec`
+    /// intermédiaire.
+    #[cfg(not(feature = "step6"))]
+    fn build_cell_faces(&mut self) {
+        let mut lists: Vec<Vec<FaceId>> = vec![Vec::new(); self.cells.len()];
+        for (i, face) in self.faces.iter().enumerate() {
+            lists[face.left.index()].push(FaceId(i as u32));
+            if let Side::Inner(right) = face.right {
+                lists[right.index()].push(FaceId(i as u32));
+            }
+        }
+        let mut offsets = vec![0];
+        for list in &lists {
+            offsets.push(offsets[offsets.len() - 1] + list.len() as u32);
+        }
+        self.cell_face_offsets = offsets;
+        self.cell_face_indices = lists.concat();
+    }
+
     /// Construit la connectivité cellule → faces au format CSR.
     ///
     /// Deux tableaux plats plutôt qu'un `Vec` par cellule : `cell_face_offsets[i]` dit
@@ -427,9 +451,9 @@ impl Mesh {
     /// d'abord les faces de chaque cellule, on cumule les compteurs en décalages, puis
     /// on remplit en avançant un curseur par cellule. Une face interne compte pour ses
     /// **deux** cellules.
-    #[cfg_attr(not(feature = "step2"), allow(unused_variables))] // trou étape 2
+    #[cfg(feature = "step6")]
     fn build_cell_faces(&mut self) {
-        // TODO-STEP:2 (pour aller plus loin) Compter les faces, calculer les offsets
+        // TODO-STEP:6 Compter les faces, calculer les offsets
         // cumulés, puis remplir les indices de faces par cellule.
         // HINT : enchaîner `face_counts`, `offsets_from_counts`, `fill_cell_faces`, puis ranger
         // les deux tableaux dans `self.cell_face_offsets` et `self.cell_face_indices`.
@@ -444,9 +468,9 @@ impl Mesh {
 }
 
 /// Compte les faces incidents de chaque cellule, avec une case initiale pour les offsets.
-#[cfg_attr(not(feature = "step3"), allow(dead_code))] // appelée depuis le trou CSR
+#[cfg_attr(not(feature = "step7"), allow(dead_code))] // appelée depuis le trou CSR
 fn face_counts(cell_count: usize, faces: &[Face]) -> Vec<u32> {
-    // TODO-STEP:2 Compter chaque face pour sa cellule gauche et, si elle est interne,
+    // TODO-STEP:6 Compter chaque face pour sa cellule gauche et, si elle est interne,
     // aussi pour sa cellule droite.
     // HINT : `vec![0; cell_count + 1]`, et compter la cellule `i` dans la case `i + 1` : la
     // case 0 reste nulle, et la somme préfixe donnera directement les débuts de liste.
@@ -464,9 +488,9 @@ fn face_counts(cell_count: usize, faces: &[Face]) -> Vec<u32> {
 }
 
 /// Transforme les comptes en offsets CSR par somme préfixe.
-#[cfg_attr(not(feature = "step3"), allow(dead_code))] // appelée depuis le trou CSR
+#[cfg_attr(not(feature = "step7"), allow(dead_code))] // appelée depuis le trou CSR
 fn offsets_from_counts(counts: &[u32]) -> Vec<u32> {
-    // TODO-STEP:2 Construire les sommes préfixes : chaque offset indique le début
+    // TODO-STEP:6 Construire les sommes préfixes : chaque offset indique le début
     // de la liste de la cellule correspondante.
     // HINT : `counts` commence par un 0 (voir `face_counts`) : copier (`to_vec`), puis
     // `offsets[i] += offsets[i - 1]` pour i de 1 à la fin. Le dernier offset est le total.
@@ -480,9 +504,9 @@ fn offsets_from_counts(counts: &[u32]) -> Vec<u32> {
 }
 
 /// Remplit les indices CSR en avançant un curseur par cellule.
-#[cfg_attr(not(feature = "step3"), allow(dead_code))] // appelée depuis le trou CSR
+#[cfg_attr(not(feature = "step7"), allow(dead_code))] // appelée depuis le trou CSR
 fn fill_cell_faces(faces: &[Face], offsets: &[u32]) -> Vec<FaceId> {
-    // TODO-STEP:2 Parcourir les faces et écrire leur identifiant dans les tranches
+    // TODO-STEP:6 Parcourir les faces et écrire leur identifiant dans les tranches
     // de leurs cellules, en avançant un curseur distinct par cellule.
     // HINT : curseurs = `offsets[..offsets.len() - 1].to_vec()` (une copie, qu'on avance) ;
     // résultat = `vec![FaceId(0); total]` ; `place_face` pour `face.left`, et pour la droite
@@ -502,9 +526,9 @@ fn fill_cell_faces(faces: &[Face], offsets: &[u32]) -> Vec<FaceId> {
 }
 
 /// Insère une face dans la tranche CSR d'une cellule et avance son curseur.
-#[cfg_attr(not(feature = "step3"), allow(dead_code))] // appelée depuis fill_cell_faces
+#[cfg_attr(not(feature = "step7"), allow(dead_code))] // appelée depuis fill_cell_faces
 fn place_face(cell: CellId, face: FaceId, cursor: &mut [u32], indices: &mut [FaceId]) {
-    // TODO-STEP:2 Écrire l'identifiant dans le prochain emplacement de la cellule,
+    // TODO-STEP:6 Écrire l'identifiant dans le prochain emplacement de la cellule,
     // puis avancer son curseur.
     // SOLUTION-BEGIN
     let slot = cursor[cell.index()] as usize;
@@ -688,17 +712,20 @@ mod tests {
         assert_eq!(edge_key(VertexId(8), VertexId(3)), (3, 8));
     }
 
+    #[cfg(feature = "step6")]
     #[test]
     fn face_counts_include_both_cells_of_an_inner_face() {
         let m = mesh_of("..\n");
         assert_eq!(face_counts(m.n_cells(), m.faces()), [0, 4, 4]);
     }
 
+    #[cfg(feature = "step6")]
     #[test]
     fn offsets_are_prefix_sums_of_face_counts() {
         assert_eq!(offsets_from_counts(&[0, 4, 4]), [0, 4, 8]);
     }
 
+    #[cfg(feature = "step6")]
     #[test]
     fn place_face_advances_only_the_selected_cell_cursor() {
         let mut cursor = [0, 1];
@@ -708,6 +735,7 @@ mod tests {
         assert_eq!(indices, [FaceId(0), FaceId(7)]);
     }
 
+    #[cfg(feature = "step6")]
     #[test]
     fn fill_cell_faces_places_each_face_in_its_incident_cells() {
         let m = mesh_of("..\n");

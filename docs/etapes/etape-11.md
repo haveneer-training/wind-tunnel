@@ -91,7 +91,7 @@ cargo build --release -p wind-tunnel-mpi
 | `transfer`       | `mpi/src/exchange.rs`  | réceptions immédiates puis envois dans `multiple_scope`, et `wait_all`                                 |
 | `unpack_all`     | `mpi/src/exchange.rs`  | recopier les tampons reçus dans les cellules fantômes                                                   |
 | `global_dt_max`  | `mpi/src/exchange.rs`  | `all_reduce_into` avec `SystemOperation::min()`                                                         |
-| `time_loop`      | `mpi/src/main.rs`      | appeler `advance_step`, puis déclencher le rapport périodique                                           |
+| `time_loop`      | `mpi/src/main.rs`      | appeler la fermeture `advance` (qui enveloppe `advance_step`), puis déclencher le rapport périodique    |
 
 Le corps d'`advance_step` est fourni : il expose les échanges avant chaque résidu et le
 cas RK2 sans mélanger cette mécanique à la boucle à écrire. `Layout::empty` initialise

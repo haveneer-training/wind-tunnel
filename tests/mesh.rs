@@ -66,7 +66,6 @@ fn each_edge_is_seen_once_or_twice() {
 
 #[test]
 fn oriented_normals_sum_to_zero() {
-    // NB: Lié à Mesh::build_cell_faces qui est en bonus
     // identité géométrique : ∮ n dl = 0 sur tout contour fermé
     let (_, mesh) = tunnel();
     for i in 0..mesh.n_cells() {
@@ -82,7 +81,6 @@ fn oriented_normals_sum_to_zero() {
 
 #[test]
 fn connectivity_is_symmetric() {
-    // NB: Lié à Mesh::build_cell_faces qui est en bonus
     // si j'ai une face avec un voisin, ce voisin a la même face dans sa propre liste
     let (_, mesh) = tunnel();
     for i in 0..mesh.n_cells() {

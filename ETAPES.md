@@ -113,11 +113,11 @@ laquelle domine à chaque étape.
 |---|---|---|---|---|---|
 | [0](docs/etapes/etape-00.md) | Géométrie de base | J1 | 20 min | types, fonctions, `Vec`, itérateurs | `derive`, doc-tests |
 | [1](docs/etapes/etape-01.md) | Le masque du domaine | J1 | 35 min | indexation, `Vec`, boucles, `&self -> Mask` | propriété, déplacement, emprunts |
-| [2](docs/etapes/etape-02.md) | Maillage et connectivité | J2 | 45 min | `match` exhaustif, `HashMap`, clé canonique, `enum` `Side`, CSR | indices typés, pointeurs vs indices |
+| [2](docs/etapes/etape-02.md) | Maillage et connectivité | J2 | 45 min | premier `Err`, parcours de composantes, `match` exhaustif, `HashMap`, clé canonique, `enum` `Side` | indices typés, pointeurs vs indices |
 | [3](docs/etapes/etape-03.md) | Écrire les résultats, et les erreurs | J2 | 25 min | `match` sur caractère, helper typé, `Option`, `Err(...)`, `write!`/`?`, `From`, `Error::source` | `enum` d'erreurs, chaîne des causes |
 | [4](docs/etapes/etape-04.md) | L'écoulement porteur | J2 | 20 min | `impl Trait for`, implémentation couvrante, `?Sized` | `Sync`, un trait comme besoin |
 | [5](docs/etapes/etape-05.md) | Le solveur | J2 | 45 min | itérateurs, `Option`, `&`/`&mut` | *gather* vs *scatter*, CFL vérifiée avant |
-| [6](docs/etapes/etape-06.md) | Qualité : conservation, ordre, `clippy` | J2 | 30 min | `fold` à accumulateur | tests de propriété, `clippy`, `cargo doc` |
+| [6](docs/etapes/etape-06.md) | Qualité : conservation, ordre, `clippy` | J2 | 45 min | accumulateurs, stockage CSR sans `Vec` par cellule | tests de propriété, `clippy`, `cargo doc` |
 | [7](docs/etapes/etape-07.md) | Passer à l'ordre 2 en espace | J2/J3 | 30 min | `match` sur `Option`, cas dégénéré | moindres carrés, limiteur, `dyn` vs générique |
 | [8](docs/etapes/etape-08.md) | RK2 : pourquoi l'ordre n'avait pas bougé | J3 | 20 min | tampons, `clone`, `zip` | `enum` de schéma, relecture critique d'un résultat |
 | [9](docs/etapes/etape-09.md) | Paralléliser avec `rayon` | J3 | 40 min | `par_iter`, fermetures, `Send`/`Sync`, écriture disjointe | ce que le compilateur refuse de paralléliser |

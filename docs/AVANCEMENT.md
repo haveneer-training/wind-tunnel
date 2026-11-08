@@ -533,11 +533,17 @@ Deux conséquences qui ont déjà coûté un aller-retour :
 Hors programme mais introduits en situation, chacun expliqué dans son énoncé :
 `?Sized` (étape 4), `thread::scope` et `mpsc` (étape 10), `&dyn Fn` (étape 12).
 
-Une exception assumée : l'extension de l'étape 1 (`Mask::check_connected`, J1) construit
-un `Err(MeshError::Disconnected { components })` alors que `Result` n'arrive qu'au J2.
-Elle reste acceptable parce qu'elle est **facultative**, que son travail réel est un
-parcours en largeur — de l'algorithmique — et que l'énoncé donne l'expression fautive
-telle quelle, à recopier. Ne pas élargir ce précédent.
+Il n'y a plus d'exception à la première règle : `Mask::check_connected`, qui construit un
+`Err(MeshError::Disconnected { components })`, était l'extension de l'étape 1 ; elle est
+passée au socle de l'étape 2 (J2, après `Option`/`Result`), avec ses deux fragments
+`fluid_neighbours` et `explore`. Jusque-là, une définition `#[cfg(not(feature =
+"step2"))]` en tient lieu, un bouchon qui renvoie `Ok(())`. Elle est sur le chemin de
+lecture du masque, comme `parse_row` : à l'étape 2, tant qu'elle n'est pas écrite, tous
+les tests de maillage paniquent sur sa ligne — l'énoncé dit donc de commencer par elle.
+Même traitement pour le CSR (`build_cell_faces` et ses quatre fragments), passé de
+l'extension de l'étape 2, où il cassait quinze tests sur quarante et un, au socle de
+l'étape 6 : avant, une version provisoire et complète (un `Vec` par cellule, mis bout à
+bout) en tient lieu ; l'exercice est de la réécrire sans allocation par cellule.
 
 **`design/` ne doit dépendre de rien, et rien ne doit en dépendre.** C'est la seule chose
 qui rend l'exercice de conception possible : dès qu'un autre fichier utiliserait ses

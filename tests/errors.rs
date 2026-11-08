@@ -51,7 +51,7 @@ fn a_fully_solid_domain() {
     ));
 }
 
-#[cfg(feature = "step1")]
+#[cfg(feature = "step2")]
 #[test]
 fn a_domain_split_in_two() {
     // une cloison qui traverse toute la veine : le calcul n'aurait aucun sens

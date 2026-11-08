@@ -1,6 +1,6 @@
 # Étape 2 — Maillage et connectivité
 
-**Fichier :** `src/mesh.rs` · **Vérification :** `cargo xtask goto 2` puis `cargo test` · **≈ 45 min**
+**Fichiers :** `src/mask.rs`, `src/mesh.rs` · **Vérification :** `cargo xtask goto 2` puis `cargo test` · **≈ 45 min**
 
 C'est le cœur de la structure de données. Une cellule ne connaîtra pas ses voisins par
 arithmétique d'indices, mais par ses faces : tout ce qui sera écrit au-dessus
@@ -14,9 +14,27 @@ fonctionnerait donc à l'identique sur un maillage lu depuis un fichier.
 
 ## Socle
 
-Le socle sépare trois objectifs : la forme d'une cellule, la clé canonique d'une arête,
-puis la création ou l'appariement d'une arête. L'extension ajoute le stockage CSR des
-faces par cellule en fragments distincts.
+Le socle sépare quatre objectifs : la connexité du masque, la forme d'une cellule, la clé
+canonique d'une arête, puis la création ou l'appariement d'une arête.
+
+**Commencez par `Mask::check_connected`** (`src/mask.rs`) : `Mask::parse` l'appelle, donc
+tant qu'elle vaut `todo!()`, aucun masque ne se lit et tous les tests de maillage
+paniquent sur la même ligne. Jusqu'ici c'était un bouchon qui répondait toujours `Ok(())`.
+L'exploration est divisée en deux fragments : `fluid_neighbours` donne les indices fluides
+à quatre connexités, puis `explore` marque une composante depuis une cellule de départ.
+`check_connected` lance ces explorations et compte les composantes ; un obstacle mal
+dessiné qui coupe la veine en deux doit produire `MeshError::Disconnected { components }`
+— votre premier `Err`. Le test `a_domain_split_in_two` de `tests/errors.rs` vous attend.
+
+Ensuite, essayez :
+
+```shell
+printf '...\n###\n...\n' > /tmp/coupe.dom
+cargo run --release -- /tmp/coupe.dom
+```
+
+et regardez ce que le programme répond. Comparez avec ce qu'un code C ferait d'un
+domaine coupé en deux qu'il n'a pas vérifié.
 
 **`cell_corners`** — les quatre coins d'une cellule, dans le sens direct, *sauf* quand
 deux parois perpendiculaires se rejoignent : le coin qu'elles encadrent disparaît et la
@@ -49,21 +67,6 @@ créée, distingue « elle attend encore son second voisin » de « elle en a d�
 il y en a trois ». Le cas fautif n'est pas un `if` ajouté après coup : il tombe de
 l'énumération des cas possibles.
 
-## Extension
-
-**`Mesh::build_cell_faces`** orchestre la connectivité inverse, cellule → faces, au format
-CSR décrit plus bas. `face_counts`, `offsets_from_counts`, `place_face` et
-`fill_cell_faces` isolent le comptage, la somme préfixe et l'insertion dans une tranche,
-un schéma qui revient partout en calcul :
-
-1. compter les faces de chaque cellule (une face interne compte pour ses **deux**
-   cellules) ;
-2. cumuler ces compteurs en décalages — `offsets[i]` dit où commencent les faces de la
-   cellule `i` ;
-3. remplir, en avançant un curseur par cellule.
-
-L'étape 12, si vous y allez, reprend exactement ce schéma pour le voisinage des sommets.
-
 ## Ce qu'il y a à remarquer
 
 **Des indices, pas des pointeurs.** La connectivité est faite de `CellId` et `FaceId`,
@@ -86,10 +89,9 @@ cellule, soit une condition aux limites — jamais ni l'un ni l'autre, jamais le
 L'énumération rend cet état incohérent inexprimable, et le `match` du solveur ne peut
 pas « oublier » le cas du bord : le compilateur exige qu'il soit traité.
 
-**Le stockage CSR.** `cell_face_offsets` et `cell_face_indices` encodent une liste de
-longueur variable par cellule dans deux tableaux plats, sans un `Vec` par cellule. C'est
-la structure qu'on retrouve partout en calcul : contiguë, sans indirection, aimable avec
-le cache.
+**La connectivité inverse est provisoire.** `Mesh::build_cell_faces` (cellule → faces)
+est fournie, dans une version simple : un `Vec` par cellule, mis bout à bout. L'étape 6
+la réécrit au format CSR, sans aucun `Vec` intermédiaire.
 
 ## Pour aller plus loin
 

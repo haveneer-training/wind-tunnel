@@ -60,20 +60,7 @@ que l'indice est valide — et nous mesurerons cela à l'étape 9.
 
 ## Pour aller plus loin
 
-**`Mask::check_connected`** est également à trous. L'exploration est divisée en deux
-fragments : `fluid_neighbours` donne les indices fluides à quatre connexités, puis
-`explore` marque une composante depuis une cellule de départ. `check_connected` lance ces
-explorations et compte les composantes ; un obstacle mal dessiné qui coupe la veine en
-deux doit produire `MeshError::Disconnected { components }`.
-
-Le test `a_domain_split_in_two` de `tests/errors.rs` vous attend.
-
-Ensuite, essayez :
-
-```shell
-printf '...\n###\n...\n' > /tmp/coupe.dom
-cargo run --release -- /tmp/coupe.dom
-```
-
-et regardez ce que le programme répond. Comparez avec ce qu'un code C ferait d'un
-domaine coupé en deux qu'il n'a pas vérifié.
+`Mask::parse` appelle déjà `check_connected`, qui vérifie que le fluide est d'un seul
+tenant. Pour l'instant c'est un bouchon qui répond toujours « oui » : construire une
+erreur demande `Result`, qui arrive au J2. Lisez sa signature — elle annonce ce que
+l'étape 2 lui fera faire.

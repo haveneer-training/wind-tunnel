@@ -79,7 +79,7 @@ distinction qui manque à beaucoup de codes.
 | 5 | `sweep` | recopier les valeurs fixées et calculer en parallèle les sommets libres dans un tampon distinct |
 | 6 | `jacobi` | appeler `sweep`, échanger les tampons, mesurer `residual_inf`, arrêter sous la tolérance ou renvoyer `NotConverged` |
 
-Le voisinage `adjacency` est donné : son CSR reprend le schéma déjà vu à l'étape 2.
+Le voisinage `adjacency` est donné : son CSR reprend le schéma déjà vu à l'étape 6.
 Les fragments isolent la valeur d'un groupe de bord, le calcul local d'une moyenne, le
 balayage parallèle et la boucle d'arrêt ; chaque contrat se teste séparément.
 
@@ -137,7 +137,7 @@ cargo run --release -- domains/square.dom --refine 2 --max-steps 200 --flow comp
   linéaire, elle s'obtient par superposition de deux résolutions — écrivez-la, et regardez la
   différence sur un obstacle placé hors de l'axe.
 - **Plusieurs obstacles** demandent une constante par corps, donc un étiquetage des
-  composantes connexes du masque (l'extension de l'étape 1, `Mask::check_connected`, en donne
+  composantes connexes du masque (`Mask::check_connected`, à l'étape 2, en donne
   la moitié). Avec une seule constante pour deux corps, que se passe-t-il ?
 - **Sous MPI**, l'exécutable de l'étape 11 refuse `--flow computed` : aucun rang ne détient le
   maillage complet. Faites-le marcher — c'est un gradient conjugué distribué, avec un échange

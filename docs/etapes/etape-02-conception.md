@@ -87,7 +87,7 @@ nécessairement la même forme. Regardez en particulier :
 - `Face` y porte davantage : normale, longueur, milieu, distance. Pourquoi ces
   quatre-là sont-ils rangés dans la face plutôt que recalculés à chaque usage ?
 - la connectivité inverse (cellule → faces) n'y est pas un `Vec<Vec<FaceId>>` mais deux
-  tableaux plats, le format CSR. C'est l'extension de l'étape 2.
+  tableaux plats, le format CSR. C'est l'objet de l'étape 6.
 - `Side::Boundary` y porte le même `BoundaryKind` que le vôtre, et le solveur en fait un
   `match` exhaustif : il ne *peut pas* oublier le cas du bord.
 

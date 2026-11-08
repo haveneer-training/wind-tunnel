@@ -13,7 +13,7 @@ DEFINITION = re.compile(r"^\s*(?:(?:pub(?:\([^)]*\))?)\s+)?(fn|struct|enum|trait
 
 
 def exercise_name(lines, marker):
-    for line in reversed(lines[max(0, marker - 30) : marker]):
+    for line in reversed(lines[max(0, marker - 60) : marker]):
         match = DEFINITION.match(line)
         if match:
             return f"{match.group(1)} `{match.group(2)}`"

@@ -1,6 +1,6 @@
 # Étape 6 — Qualité : conservation, ordre, clippy
 
-**Fichiers :** `src/field.rs` · **Vérification :** `cargo xtask goto 6`, `cargo test`, puis `cargo clippy --all-targets --all-features -- -D warnings` · **≈ 30 min**
+**Fichiers :** `src/field.rs`, `src/mesh.rs` · **Vérification :** `cargo xtask goto 6`, `cargo test`, puis `cargo clippy --all-targets --all-features -- -D warnings` · **≈ 45 min**
 
 Le code tourne depuis l'étape 5 et produit ses premières images. Cette étape ne lui ajoute
 rien : elle vérifie ce qu'il fait déjà, de deux façons différentes, et fait le ménage dans
@@ -36,10 +36,36 @@ mesure : c'est le trou de cette étape.
 | Fonction | Fichier | Ce qu'elle doit faire |
 |---|---|---|
 | `Field::mean_abs_error` | `field.rs` | écart moyen entre deux champs, pondéré par l'aire des cellules : `Σ |cᵢ − dᵢ| · |Ωᵢ| / Σ |Ωᵢ|` |
+| `face_counts` | `mesh.rs` | le nombre de faces de chaque cellule — une face interne compte pour ses **deux** cellules |
+| `offsets_from_counts` | `mesh.rs` | la somme préfixe des comptes : `offsets[i]` dit où commencent les faces de la cellule `i` |
+| `place_face` | `mesh.rs` | écrire une face dans le prochain emplacement d'une cellule, puis avancer son curseur |
+| `fill_cell_faces` | `mesh.rs` | remplir le tableau des faces, en avançant un curseur par cellule |
+| `Mesh::build_cell_faces` | `mesh.rs` | enchaîner les trois et ranger le résultat dans le maillage |
 
 Deux tests unitaires dans `field.rs` la vérifient directement. Une fois qu'elle est
 écrite, `cargo test` fait tourner `order_of_convergence_is_about_one`, qui calcule
 l'ordre observé entre les deux raffinements : `ln(e₁/e₂) / ln(2)`.
+
+## Le ménage dans la connectivité : le stockage CSR
+
+Depuis l'étape 2, `Mesh::build_cell_faces` (cellule → faces) est une version provisoire :
+un `Vec` par cellule, puis tous mis bout à bout. Elle est juste, mais elle fait une
+allocation par cellule — un million pour un million de cellules. Le résultat, lui, est
+déjà au format **CSR** : `cell_face_offsets` et `cell_face_indices` encodent une liste de
+longueur variable par cellule dans deux tableaux plats. C'est la structure qu'on retrouve
+partout en calcul : contiguë, sans indirection, aimable avec le cache.
+
+Il reste à l'obtenir **sans** `Vec` intermédiaire, en trois temps, un schéma qui revient
+partout lui aussi :
+
+1. compter les faces de chaque cellule ;
+2. cumuler ces compteurs en décalages ;
+3. remplir, en avançant un curseur par cellule.
+
+Les tests `oriented_normals_sum_to_zero` et `connectivity_is_symmetric` de
+`tests/mesh.rs` passaient déjà avec la version provisoire : ils doivent rester verts. C'est
+le principe d'une réécriture — le comportement ne change pas, seul le coût change.
+L'étape 12, si vous y allez, reprend exactement ce schéma pour le voisinage des sommets.
 
 ## Ce qu'il y a à remarquer
 
