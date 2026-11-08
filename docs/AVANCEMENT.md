@@ -36,8 +36,11 @@ le titre, et des listes vides pour ce que la soufflerie n'a pas (`SHORT_EXERCISE
 `SENTINEL_MANIFESTS` (`starter.rs`), qui vide la sentinelle de `mpi/Cargo.toml` dans le
 dossier stagiaire, d'où `rewrite_default` rendu public. `check-steps.sh` déduit la
 dernière étape de la sentinelle `step13` dans `Cargo.toml`. `update` apparie les trous
-par leur rang au sein de leur étape, comme sentinelle : un trou ajouté **avant** un autre
-de la même étape, dans le même fichier, décale la correspondance.
+par `(étape, portée, rang)` — la portée étant le chemin `mod`/`impl`/`trait`/`fn` qui
+contient le trou (`impl Mask::refine`), lu en suivant les accolades — et ce, dans les deux
+dépôts : un trou ajouté avant un autre, dans une autre fonction, ne décale plus rien.
+Renommer une fonction (ou réécrire l'en-tête de son `impl`) qui contient un trou rempli
+fait échouer `update` au lieu d'égarer la réponse.
 
 Le nombre d'exercices passe à **43 blocs**, dont le nouveau helper `edge_key` (2), le
 decodeur local `cell_of` (3), la rastérisation par tranche (10), le tri unitaire `place`
