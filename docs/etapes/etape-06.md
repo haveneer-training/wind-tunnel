@@ -28,7 +28,7 @@ nulle : la solution exacte de l'advection pure est alors sa propre translation,
 c_exact(x, y, T) = c₀(x − U·T, y)
 ```
 
-`tests/order.rs` construit ce cas à deux niveaux de raffinement du même domaine physique
+`tests/step6_order.rs` construit ce cas à deux niveaux de raffinement du même domaine physique
 (`Mask::refine`, comme `--refine` en CLI), roule chacun jusqu'à la même durée physique, et
 compare le champ numérique à sa translation exacte. L'écart entre les deux a besoin d'une
 mesure : c'est le trou de cette étape.
@@ -65,7 +65,7 @@ partout lui aussi :
 3. remplir, en avançant un curseur par cellule.
 
 Les tests `oriented_normals_sum_to_zero` et `connectivity_is_symmetric` de
-`tests/mesh.rs` passaient déjà avec la version provisoire : ils doivent rester verts. C'est
+`tests/step2_mesh.rs` passaient déjà avec la version provisoire : ils doivent rester verts. C'est
 le principe d'une réécriture — le comportement ne change pas, seul le coût change.
 L'étape 12, si vous y allez, reprend exactement ce schéma pour le voisinage des sommets.
 
@@ -100,6 +100,6 @@ quelqu'un qui n'a jamais vu le code.
   vérifiez que l'ordre observé entre 4→8 et celui entre 8→16 sont proches : c'est la
   signature d'un régime asymptotique, plutôt qu'une coïncidence sur une seule paire de
   points.
-- Changez `Upwind` en `Centered` dans `tests/order.rs` (schéma d'ordre 2, mais oscillant —
+- Changez `Upwind` en `Centered` dans `tests/step6_order.rs` (schéma d'ordre 2, mais oscillant —
   voir l'étape 5). L'ordre mesuré s'améliore-t-il vraiment ? Le champ reste-t-il seulement
   borné pendant la mesure ?

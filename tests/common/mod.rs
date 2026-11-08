@@ -1,19 +1,40 @@
-#![cfg(feature = "step6")]
+//! Aides partagées par les tests de plusieurs étapes.
 
-//! Vérifie l'ordre du schéma par solution manufacturée : un profil lisse, transporté à
-//! vitesse uniforme, a une solution exacte connue — sa propre translation. L'écart entre
-//! le champ numérique et cette translation doit décroître comme h¹ : c'est ce qu'on
-//! attend d'un schéma décentré amont couplé à un Euler explicite, tous deux d'ordre 1.
-//! (L'étape 7 relève l'ordre spatial à 2 ; l'ordre mesuré ici n'en bougera pourtant pas
-//! avant l'étape 8 — l'erreur en temps domine dès que `dt ∝ h`.)
+#![allow(dead_code)] // chaque binaire de test n'utilise qu'une partie de ces aides
+
+use std::path::PathBuf;
 
 use wind_tunnel::field::Field;
-use wind_tunnel::flux::{FluxScheme, Upwind};
+use wind_tunnel::flux::FluxScheme;
 use wind_tunnel::geom::{Point, Vec2};
 use wind_tunnel::mask::Mask;
 use wind_tunnel::mesh::Mesh;
 use wind_tunnel::solver::{Config, Solver, TimeScheme};
 use wind_tunnel::velocity::Uniform;
+
+/// Un fichier temporaire propre à ce processus : deux `cargo test` lancés en même temps
+/// sur la même machine n'écrivent pas dans le même fichier.
+pub fn temp_path(name: &str) -> PathBuf {
+    std::env::temp_dir().join(format!("wind-tunnel-{}-{name}", std::process::id()))
+}
+
+/// Un petit maillage avec un obstacle : 12 cellules au plus, de quoi relire un fichier.
+pub fn small_mesh() -> Mesh {
+    let mask = Mask::parse("....\n.##.\n....\n").expect("masque invalide");
+    Mesh::from_mask(&mask, 0.5).expect("maillage impossible")
+}
+
+/// Valeur qui suit un mot-clé dans l'en-tête VTK, par exemple `POINTS 42 double`.
+pub fn header_value(text: &str, keyword: &str) -> usize {
+    text.lines()
+        .find(|l| l.starts_with(keyword))
+        .unwrap_or_else(|| panic!("mot-clé {keyword} absent du fichier"))
+        .split_whitespace()
+        .nth(1)
+        .expect("valeur absente")
+        .parse()
+        .expect("valeur non entière")
+}
 
 const SPEED: f64 = 1.0;
 const SIGMA: f64 = 0.6;
@@ -29,7 +50,14 @@ fn bump(p: Point) -> f64 {
 /// Écart entre le champ transporté numériquement et sa translation exacte, à un facteur
 /// de raffinement donné du même domaine physique (voir [`Mask::refine`]), pour un
 /// schéma de flux et une intégration en temps donnés.
-fn advection_error(factor: usize, scheme: impl FluxScheme + Copy, time_scheme: TimeScheme) -> f64 {
+///
+/// C'est la solution manufacturée des étapes 6 et 8 : un profil lisse, transporté à
+/// vitesse uniforme, a une solution exacte connue — sa propre translation.
+pub fn advection_error(
+    factor: usize,
+    scheme: impl FluxScheme + Copy,
+    time_scheme: TimeScheme,
+) -> f64 {
     let base = Mask::parse(
         "............\n\
          ............\n\
@@ -74,29 +102,9 @@ fn advection_error(factor: usize, scheme: impl FluxScheme + Copy, time_scheme: T
     c.mean_abs_error(&exact, &mesh)
 }
 
-#[test]
-fn order_of_convergence_is_about_one() {
-    let e_coarse = advection_error(8, Upwind, TimeScheme::Euler);
-    let e_fine = advection_error(16, Upwind, TimeScheme::Euler);
-    let order = (e_coarse / e_fine).ln() / 2f64.ln();
-    assert!(
-        (order - 1.0).abs() < 0.3,
-        "ordre observé {order:.2} (attendu ≈ 1 : décentrement amont + Euler explicite, \
-         tous deux d'ordre 1)"
-    );
-}
-
-#[cfg(feature = "step8")]
-#[test]
-fn order_of_convergence_reaches_two_with_muscl_and_rk2() {
-    use wind_tunnel::flux::Muscl;
-
-    let e_coarse = advection_error(8, Muscl, TimeScheme::Rk2);
-    let e_fine = advection_error(16, Muscl, TimeScheme::Rk2);
-    let order = (e_coarse / e_fine).ln() / 2f64.ln();
-    assert!(
-        (order - 2.0).abs() < 0.4,
-        "ordre observé {order:.2} (attendu ≈ 2 : reconstruction MUSCL + RK2, tous deux \
-         d'ordre 2 — c'est ce qui résout l'énigme des étapes 6-7)"
-    );
+/// L'ordre observé entre deux raffinements d'un facteur 2.
+pub fn observed_order(scheme: impl FluxScheme + Copy, time_scheme: TimeScheme) -> f64 {
+    let e_coarse = advection_error(8, scheme, time_scheme);
+    let e_fine = advection_error(16, scheme, time_scheme);
+    (e_coarse / e_fine).ln() / 2f64.ln()
 }

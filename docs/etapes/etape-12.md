@@ -93,7 +93,7 @@ faisant rien — vérifiez-le sur le maillage.
 ## Ce qu'il y a à remarquer
 
 ```shell
-cargo test --test stream
+cargo test --test step12_stream
 cargo run --release -- domains/square.dom --refine 2 --max-steps 200                  # analytique
 cargo run --release -- domains/square.dom --refine 2 --max-steps 200 --flow computed  # calculé
 ```

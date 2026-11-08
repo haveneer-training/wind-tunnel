@@ -1,14 +1,16 @@
 #![cfg(feature = "step5")]
 
-//! Propriétés du transport, de bout en bout sur le domaine livré.
+//! Propriétés du transport, de bout en bout sur le domaine livré, et le refus d'un pas
+//! de temps instable.
 
+use wind_tunnel::error::SolverError;
 use wind_tunnel::field::Field;
 use wind_tunnel::flux::Upwind;
-use wind_tunnel::geom::Point;
+use wind_tunnel::geom::{Point, Vec2};
 use wind_tunnel::mask::Mask;
 use wind_tunnel::mesh::Mesh;
 use wind_tunnel::solver::{Config, Solver};
-use wind_tunnel::velocity::PotentialCylinder;
+use wind_tunnel::velocity::{PotentialCylinder, Uniform};
 
 const H: f64 = 0.5;
 
@@ -88,4 +90,25 @@ fn the_smoke_eventually_leaves() {
     let after = c.total_mass(&mesh);
     assert!(after < before, "masse {before} → {after}");
     assert!(after > 0.0);
+}
+
+#[test]
+fn unstable_time_step_is_rejected_before_computing() {
+    let mask = Mask::parse("....\n....\n").unwrap();
+    let mesh = Mesh::from_mask(&mask, 1.0).unwrap();
+    let flow = Uniform {
+        value: Vec2::new(1.0, 0.0),
+    };
+    let config = Config {
+        dt: Some(42.0),
+        ..Config::default()
+    };
+    match Solver::new(&mesh, &flow, Upwind, config) {
+        Err(SolverError::Cfl { dt, dt_max }) => {
+            assert_eq!(dt, 42.0);
+            assert!(dt_max < dt, "dt_max = {dt_max}");
+        }
+        Err(other) => panic!("attendu Cfl, obtenu {other}"),
+        Ok(_) => panic!("le solveur a accepté un pas de temps instable"),
+    }
 }

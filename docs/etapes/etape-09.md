@@ -57,7 +57,7 @@ rayon::prelude::*;` dans chaque fichier concerné.
 cargo test parallel_execution_matches_sequential_bit_for_bit
 ```
 
-Ce test (`tests/parallel.rs`) force tour à tour un seul thread puis plusieurs, et
+Ce test (`tests/step9_parallel.rs`) force tour à tour un seul thread puis plusieurs, et
 compare les champs obtenus **au bit près**. Rien n'est sommé dans un ordre qui
 dépendrait du nombre de threads — chaque cellule écrit sa propre case, indépendamment
 des autres — donc le résultat est déterministe, contrairement à ce qu'on pourrait

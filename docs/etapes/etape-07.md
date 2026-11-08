@@ -85,7 +85,7 @@ Le champ reste dans `[0, 1]` — comme `Upwind`, contrairement à `Centered` —
 interfaces des bandes de fumée restent plus nettes plus longtemps. C'est la
 reconstruction d'ordre 2 qui travaille, sous la garde du limiteur.
 
-**Et pourtant, si vous relancez `tests/order.rs` avec `Muscl` à la place d'`Upwind`,
+**Et pourtant, si vous relancez `tests/step6_order.rs` avec `Muscl` à la place d'`Upwind`,
 l'ordre mesuré ne bouge pas : il reste ≈ 1.** Ce n'est pas un bug — c'est exactement
 l'énigme que l'étape 8 explique et résout.
 

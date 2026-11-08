@@ -81,7 +81,7 @@ un corps de fonction.
 
 Ce n'est pas faisable sur le fil rouge lui-même, et la raison est structurelle : la forme
 d'un type est un contrat contre lequel tout le reste est déjà compilé. `Side` est utilisé
-dans `mesh.rs`, `solver.rs` et `tests/mesh.rs` ; `MeshError` dans cinq fichiers ; les
+dans `mesh.rs`, `solver.rs` et `tests/step2_mesh.rs` ; `MeshError` dans cinq fichiers ; les
 identifiants typés dans quinze. Un squelette qui ferait compiler le reste donnerait la
 réponse, et un trou qui ne compile pas casserait tout le projet.
 
@@ -148,7 +148,7 @@ version sûre est aussi la plus petite.
     (`EXC_BAD_ACCESS` dans `vtkXMLCollectionReader::ReadXMLDataImpl`, reproduit avec
     `pvpython`, `part` comme `group`) — ce lecteur attend des fichiers XML
     (`.vtu`/`.vtp`), pas le format legacy que ce projet écrit délibérément.
-  - `tests/decomposition.rs` (9 tests) rejoue la décomposition dans un seul processus,
+  - `tests/step11_decomposition.rs` (9 tests) rejoue la décomposition dans un seul processus,
     halos échangés par mémoire, et compare au calcul monolithique cellule par cellule.
     `scripts/check-mpi.sh` lance ensuite le vrai binaire à 1, 2, 3 et 4 rangs et compare
     au binaire séquentiel ; il sort proprement en code 0 si `mpirun` est introuvable.
@@ -191,7 +191,7 @@ version sûre est aussi la plus petite.
   donc `dt ∝ h`) — c'est voulu, et l'étape 7 ne le fait **pas** bouger non plus, parce que
   l'erreur en temps domine tant que `dt ∝ h`, quel que soit l'ordre spatial. L'étape 8
   intègre en temps par RK2 (Heun) : l'ordre mesuré passe alors à **≈ 2**
-  (`order_of_convergence_reaches_two_with_muscl_and_rk2`, `tests/order.rs`)
+  (`order_of_convergence_reaches_two_with_muscl_and_rk2`, `tests/step8_rk2.rs`)
 - `src/gradient.rs` : `least_squares_gradient` (le trou), `barth_jespersen` (fourni),
   orchestrés par `limited_gradients`, appelée depuis `Solver::residual` — qui alloue donc
   un tampon de gradients à chaque pas de temps ; c'est signalé comme extension dans
@@ -213,7 +213,7 @@ version sûre est aussi la plus petite.
   demande de réécriture — juste `.iter()` → `.par_iter()` (et `.par_iter_mut()` côté
   écriture). `FluxScheme` et `VelocityField` étaient déjà bornés par `Sync` depuis leur
   écriture (étapes 4-5), en prévision de cette étape justement (`velocity.rs` le dit en
-  toutes lettres). `tests/parallel.rs` verrouille le résultat : un run forcé à un thread
+  toutes lettres). `tests/step9_parallel.rs` verrouille le résultat : un run forcé à un thread
   et un run à plusieurs threads doivent produire des champs identiques au bit près —
   aucune réduction flottante dont l'ordre dépendrait du nombre de threads
 - **Correction (2026-09-02) : `cargo run` était cassé de l'étape 5 à l'étape 8.** Le bloc
@@ -468,10 +468,13 @@ l'étape en cours. Le scan se refait en régénérant `travail/` puis, pour chaq
    Conséquence : ce qui dépend de ces définitions **ne compile plus** tant que le trou est
    vide. Un tel trou n'a donc sa place que dans du code dont rien d'autre ne dépend — en
    pratique, le crate `design/`. N'en mettez pas dans `src/`.
-2. **Les tests de l'étape n** vont sous `#[cfg(all(test, feature = "stepN"))]`, ou
-   `#![cfg(feature = "stepN")]` en tête d'un fichier de `tests/`. Les features sont
-   chaînées dans `Cargo.toml` (`stepN = ["stepN-1"]`), ce qui fait que `cargo test` ne
-   montre au stagiaire que les étapes déjà ouvertes.
+2. **Les tests de l'étape n** vont sous `#[cfg(all(test, feature = "stepN"))]` dans
+   `src/`, ou dans **un fichier par étape** `tests/stepN_<thème>.rs`, conditionné en
+   entier par `#![cfg(feature = "stepN")]` en tête — comme dans sentinelle. Les aides
+   que partagent plusieurs étapes vont dans `tests/common/mod.rs` (`mod common;`), et un
+   fichier temporaire se nomme par `common::temp_path`, propre au processus. Les
+   features sont chaînées dans `Cargo.toml` (`stepN = ["stepN-1"]`), ce qui fait que
+   `cargo test` ne montre au stagiaire que les étapes déjà ouvertes.
 3. **Relever `LAST_STEP`** dans `xtask/src/steps.rs` et déplacer la sentinelle `stepN`
    dans les manifestes. Si l'étape ajoute un crate à part, l'ajouter à
    `starter::STARTER_ENTRIES` et à `files::SOURCE_DIRS` — sans quoi `start`/`goto`/
@@ -623,7 +626,7 @@ constaté). Le traceur descend sous `1e-308` en quelques dizaines de pas, donc t
 un peu long est concerné. Mesuré au passage : la *longueur* du jeton, elle, n'y est pour
 rien — un nombre de 402 caractères se relit parfaitement ; le passage en `{:e}` hors des
 exposants usuels n'est là que pour la taille et la lisibilité des fichiers. Un test
-(`tests/io.rs`) verrouille la propriété. C'est un type à `Display` et non une fonction
+(`tests/step3_output_and_errors.rs`) verrouille la propriété. C'est un type à `Display` et non une fonction
 renvoyant une `String` : un fichier contient de l'ordre du million de nombres, et une
 `String` par nombre faisait 273 691 allocations par fichier contre 3 aujourd'hui.
 

@@ -4,15 +4,16 @@
 
 **Prérequis rustlings :** `18_iterators` (`zip`), conseillé ; une boucle `for` sur les indices suffit.
 
-À l'étape 6, l'ordre mesuré (`tests/order.rs`) valait ≈ 1 : normal, décentrement amont et
+À l'étape 6, l'ordre mesuré (`tests/step6_order.rs`) valait ≈ 1 : normal, décentrement amont et
 Euler explicite sont tous deux d'ordre 1. À l'étape 7, la reconstruction MUSCL a passé
 l'espace à l'ordre 2 — et l'ordre mesuré n'a **pas bougé**. Cette étape referme
 l'énigme.
 
 ## L'explication
 
-`tests/order.rs` fixe le nombre de Courant, pas le nombre de pas : le pas de temps `dt`
-est déduit de la CFL à chaque raffinement, donc `dt ∝ h`. Deux erreurs vivent dans le
+Le cas de mesure (`advection_error`, dans `tests/common/mod.rs`) fixe le nombre de
+Courant, pas le nombre de pas : le pas de temps `dt` est déduit de la CFL à chaque
+raffinement, donc `dt ∝ h`. Deux erreurs vivent dans le
 résultat numérique — celle du schéma spatial, et celle de l'intégration en temps — et
 c'est toujours la moins bonne des deux qui domine la mesure. Passer l'espace à l'ordre 2
 sans toucher au temps ne change rien tant que le temps reste le facteur limitant, à
@@ -113,8 +114,8 @@ sur `--time-scheme euler\|rk2` en CLI et sur `Solver::step`, qui bascule vers
 `step_euler` (inchangée depuis l'étape 5) ou `step_rk2` selon le schéma choisi — rien à
 modifier de ce côté.
 
-Un nouveau test dans `tests/order.rs`, `order_of_convergence_reaches_two_with_muscl_and_rk2`,
-mesure l'ordre avec MUSCL + RK2 exactement comme celui de l'étape 6 mesurait Upwind +
+Un nouveau test, `order_of_convergence_reaches_two_with_muscl_and_rk2`
+(`tests/step8_rk2.rs`), mesure l'ordre avec MUSCL + RK2 exactement comme celui de l'étape 6 mesurait Upwind +
 Euler.
 
 ## Ce qu'il y a à remarquer

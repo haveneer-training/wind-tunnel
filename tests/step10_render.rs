@@ -6,6 +6,8 @@
 //! threads obtiennent le verrou. Le `debug_assert_eq!` du suivi (`mpsc`), lui, vérifie
 //! en passant qu'aucune cellule n'a été oubliée ou comptée deux fois.
 
+mod common;
+
 use std::fs;
 
 use wind_tunnel::field::Field;
@@ -20,7 +22,7 @@ fn mesh_of(mask: &str, refine: usize) -> Mesh {
 
 fn render(mesh: &Mesh, name: &str) -> Vec<u8> {
     let field = Field::from_fn(mesh, |id| id.index() as f64);
-    let path = std::env::temp_dir().join(name);
+    let path = common::temp_path(name);
     write_png(&path, mesh, &field, 200, field.min_max()).expect("écriture impossible");
     let bytes = fs::read(&path).expect("relecture impossible");
     fs::remove_file(&path).ok();
@@ -39,8 +41,8 @@ fn rendering_is_deterministic_across_runs() {
         3,
     );
 
-    let a = render(&mesh, "wind-tunnel-test-render-a.png");
-    let b = render(&mesh, "wind-tunnel-test-render-b.png");
+    let a = render(&mesh, "render-a.png");
+    let b = render(&mesh, "render-b.png");
     assert_eq!(
         a, b,
         "deux rendus du même champ diffèrent : une écriture a échappé au verrou"
@@ -53,7 +55,7 @@ fn rendering_a_handful_of_cells_still_works() {
     // faire, ce que le suivi (mpsc) doit encaisser sans bloquer ni paniquer.
     let mesh = mesh_of("...\n...\n", 0);
 
-    let a = render(&mesh, "wind-tunnel-test-render-small-a.png");
-    let b = render(&mesh, "wind-tunnel-test-render-small-b.png");
+    let a = render(&mesh, "render-small-a.png");
+    let b = render(&mesh, "render-small-b.png");
     assert_eq!(a, b);
 }

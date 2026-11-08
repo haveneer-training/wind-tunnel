@@ -26,7 +26,7 @@ L'exploration est divisée en deux fragments : `fluid_neighbours` donne les indi
 à quatre connexités, puis `explore` marque une composante depuis une cellule de départ.
 `check_connected` lance ces explorations et compte les composantes ; un obstacle mal
 dessiné qui coupe la veine en deux doit produire `MeshError::Disconnected { components }`
-— votre premier `Err`. Le test `a_domain_split_in_two` de `tests/errors.rs` vous attend.
+— votre premier `Err`. Le test `a_domain_split_in_two` de `tests/step2_mesh.rs` vous attend.
 
 Ensuite, essayez :
 

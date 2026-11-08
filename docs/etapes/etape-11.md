@@ -132,11 +132,11 @@ communication, elle, est parfaitement correcte. Essayez : passez `HALO` à 2 dan
 ## Ce qu'il y a à remarquer
 
 ```shell
-cargo test --test decomposition
+cargo test --test step11_decomposition
 scripts/check-mpi.sh
 ```
 
-`tests/decomposition.rs` rejoue la décomposition **dans un seul processus**, en
+`tests/step11_decomposition.rs` rejoue la décomposition **dans un seul processus**, en
 échangeant les halos par recopie mémoire, et compare au calcul monolithique cellule par
 cellule. Si ce test passe, l'algorithme est juste ; il ne reste au crate `mpi/` qu'à
 transporter les mêmes tampons. `scripts/check-mpi.sh` fait ensuite tourner le vrai

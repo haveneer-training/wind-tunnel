@@ -82,7 +82,7 @@ cargo test rendering_is_deterministic_across_runs
 cargo test rendering_a_handful_of_cells_still_works
 ```
 
-Ces tests (`tests/render.rs`) rendent deux fois le même champ et comparent les fichiers
+Ces tests (`tests/step10_render.rs`) rendent deux fois le même champ et comparent les fichiers
 PNG produits **octet pour octet** : rien ne doit dépendre de l'ordre dans lequel les
 threads obtiennent le verrou. Le second force un maillage plus petit que le nombre de
 threads disponibles — certaines tranches sont vides, ce que le suivi doit encaisser sans
