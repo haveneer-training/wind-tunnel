@@ -4,3 +4,9 @@
 /travail
 .DS_Store
 .idea/
+
+# Fichiers propres aux assistants IA : locaux, jamais versionnés
+CLAUDE.md
+.claude/
+.junie/
+.mcp.json
