@@ -11,9 +11,9 @@
 
 use std::time::Instant;
 
+use faer::Side;
 use faer::linalg::solvers::Solve;
 use faer::sparse::{SparseColMat, Triplet};
-use faer::Side;
 use wind_tunnel::mask::Mask;
 use wind_tunnel::mesh::{BoundaryKind, Mesh};
 use wind_tunnel::stream::{ComputedStream, StreamOptions};

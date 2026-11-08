@@ -375,9 +375,11 @@ mod tests {
                 ]
             })
             .collect();
-        assert!(obstacle_values
-            .iter()
-            .all(|value| *value == obstacle_values[0]));
+        assert!(
+            obstacle_values
+                .iter()
+                .all(|value| *value == obstacle_values[0])
+        );
         let outlet_middle = mesh.face(groups[&BoundaryKind::Outlet][1]);
         assert_eq!(fixed[outlet_middle.a.index()], None);
         assert_eq!(fixed[outlet_middle.b.index()], None);

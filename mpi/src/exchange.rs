@@ -9,7 +9,7 @@ use mpi::collective::SystemOperation;
 use mpi::topology::SimpleCommunicator;
 use mpi::traits::*;
 
-use wind_tunnel::decomposition::{pack_into, unpack, Layout};
+use wind_tunnel::decomposition::{Layout, pack_into, unpack};
 use wind_tunnel::field::Field;
 
 /// Les tampons d'un échange de halo, alloués une fois pour toutes.
@@ -99,7 +99,6 @@ fn transfer(
         };
         post(layout.left(), from_left, to_left);
         post(layout.right(), from_right, to_right);
-        drop(post);
         requests.wait_all(&mut Vec::with_capacity(4));
     });
     // SOLUTION-END

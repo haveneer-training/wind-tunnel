@@ -88,11 +88,7 @@ impl Vec2 {
     /// Vecteur unitaire de même direction ; renvoie [`Vec2::ZERO`] si le vecteur est nul.
     pub fn normalized(self) -> Vec2 {
         let n = self.norm();
-        if n == 0.0 {
-            Vec2::ZERO
-        } else {
-            self / n
-        }
+        if n == 0.0 { Vec2::ZERO } else { self / n }
     }
 }
 

@@ -5,7 +5,7 @@
 //! fonctionnera tel quel sur un maillage lu depuis un fichier.
 
 #[cfg(feature = "step10")]
-use std::sync::{mpsc, Mutex};
+use std::sync::{Mutex, mpsc};
 #[cfg(feature = "step10")]
 use std::thread;
 

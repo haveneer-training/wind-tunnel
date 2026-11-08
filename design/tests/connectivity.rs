@@ -4,7 +4,7 @@
 //! Lisez les erreurs du compilateur dans l'ordre : chacune nomme une définition qui
 //! manque encore.
 
-use wind_tunnel_design::{neighbours, BoundaryKind, CellId, Face, Side, VertexId};
+use wind_tunnel_design::{BoundaryKind, CellId, Face, Side, VertexId, neighbours};
 
 /// Une face interne, entre les cellules 7 et 9.
 fn inner_face() -> Face {

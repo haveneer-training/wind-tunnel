@@ -7,7 +7,7 @@
 //! processus, échange les halos par mémoire, et compare au calcul monolithique. Si
 //! celui-là passe, il ne reste au crate `mpi/` qu'à transporter les mêmes tampons.
 
-use wind_tunnel::decomposition::{owned_mass, pack, unpack, Bands, Layout, HALO};
+use wind_tunnel::decomposition::{Bands, HALO, Layout, owned_mass, pack, unpack};
 use wind_tunnel::field::Field;
 use wind_tunnel::flux::Muscl;
 use wind_tunnel::mask::Mask;

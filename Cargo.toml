@@ -1,7 +1,7 @@
 [package]
 name = "wind-tunnel"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 rust-version = "1.90"
 description = "Soufflerie numérique — projet fil rouge de la formation « Rust pour le calcul scientifique »"
 license = "CC-BY-NC-SA-4.0"

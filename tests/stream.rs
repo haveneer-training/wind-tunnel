@@ -8,7 +8,7 @@ use wind_tunnel::geom::Point;
 use wind_tunnel::mask::Mask;
 use wind_tunnel::mesh::{BoundaryKind, Mesh};
 use wind_tunnel::solver::{Bc, Config, Solver};
-use wind_tunnel::stream::{residual_of, ComputedStream, StreamOptions};
+use wind_tunnel::stream::{ComputedStream, StreamOptions, residual_of};
 use wind_tunnel::velocity::PotentialCylinder;
 
 const H: f64 = 2.0;

@@ -279,14 +279,14 @@ fn parse_row(
     fluid: &mut Vec<bool>,
 ) -> Result<usize, MeshError> {
     let width = line.chars().count();
-    if let Some(cols) = expected {
-        if width != cols {
-            return Err(MeshError::RaggedMask {
-                line: line_no,
-                expected: cols,
-                got: width,
-            });
-        }
+    if let Some(cols) = expected
+        && width != cols
+    {
+        return Err(MeshError::RaggedMask {
+            line: line_no,
+            expected: cols,
+            got: width,
+        });
     }
 
     for (col, ch) in line.chars().enumerate() {
@@ -298,7 +298,7 @@ fn parse_row(
                     line: line_no,
                     col: col + 1,
                     ch: other,
-                })
+                });
             }
         }
     }
@@ -329,14 +329,14 @@ fn check_width(width: usize, expected: Option<usize>, line_no: usize) -> Result<
     // TODO-STEP:3 Comparer la largeur à la largeur attendue, si elle existe, et
     // construire `RaggedMask` avec les coordonnées fournies.
     // SOLUTION-BEGIN
-    if let Some(expected) = expected {
-        if width != expected {
-            return Err(MeshError::RaggedMask {
-                line: line_no,
-                expected,
-                got: width,
-            });
-        }
+    if let Some(expected) = expected
+        && width != expected
+    {
+        return Err(MeshError::RaggedMask {
+            line: line_no,
+            expected,
+            got: width,
+        });
     }
     Ok(())
     // SOLUTION-END

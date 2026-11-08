@@ -62,11 +62,7 @@ impl FluxScheme for Upwind {
     fn interface_value(&self, s: &FaceState) -> f64 {
         // TODO-STEP:5 Retenir la valeur du côté d'où vient le fluide, selon le signe de `un`
         // SOLUTION-BEGIN
-        if s.un >= 0.0 {
-            s.c_left
-        } else {
-            s.c_right
-        }
+        if s.un >= 0.0 { s.c_left } else { s.c_right }
         // SOLUTION-END
     }
 }

@@ -395,11 +395,7 @@ pub fn initial_field(mesh: &Mesh, bands: usize) -> Field {
     Field::from_fn(mesh, |id| {
         let y = mesh.cell(id).centroid.y;
         let band = ((y - ymin) / stripe).floor() as i64;
-        if band % 2 == 0 {
-            1.0
-        } else {
-            0.0
-        }
+        if band % 2 == 0 { 1.0 } else { 0.0 }
     })
 }
 

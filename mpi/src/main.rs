@@ -19,13 +19,13 @@ use mpi::topology::SimpleCommunicator;
 use mpi::traits::*;
 
 use wind_tunnel::app;
-use wind_tunnel::decomposition::{owned_mass, owned_min_max, Bands, Layout, HALO};
+use wind_tunnel::decomposition::{Bands, HALO, Layout, owned_mass, owned_min_max};
 use wind_tunnel::field::Field;
 use wind_tunnel::flux::FluxScheme;
 use wind_tunnel::io::{png, vtk};
 use wind_tunnel::solver::{Config, Solver, TimeScheme};
 
-use exchange::{global_dt_max, global_min_max, global_sum, Halo};
+use exchange::{Halo, global_dt_max, global_min_max, global_sum};
 
 /// Ce que le pilote fait du champ à intervalle régulier : l'écrire et le diagnostiquer.
 ///

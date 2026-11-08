@@ -21,7 +21,7 @@
 use std::collections::{BTreeMap, HashMap};
 
 use crate::error::MeshError;
-use crate::geom::{polygon_area, polygon_centroid, Point, Vec2};
+use crate::geom::{Point, Vec2, polygon_area, polygon_centroid};
 use crate::mask::Mask;
 
 /// Identifiant d'un sommet.
@@ -565,11 +565,7 @@ fn edge_key(a: VertexId, b: VertexId) -> (u32, u32) {
     // TODO-STEP:2 Ordonner les deux indices : l'arête a→b et l'arête b→a doivent
     // produire la même clé.
     // SOLUTION-BEGIN
-    if a.0 < b.0 {
-        (a.0, b.0)
-    } else {
-        (b.0, a.0)
-    }
+    if a.0 < b.0 { (a.0, b.0) } else { (b.0, a.0) }
     // SOLUTION-END
 }
 

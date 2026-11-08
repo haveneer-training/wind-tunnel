@@ -14,7 +14,7 @@ use wind_tunnel::field::Field;
 use wind_tunnel::geom::Vec2;
 use wind_tunnel::io::vtk::write_vtk;
 #[cfg(feature = "step4")]
-use wind_tunnel::io::vtk::{write_frame, write_series, Frame};
+use wind_tunnel::io::vtk::{Frame, write_frame, write_series};
 use wind_tunnel::mask::Mask;
 use wind_tunnel::mesh::{CellId, Mesh};
 

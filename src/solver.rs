@@ -458,10 +458,11 @@ impl<'m, F: FluxScheme> Solver<'m, F> {
             self.step(c, &mut work);
             let time = step as f64 * self.dt;
 
-            if self.config.check_every > 0 && step % self.config.check_every == 0 {
-                if let Some(cell) = c.first_non_finite() {
-                    return Err(SolverError::NotFinite { step, cell });
-                }
+            if self.config.check_every > 0
+                && step % self.config.check_every == 0
+                && let Some(cell) = c.first_non_finite()
+            {
+                return Err(SolverError::NotFinite { step, cell });
             }
             match self.config.output_dt {
                 Some(period) if period > 0.0 => {
@@ -484,10 +485,10 @@ impl<'m, F: FluxScheme> Solver<'m, F> {
             // avant : raboter le dernier pas pour tomber dessus exactement donnerait un pas
             // de temps non uniforme, prix trop élevé pour une décimale. Le dépassement vaut
             // moins d'un pas de temps.
-            if let Some(end) = self.config.max_time {
-                if time >= end {
-                    break;
-                }
+            if let Some(end) = self.config.max_time
+                && time >= end
+            {
+                break;
             }
         }
         Ok(())
