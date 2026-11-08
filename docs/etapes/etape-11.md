@@ -175,3 +175,68 @@ retrouvez un « groupe » par pas de temps au lieu d'une série dans le temps.
 - `mpirun -n 4` sur une seule machine, ce sont quatre processus qui se parlent par
   mémoire partagée. Comparez avec `rayon` de l'étape 9 sur le même nombre de cœurs : que
   coûte le fait d'avoir renoncé à la mémoire commune ?
+
+## Éléments de réponse
+
+<details>
+<summary>Assembler une image unique sur le rang 0</summary>
+
+Chaque rang envoie les valeurs de ses cellules **possédées** (`layout.owned`), dans
+l'ordre de sa bande ; le rang 0 les reçoit toutes en une fois :
+
+```text
+world.all_gather_into(&n_possédées, &mut counts)        // un entier par rang
+displs = sommes préfixes de counts                      // le schéma CSR, encore
+si rang 0 : buffer = vec![0.0; Σ counts]
+            root.gather_varcount_into_root(&local,
+                &mut PartitionMut::new(&mut buffer[..], counts, displs))
+sinon     : root.gather_varcount_into(&local)
+```
+
+Le rang 0 doit alors connaître la place de chaque valeur dans le maillage complet : le
+plus simple est qu'il construise lui-même le `Layout` de chaque bande (c'est déterministe,
+`Layout::new` ne lit que le masque). Le rassemblement déplace tout le champ, `N` valeurs,
+alors qu'un pas de temps n'échange que deux colonnes de halo : il ne se fait qu'aux pas
+de sortie, jamais à chaque pas.
+
+</details>
+
+<details>
+<summary>Recouvrir calcul et communication</summary>
+
+```text
+poster les réceptions et les envois immédiats (comme transfer, sans wait_all)
+calculer le résidu des cellules intérieures   // aucune face vers une cellule fantôme
+wait_all
+calculer le résidu des cellules de bord de bande
+```
+
+La liste des cellules intérieures se calcule une fois, avec le `Layout`. Le résidu doit
+alors pouvoir se calculer sur un sous-ensemble de cellules : c'est la seule modification du
+solveur. Le gain est le temps de transfert du halo, gagné tant que le calcul intérieur
+dure plus longtemps que lui — ce qui est vrai dès que les bandes sont larges.
+
+</details>
+
+<details>
+<summary>À partir de combien de rangs cela ne vaut plus la peine</summary>
+
+Sur une grille de `W × H` cellules coupée en `p` bandes verticales, chaque rang calcule
+`W·H/p` cellules et échange `2·H` valeurs de halo par résidu. Le rapport communication
+sur calcul vaut donc `2p / W` : il **croît avec `p`**, indépendamment de `H`. Quand les
+bandes n'ont plus que quelques colonnes, le halo pèse autant que le calcul et
+l'accélération plafonne. Un découpage en blocs (`√p × √p`) réduirait ce rapport à
+`4√p / W` : c'est pourquoi les vrais codes ne découpent pas en bandes.
+
+</details>
+
+<details>
+<summary><code>mpirun -n 4</code> contre <code>rayon</code> sur 4 cœurs</summary>
+
+Sur une seule machine, `rayon` gagne en général : ses threads lisent directement le champ
+voisin, alors que les processus MPI recopient les halos dans des tampons, les envoient
+et les recopient à l'arrivée, et ajoutent une synchronisation à chaque échange. L'avantage
+de MPI n'est pas là : il passe à **plusieurs machines**, ce que la mémoire partagée ne
+peut pas faire.
+
+</details>

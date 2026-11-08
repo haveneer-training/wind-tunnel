@@ -227,3 +227,52 @@ Deux détails que ces essais révèlent, et qui valent d'être regardés :
   vous de le voir ;
 - `--angle` est refusé sur un masque avec obstacle : l'écoulement y est celui du
   cylindre, dont la direction amont est imposée.
+
+## Éléments de réponse
+
+<details>
+<summary>Pourquoi <code>--diffusivity 0.05</code> fait chuter le pas de temps</summary>
+
+La condition de stabilité borne `dt` cellule par cellule :
+
+```text
+dt ≤ |Ω| / Σ_faces ( |F| + 2·D·L / d )
+```
+
+Le premier terme est le transport par l'écoulement, le second la diffusion. Ce dernier
+**s'ajoute** au premier : il ne peut que réduire la borne, et il ne dépend pas de la
+vitesse. Sur `domains/tunnel.dom`, le pas maximal passe de 0,190 s à 0,144 s.
+
+Le rapport entre les deux termes change avec le maillage. Le transport impose
+`dt ∝ h / |u|`, la diffusion `dt ∝ h² / D` : en raffinant, la seconde finit toujours par
+l'emporter. C'est la raison d'être des schémas implicites en diffusion.
+
+</details>
+
+<details>
+<summary>Pourquoi le schéma centré explose</summary>
+
+Deux raisons distinctes.
+
+- **Il n'est pas borné.** Aucun schéma linéaire d'ordre supérieur à 1 ne respecte le
+  principe du maximum (théorème de Godunov). La valeur à la face est une moyenne des deux
+  côtés : en aval d'un front, une cellule reçoit plus qu'elle ne contient, d'où des
+  valeurs négatives ou supérieures à 1.
+- **Il est instable avec Euler explicite.** Pour l'advection pure, le schéma centré a des
+  valeurs propres imaginaires pures `iλ`, et un pas d'Euler les multiplie par
+  `|1 + iλ·dt| > 1` quel que soit `dt`. L'amplitude croît donc à chaque pas, sans limite —
+  d'où 10¹⁶ à 4 000 pas. Le décentrement amont, lui, ajoute exactement la diffusion
+  numérique qui ramène le facteur sous 1.
+
+</details>
+
+<details>
+<summary>Ce que coûte <code>--refine 4</code></summary>
+
+`h` est divisé par 4, donc la CFL divise `dt` par 4 environ : 0,190 s devient 0,042 s
+(un peu plus que 4 : la cellule la plus contrainte est près de l'obstacle, où la vitesse
+qu'elle voit change avec la résolution). Il y a 16 fois plus de cellules et 4 fois plus de pas pour la même
+durée physique : **64 fois** plus de calcul. Une dimension de plus coûterait 4⁴ = 256 :
+c'est pourquoi le raffinement se paie en parallélisme (étapes 9 à 11).
+
+</details>

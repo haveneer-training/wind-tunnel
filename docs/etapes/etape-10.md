@@ -117,3 +117,44 @@ threads.
   l'étape 9 ? Essayez de récrire le socle avec `rayon` et un `Mutex` — ça marche aussi,
   et c'est même plus court. La version à la main sert ici à voir ce que `rayon` cache :
   la répartition du travail en tranches, la portée des threads, le passage de message.
+
+## Éléments de réponse
+
+Les deux premières extensions sont écrites et testées dans `solutions/src/render.rs` :
+`render_spawn_arc` (`std::thread::spawn` et `Arc`), `render_lock_free` (les pixels par le
+canal) et `render_rayon` (`rayon` et un `Mutex`). Toutes rendent la même image que
+`write_png`, au pixel près. `solutions/README.md` dit comment les lancer.
+
+<details>
+<summary>Avec verrou ou sans verrou : qui gagne ?</summary>
+
+Mesuré par `cargo run --release --manifest-path solutions/Cargo.toml --example
+render_timing` sur une machine à 10 cœurs (meilleur de 5 essais, encodage PNG exclu) :
+
+| Cellules | Séquentiel | `spawn` + `Arc` | Sans verrou | `rayon` + `Mutex` |
+|---:|---:|---:|---:|---:|
+| 5 626 | 1,5 ms | 2,8 ms | 0,6 ms | 3,1 ms |
+| 90 016 | 26,6 ms | 41,3 ms | 8,7 ms | 43,2 ms |
+
+Les deux versions qui prennent le verrou **à chaque cellule** sont plus lentes que le
+séquentiel : une cellule ne coûte que quelques dizaines de pixels, et les threads passent
+plus de temps à attendre le verrou qu'à calculer. Sans verrou, le calcul se fait
+vraiment en parallèle, et la recopie séquentielle finale coûte peu : c'est 3 fois plus
+rapide que le séquentiel, à toutes les tailles.
+
+La leçon vaut au-delà de l'image : un verrou se prend **rarement**, sur beaucoup de
+travail — par tranche plutôt que par cellule —, ou pas du tout.
+
+</details>
+
+<details>
+<summary>Pourquoi des threads « à la main » plutôt que <code>rayon</code></summary>
+
+Ce n'est pas pour la performance : `render_rayon` fait la même chose en dix lignes.
+C'est pour voir ce que `rayon` cache : le découpage en tranches (`chunks`), la durée de
+vie des threads (`thread::scope` garantit qu'ils sont tous finis à la sortie, ce qui
+permet de leur prêter `mesh` et `field`), et la remontée de résultats (`mpsc`). La
+version `spawn` + `Arc` montre le prix à payer sans `scope` : des threads qui peuvent
+survivre à la fonction ne peuvent rien emprunter.
+
+</details>

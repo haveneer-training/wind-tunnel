@@ -74,8 +74,9 @@ impl Default for StreamOptions {
 /// et les voisins de tous les sommets bout à bout. C'est la matrice du système, sans
 /// jamais en stocker une : on ne garde que ce qui est non nul, et le produit
 /// matrice-vecteur se lit directement dessus.
-#[cfg_attr(not(feature = "step13"), allow(dead_code))] // collatéral des trous étape 12
-struct Adjacency {
+///
+/// Public pour `solutions/`, qui résout le même système par d'autres méthodes.
+pub struct Adjacency {
     offsets: Vec<u32>,
     neighbours: Vec<VertexId>,
     weights: Vec<f64>,
@@ -83,7 +84,7 @@ struct Adjacency {
 
 impl Adjacency {
     /// Voisins du sommet `id`, et le poids de chaque arête.
-    fn of(&self, id: VertexId) -> (&[VertexId], &[f64]) {
+    pub fn of(&self, id: VertexId) -> (&[VertexId], &[f64]) {
         let start = self.offsets[id.index()] as usize;
         let end = self.offsets[id.index() + 1] as usize;
         (&self.neighbours[start..end], &self.weights[start..end])
@@ -100,7 +101,7 @@ impl Adjacency {
 ///
 /// Comme pour la connectivité du maillage, deux passes : compter les arêtes de chaque
 /// sommet pour construire `offsets`, puis remplir en avançant un curseur par sommet.
-fn adjacency(mesh: &Mesh) -> Adjacency {
+pub fn adjacency(mesh: &Mesh) -> Adjacency {
     let n = mesh.n_vertices();
     let mut counts = vec![0u32; n + 1];
     for face in mesh.faces() {
@@ -140,8 +141,7 @@ fn adjacency(mesh: &Mesh) -> Adjacency {
 
 /// Niveau constant de la fonction de courant imposé sur l'obstacle.
 #[cfg_attr(not(feature = "step12"), allow(unused_variables))] // trou étape 12
-#[cfg_attr(not(feature = "step13"), allow(dead_code))] // appelée depuis le trou de boundary_values
-fn obstacle_level(mesh: &Mesh, options: &StreamOptions) -> Option<f64> {
+pub fn obstacle_level(mesh: &Mesh, options: &StreamOptions) -> Option<f64> {
     // TODO-STEP:12 Calculer la valeur constante de ψ sur l'obstacle à partir de
     // l'ordonnée moyenne de ses sommets. Renvoyer `None` s'il n'y a pas d'obstacle.
     // HINT :
@@ -167,7 +167,7 @@ fn obstacle_level(mesh: &Mesh, options: &StreamOptions) -> Option<f64> {
 /// L'entrée et les parois portent `ψ₀(y) = speed × (y − ymin)`, l'obstacle une constante
 /// donnée par [`obstacle_level`], et la sortie reste libre (condition de Neumann).
 #[cfg_attr(not(feature = "step12"), allow(unused_variables))] // trou étape 12
-fn boundary_values(mesh: &Mesh, options: &StreamOptions) -> Vec<Option<f64>> {
+pub fn boundary_values(mesh: &Mesh, options: &StreamOptions) -> Vec<Option<f64>> {
     // TODO-STEP:12 Initialiser tous les sommets libres, fixer l'obstacle à sa valeur
     // constante, puis l'entrée et les parois avec ψ₀.
     // HINT : ψ₀(p) = speed · (p.y − ymin) s'écrit en fermeture `|p: Point| …` et se passe
@@ -186,8 +186,7 @@ fn boundary_values(mesh: &Mesh, options: &StreamOptions) -> Vec<Option<f64>> {
 }
 
 /// Applique une fonction de valeur imposée à tous les sommets d'un groupe de bord.
-#[cfg_attr(not(feature = "step13"), allow(dead_code))] // appelée depuis boundary_values
-fn fix_group(
+pub fn fix_group(
     mesh: &Mesh,
     fixed: &mut [Option<f64>],
     kind: BoundaryKind,
@@ -209,7 +208,7 @@ fn fix_group(
 }
 
 /// Résidu `max |Σ w (ψ_voisin − ψ_v)|` sur les sommets libres, rapporté à l'échelle de `ψ`.
-fn residual_inf(adjacency: &Adjacency, fixed: &[Option<f64>], psi: &[f64], scale: f64) -> f64 {
+pub fn residual_inf(adjacency: &Adjacency, fixed: &[Option<f64>], psi: &[f64], scale: f64) -> f64 {
     let worst = (0..psi.len())
         .into_par_iter()
         .filter(|&i| fixed[i].is_none())
@@ -337,7 +336,7 @@ impl StreamSource for ComputedStream {
 }
 
 /// Échelle de `ψ` : le débit total de la veine, ce qui rend le résidu sans dimension.
-fn scale_of(mesh: &Mesh, options: &StreamOptions) -> f64 {
+pub fn scale_of(mesh: &Mesh, options: &StreamOptions) -> f64 {
     let (_, ymin, _, ymax) = mesh.bounds();
     (options.speed * (ymax - ymin)).abs().max(f64::MIN_POSITIVE)
 }

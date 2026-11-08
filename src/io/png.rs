@@ -19,7 +19,7 @@ use crate::mesh::{Cell, CellId, Mesh};
 ///
 /// Un gris neutre, volontairement étranger à la palette : ce qui n'est pas une donnée
 /// ne doit pas pouvoir se confondre avec une valeur faible.
-const BACKGROUND: Rgb<u8> = Rgb([88, 88, 96]);
+pub const BACKGROUND: Rgb<u8> = Rgb([88, 88, 96]);
 
 /// Points d'ancrage de la palette (type « inferno »).
 const PALETTE: [[f64; 3]; 5] = [
@@ -44,7 +44,10 @@ pub fn colormap(t: f64) -> Rgb<u8> {
 }
 
 /// Projection et palette d'un rendu, partagées entre les chemins séquentiel et parallèle.
-struct Raster {
+///
+/// Publique pour `solutions/`, dont les variantes du rendu parallèle ne changent que
+/// l'organisation des threads, pas la géométrie.
+pub struct Raster {
     xmin: f64,
     ymax: f64,
     scale: f64,
@@ -55,7 +58,9 @@ struct Raster {
 }
 
 impl Raster {
-    fn new(mesh: &Mesh, width: u32, range: (f64, f64)) -> Raster {
+    /// La projection d'un maillage sur une image de `width` pixels de large, et la palette
+    /// qui envoie `range` sur `[0, 1]`.
+    pub fn new(mesh: &Mesh, width: u32, range: (f64, f64)) -> Raster {
         let (xmin, ymin, xmax, ymax) = mesh.bounds();
         let scale = width as f64 / (xmax - xmin);
         let height = (((ymax - ymin) * scale).round() as u32).max(1);
@@ -76,7 +81,16 @@ impl Raster {
         }
     }
 
-    fn cell_pixels(
+    /// Hauteur de l'image en pixels, déduite des proportions du domaine.
+    pub fn height(&self) -> u32 {
+        self.height
+    }
+
+    /// Les pixels couverts par une cellule, dans `pixels`, et la couleur de sa valeur.
+    ///
+    /// `polygon` et `corners` sont des tampons de travail, vidés à chaque appel : les
+    /// fournir permet de les réutiliser d'une cellule à l'autre.
+    pub fn cell_pixels(
         &self,
         mesh: &Mesh,
         value: f64,

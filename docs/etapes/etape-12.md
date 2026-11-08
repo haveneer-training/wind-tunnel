@@ -149,3 +149,95 @@ cargo run --release -- domains/square.dom --refine 2 --max-steps 200 --flow comp
   décollement, pas de sillage, pas de traînée, et une fumée symétrique amont/aval. Le modèle
   qui les donne est `ψ`–`ω` : la même équation avec `∇²ψ = −ω`, et une équation de transport
   pour `ω`… que le solveur du projet sait déjà résoudre.
+
+## Éléments de réponse
+
+Le gradient conjugué, le SOR et la constante de circulation nulle sont écrits et testés
+dans `solutions/src/stream.rs`. Mesures de `cargo run --release --manifest-path
+solutions/Cargo.toml --example stream_solvers` sur `domains/tunnel.dom`, tolérance
+`1e-6` :
+
+| Raffinement | Sommets | Jacobi | Gradient conjugué | SOR (ω = 1,9) |
+|---:|---:|---:|---:|---:|
+| 1 | 5 805 | 7 134 it. (1,15 s) | 201 it. (0,01 s) | 175 it. (0,02 s) |
+| 2 | 22 878 | 23 667 it. (5,5 s) | 383 it. (0,07 s) | 676 it. (0,26 s) |
+| 4 | 90 780 | 75 221 it. (33,6 s) | 738 it. (0,56 s) | 2 395 it. (3,7 s) |
+
+<details>
+<summary>Pourquoi Jacobi est si lent, et pas le gradient conjugué</summary>
+
+Le facteur de convergence de Jacobi est le rayon spectral de sa matrice d'itération,
+`1 − O(h²)` : le nombre d'itérations croît comme `h⁻²`, donc ×4 par doublement. On
+observe ×3,3 : la sortie libre et l'obstacle rendent le problème un peu mieux conditionné
+que le carré idéal. Au-delà de `--stream-iters`, la résolution renvoie
+`SolverError::NotConverged`, avec le résidu atteint : le programme s'arrête plutôt que de
+calculer un transport sur un écoulement faux.
+
+Le gradient conjugué converge en `O(√κ)` itérations, et le conditionnement `κ` du
+laplacien croît comme `h⁻²` : ses itérations ne croissent que comme `h⁻¹`, ×1,9 par
+doublement dans le tableau. Le SOR bien réglé est aussi en `h⁻¹` en théorie, mais
+`ω = 1,9` n'est optimal que pour une taille donnée : il se dégrade quand on raffine.
+Et il est séquentiel — chaque sommet lit ce que le balayage vient d'écrire.
+
+</details>
+
+<details>
+<summary>Ce que <code>faer</code> n'apprend pas</summary>
+
+L'appel à `faer` résout mieux et plus vite. Mais il demande d'**assembler** la matrice —
+le travail le plus long de l'exemple —, alors que le balayage ne l'a jamais écrite : le
+produit matrice-vecteur se lit sur le CSR. Le socle a appris ce que la bibliothèque
+cache : la forme d'un système creux, la différence entre résidu et erreur, et pourquoi
+une méthode itérative converge lentement. C'est ce qu'il faut savoir pour choisir la
+bibliothèque, et pour comprendre ce qu'elle répond quand elle échoue.
+
+</details>
+
+<details>
+<summary>La constante de l'obstacle, par circulation nulle</summary>
+
+Le problème est linéaire en ses valeurs imposées. On résout deux fois : `ψ_a` avec les
+parois à `ψ₀` et l'obstacle à 0, `ψ_b` avec les parois à 0 et l'obstacle à 1. La solution
+pour une constante `c` vaut `ψ_a + c·ψ_b`, sa circulation `Γ_a + c·Γ_b`, nulle pour
+`c = −Γ_a / Γ_b`. La circulation discrète est le bilan `Σ w (ψ_voisin − ψ_v)` sur les
+sommets de l'obstacle.
+
+Sur `tunnel.dom`, le corps est presque centré : 24,50 (ordonnée moyenne) contre 24,55.
+Pour un carré placé au quart supérieur d'une veine (exemple `stream_solvers`) : 8,50
+contre 8,92. L'ordonnée moyenne fait passer trop de débit d'un côté du corps, ce qui
+revient à lui donner une circulation, donc une portance qu'il n'a pas.
+
+</details>
+
+<details>
+<summary>Plusieurs obstacles</summary>
+
+Il faut une constante **par corps**, donc savoir à quel corps appartient chaque face
+d'obstacle : un parcours de composantes connexes, comme `check_connected`, mais sur le
+solide. Puis une résolution par corps pour la superposition. Avec une seule constante
+pour deux corps, `ψ` est la même sur les deux : le débit entre eux est nul, et
+l'intervalle qui les sépare devient une zone morte, que la fumée contourne.
+
+</details>
+
+<details>
+<summary><code>--flow computed</code> sous MPI</summary>
+
+Le gradient conjugué distribué n'a besoin que de deux opérations collectives : le
+produit matrice-vecteur, précédé d'un échange de halo (le `Halo` existe, il faut seulement
+une version aux sommets), et le produit scalaire, qui est une somme locale suivie d'un
+`all_reduce_into` en `SUM`, sur le modèle de `global_dt_max`. Attention à ne sommer que
+les sommets **possédés**, sans quoi ceux des halos comptent deux fois.
+
+</details>
+
+<details>
+<summary>Vers <code>ψ</code>–<code>ω</code></summary>
+
+À chaque pas : résoudre `∇²ψ = −ω` (le même système, avec un second membre), en déduire
+les débits des faces, puis transporter `ω` par ces débits avec le solveur du projet, en
+ajoutant la diffusion visqueuse et la condition de paroi de Thom sur `ω`. Le système de
+`ψ` change à chaque pas, ce qui rend le gradient conjugué (ou `faer`, dont la
+factorisation se réutilise) indispensable : Jacobi y passerait tout le temps du calcul.
+
+</details>

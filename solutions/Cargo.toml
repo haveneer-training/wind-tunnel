@@ -1,0 +1,27 @@
+[package]
+name = "wind-tunnel-solutions"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.90"
+description = "Réponses en code aux « pour aller plus loin » du fil rouge, et variantes simples des trous"
+license = "CC-BY-NC-SA-4.0"
+publish = false
+
+# Paquet autonome, comme `solutions/` dans sentinelle : son propre workspace (la table
+# vide ci-dessous) et son propre Cargo.lock. Il n'est pas membre du workspace racine, car
+# `cargo xtask start` recopie le `Cargo.toml` racine dans `travail/` sans y livrer
+# `solutions/` — un membre absent y casserait toute commande cargo.
+#
+#     cargo test --manifest-path solutions/Cargo.toml
+#
+# Il dépend du corrigé par son chemin, avec ses features par défaut (la sentinelle
+# `step13`) : tout le fil rouge est donc disponible, jusqu'à l'étape 12.
+[workspace]
+
+[dependencies]
+wind-tunnel = { path = ".." }
+image = { version = "0.25", default-features = false, features = ["png"] }
+rayon = "1"
+
+[profile.release]
+debug = true

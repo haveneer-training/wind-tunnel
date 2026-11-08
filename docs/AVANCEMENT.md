@@ -358,6 +358,16 @@ et 8 (tampons de gradients, de RK2) plus la construction du maillage, chiffres e
 solutions dépliables à l'appui, et s'appuie sur `examples/alloc_count.rs` — un allocateur
 global compteur qui donne le tableau des allocations par phase.
 
+`solutions/` contient les réponses en code aux « pour aller plus loin » (étapes 10 et 12
+pour l'instant) et les variantes simples des trous (boucles `for` plutôt qu'adaptateurs,
+pile `Vec` plutôt que `VecDeque`…), compilées et testées contre le corrigé. Les réponses
+rédigées sont en fin d'énoncé, sous « Éléments de réponse » (étapes 5, 10, 11, 12). Paquet
+**autonome**, hors du workspace : `cargo xtask start` recopie le `Cargo.toml` racine sans
+livrer `solutions/`, et un membre absent casserait `travail/`. Pour ne rien y dupliquer,
+le corrigé exporte `io::png::Raster`/`BACKGROUND` et les briques de `stream` (voisinage,
+valeurs imposées, résidu) ; ces exports ne sont pas à reprivatiser. Index et reste à
+faire : `solutions/README.md`.
+
 Hors étapes : les slides de transition dans `index.html` du dépôt de formation (point
 resté ouvert dans ses notes de suivi), et le rebranchement éventuel de la démo
 interop existante sur la sortie du fil rouge — **démo seulement**, le programme est
@@ -662,4 +672,6 @@ cd .. && scripts/check-steps.sh              # le même tour, automatisé, étap
                                              # (et le bonus design/, rouge puis vert)
 scripts/check-mpi.sh                         # étape 11 ; sans effet si mpirun est absent
 cargo run --release --features faer --example stream_faer       # extension de l'étape 12
+cargo test --manifest-path solutions/Cargo.toml                 # réponses et variantes
+cargo clippy --manifest-path solutions/Cargo.toml --all-targets -- -D warnings
 ```
