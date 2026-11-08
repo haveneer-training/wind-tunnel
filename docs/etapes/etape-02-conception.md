@@ -3,6 +3,8 @@
 **Fichier :** `design/src/lib.rs` · **Vérification :** `cargo test -p wind-tunnel-design`
 · **≈ 30 min** · *facultatif, à faire au début de l'étape 2*
 
+**Prérequis rustlings :** `07_structs` et `08_enums` — ce bonus en est la mise en pratique directe.
+
 > Il vient juste après les `struct` et les `enum` du sas de fin de J1 : c'est leur
 > première mise en œuvre sur un vrai sujet, et le seul endroit du fil rouge où la forme
 > des types n'est pas donnée d'avance.

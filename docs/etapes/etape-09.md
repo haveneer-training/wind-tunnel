@@ -3,6 +3,8 @@
 **Fichiers :** `src/solver.rs`, `src/gradient.rs` · **Vérification :** `cargo xtask goto 9`,
 `cargo test` · **≈ 40 min**
 
+**Prérequis rustlings :** `18_iterators` (`map`, `zip`, `enumerate`, `for_each`) — `par_iter` n'en est que la version parallèle.
+
 Le solveur est écrit en *gather* depuis l'étape 5 : chaque cellule lit ses voisines et
 n'écrit que sa propre case. Personne n'écrit chez le voisin — c'est précisément ce qui
 rend cette étape possible sans réécrire quoi que ce soit. `FluxScheme` et

@@ -2,6 +2,8 @@
 
 **Fichier :** `src/velocity.rs` · **Vérification :** `cargo xtask goto 4` puis `cargo test` · **≈ 20 min**
 
+**Prérequis rustlings :** `14_generics`, `15_traits` (implémentation d'un trait, trait bounds).
+
 Le traceur ne se déplace pas tout seul : il est transporté. Il nous faut donc un champ de
 vitesse — et, cette fois, un trait pour ne pas dépendre de la façon dont il est obtenu.
 

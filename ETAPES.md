@@ -109,6 +109,10 @@ La colonne **« ce que vous écrivez »** est ce qui sort de votre clavier ; la 
 deux comptent, mais elles ne s'apprennent pas de la même façon — et le tableau dit
 laquelle domine à chaque étape.
 
+Chaque énoncé commence par ses **prérequis rustlings** : les chapitres des exercices
+préalables dont l'étape se sert. Si une notion bloque, c'est le chapitre à refaire avant
+d'insister sur le trou.
+
 | # | Étape | Jour | ~Durée | Ce que vous écrivez | Ce que vous lisez |
 |---|---|---|---|---|---|
 | [0](docs/etapes/etape-00.md) | Géométrie de base | J1 | 20 min | types, fonctions, `Vec`, itérateurs | `derive`, doc-tests |

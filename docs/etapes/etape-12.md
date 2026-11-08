@@ -3,6 +3,8 @@
 **Fichier :** `src/stream.rs` · **Vérification :** `cargo xtask goto 12`, `cargo test`
 · **≈ 40 min** · *bonus*
 
+**Prérequis rustlings :** `18_iterators`, et le parallélisme `rayon` de l'étape 9.
+
 Dessinez un carré dans le masque, lancez le calcul, regardez la fumée : elle contourne un
 cercle. Depuis l'étape 4, l'écoulement porteur est une formule — celle du cylindre — et
 `obstacle()` se contente de réduire la forme dessinée à un disque de même aire. La forme,

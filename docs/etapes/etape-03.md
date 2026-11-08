@@ -2,6 +2,8 @@
 
 **Fichiers :** `src/mask.rs`, `src/io/vtk.rs`, `src/error.rs` · **Vérification :** `cargo xtask goto 3` puis `cargo test` · **≈ 25 min**
 
+**Prérequis rustlings :** `13_error_handling` (erreurs personnalisées, `?`), `12_options`. En autonomie : `09_strings` (`&str`, `chars()`), `23_conversions` (le trait `From`).
+
 Un calcul dont on ne voit rien ne sert à rien, et un calcul qui échoue sans le dire est
 pire qu'inutile. Cette étape traite les deux faces de la même pièce : les sorties, et ce
 qu'on raconte quand ça se passe mal — à l'entrée du programme comme à sa sortie.

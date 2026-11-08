@@ -2,6 +2,8 @@
 
 **Fichier :** `src/mask.rs` · **Vérification :** `cargo xtask goto 1` puis `cargo test` · **≈ 35 min**
 
+**Prérequis rustlings :** `06_move_semantics` — copie ou déplacement, `&T` ou `&mut T` : c'est tout le sujet de `refine`.
+
 Le domaine de calcul est dessiné à la main dans un fichier texte : `.` pour du fluide,
 `#` pour du solide. C'est confortable pour l'utilisateur, et c'est donc l'endroit exact
 où le programme recevra des données fausses.

@@ -2,6 +2,8 @@
 
 **Fichiers :** `src/gradient.rs` · `src/flux.rs` · **Vérification :** `cargo xtask goto 7`, `cargo test` · **≈ 30 min**
 
+**Prérequis rustlings :** `12_options` (`match` sur `grad_right`). Ouverte dès la fin du J2, elle n'exige pas `18_iterators`.
+
 L'étape 6 a mesuré la fausse diffusion du décentrement amont : nulle quand l'écoulement
 suit les axes du maillage, maximale à 45°. Sur un maillage non structuré, l'écoulement
 n'est *jamais* aligné avec les faces — cette étape s'attaque donc au défaut, pas à un cas

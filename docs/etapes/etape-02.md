@@ -2,6 +2,8 @@
 
 **Fichiers :** `src/mask.rs`, `src/mesh.rs` · **Vérification :** `cargo xtask goto 2` puis `cargo test` · **≈ 45 min**
 
+**Prérequis rustlings :** `07_structs`, `08_enums` (pour `Side` et le `match` imbriqué de `pair_edge`), `12_options` et `13_error_handling` (premier `Err`, `?`). En autonomie : `11_hashmaps`, pour le `get`/`insert` de la clé canonique.
+
 C'est le cœur de la structure de données. Une cellule ne connaîtra pas ses voisins par
 arithmétique d'indices, mais par ses faces : tout ce qui sera écrit au-dessus
 fonctionnerait donc à l'identique sur un maillage lu depuis un fichier.

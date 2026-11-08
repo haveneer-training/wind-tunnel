@@ -4,6 +4,8 @@
 · **Vérification :** `cargo xtask goto 11`, `cargo test`, puis `mpirun -n 4 …`
 · **≈ 60 min** · *bonus*
 
+**Prérequis rustlings :** `20_threads` (pour `Send`) et `18_iterators`. MPI lui-même n'a pas d'équivalent rustlings : voir les slides `rsmpi`.
+
 Les étapes 9 et 10 ont fait travailler plusieurs cœurs sur **une seule** mémoire :
 `par_iter()` et `thread::scope` supposent tous les deux que n'importe quel thread peut
 lire n'importe quelle cellule. Au-delà d'une machine, il faut passer par le réseau,

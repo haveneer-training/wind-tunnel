@@ -2,6 +2,8 @@
 
 **Fichiers :** `src/solver.rs` · **Vérification :** `cargo xtask goto 8`, `cargo test` · **≈ 20 min**
 
+**Prérequis rustlings :** `18_iterators` (`zip`), conseillé ; une boucle `for` sur les indices suffit.
+
 À l'étape 6, l'ordre mesuré (`tests/order.rs`) valait ≈ 1 : normal, décentrement amont et
 Euler explicite sont tous deux d'ordre 1. À l'étape 7, la reconstruction MUSCL a passé
 l'espace à l'ordre 2 — et l'ordre mesuré n'a **pas bougé**. Cette étape referme

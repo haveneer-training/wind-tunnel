@@ -2,6 +2,8 @@
 
 **Fichiers :** `src/field.rs`, `src/mesh.rs` · **Vérification :** `cargo xtask goto 6`, `cargo test`, puis `cargo clippy --all-targets --all-features -- -D warnings` · **≈ 45 min**
 
+**Prérequis rustlings :** `17_tests` (tests unitaires et d'intégration), `22_clippy`.
+
 Le code tourne depuis l'étape 5 et produit ses premières images. Cette étape ne lui ajoute
 rien : elle vérifie ce qu'il fait déjà, de deux façons différentes, et fait le ménage dans
 ce que vous avez écrit.

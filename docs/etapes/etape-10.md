@@ -3,6 +3,8 @@
 **Fichier :** `src/io/png.rs` · **Vérification :** `cargo xtask goto 10`, `cargo test`
 · **≈ 45 min**
 
+**Prérequis rustlings :** `20_threads` (`spawn`, `move`, `Send`/`Sync`, `Mutex`) ; `19_smart_pointers` pour `Arc`, utile aux extensions.
+
 L'étape 9 a paralléliné trois boucles sans rien changer à leur forme : chaque cellule
 lisait ses voisines et n'écrivait que sa propre case, donc `.iter()` devenait
 `.par_iter()` et le compilateur laissait faire. Le rendu PNG est différent : toutes les

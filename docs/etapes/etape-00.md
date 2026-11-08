@@ -2,6 +2,8 @@
 
 **Fichier :** `src/geom.rs` · **Vérification :** `cargo xtask goto 0` puis `cargo test` · **≈ 20 min**
 
+**Prérequis rustlings :** `01_variables`, `02_functions`, `03_if`, `04_primitive_types` (tuples, tableaux, tranches), `05_vecs`.
+
 Avant le maillage, les briques : un point, un vecteur, l'aire et le centre de gravité
 d'un polygone. Ce sera la fondation de tout le reste, et l'occasion de voir à quoi
 ressemble du Rust ordinaire.
