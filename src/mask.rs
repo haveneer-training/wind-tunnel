@@ -135,7 +135,10 @@ impl Mask {
         // place de chaque case, chacune reprenant la valeur de celle dont elle vient.
         // Un `factor` de 0 ou 1 ne change rien, et le masque courant est seulement
         // *emprunté* : il faut donc en rendre un nouveau.
-        // HINT: Un cellule "refined" réduite d'un facteur `factor` retombe sur une cellule originale
+        // HINT : la case `(row, col)` du masque raffiné reprend la case
+        // `(row / factor, col / factor)` de l'original ; `self.clone()` si `factor <= 1`.
+        // Réserver la place d'un coup : `Vec::with_capacity(rows * cols)`, puis deux boucles
+        // imbriquées et `push` ; finir par `Mask { rows, cols, fluid }` (forme abrégée).
         // SOLUTION-BEGIN
         if factor <= 1 {
             return self.clone();
@@ -196,11 +199,17 @@ impl Mask {
 
     /// Vérifie que le fluide est d'un seul tenant.
     ///
-    /// Un parcours en largeur suffit : on part de la première cellule fluide, et si
-    /// l'on n'a pas tout atteint, on compte les morceaux restants pour le message.
+    /// On compte les composantes : chaque cellule fluide qu'aucun parcours n'a encore
+    /// atteinte en démarre un nouveau (en largeur, voir `explore`). Plus d'une, et le
+    /// domaine est coupé — leur nombre va dans le message d'erreur.
     fn check_connected(&self) -> Result<(), MeshError> {
         // TODO-STEP:1 Compter les composantes : chaque cellule fluide encore non visitée
         // démarre une exploration ; renvoyer `Disconnected` si le compte dépasse un.
+        // HINT : `seen` vaut `vec![false; self.fluid.len()]`, puis :
+        //     composantes = 0
+        //     pour chaque indice k fluide et pas encore vu :
+        //         composantes += 1 ; explorer depuis k
+        //     composantes > 1 → `Err(MeshError::Disconnected { components })`
         // SOLUTION-BEGIN
         let mut seen = vec![false; self.fluid.len()];
         let mut components = 0usize;
@@ -222,6 +231,14 @@ impl Mask {
     fn fluid_neighbours(&self, k: usize) -> Vec<usize> {
         // TODO-STEP:1 Convertir l'indice à plat en ligne/colonne et collecter les
         // voisines fluides situées dans la grille, sans diagonales.
+        // HINT : piège — `row - 1` sur un `usize` nul panique (débordement). Le plus simple :
+        // tester avant de soustraire, voisine par voisine, dans un `Vec` que l'on remplit :
+        //     si row > 0 et is_fluid(row - 1, col) → pousser (row - 1)·cols + col
+        //     si is_fluid(row + 1, col)            → pousser (row + 1)·cols + col
+        //     (idem à gauche avec col > 0, et à droite)
+        // `is_fluid` répond déjà `false` au-delà du bord bas ou droit. Variante (J2, avec
+        // `Option`) : `row.checked_sub(1)` rend `None` au lieu de paniquer, et
+        // `filter_map(|(r, c)| Some((r?, c?)))` écarte les candidats hors grille.
         // SOLUTION-BEGIN
         let (row, col) = (k / self.cols, k % self.cols);
         [
@@ -243,6 +260,17 @@ impl Mask {
     fn explore(&self, start: usize, seen: &mut [bool]) {
         // TODO-STEP:1 Parcourir la composante avec une file ; marquer chaque cellule
         // avant de l'ajouter afin qu'elle ne soit mise en file qu'une seule fois.
+        // HINT : un simple `Vec` sert de pile — `vec![start]`, `push`, `pop` :
+        //     marquer start ; pile = [start]
+        //     tant que la pile n'est pas vide :
+        //         k = pile.pop().unwrap()
+        //         pour chaque voisine v non marquée de `self.fluid_neighbours(k)` :
+        //             marquer v, l'empiler
+        // L'ordre de visite (en profondeur) importe peu : seul compte qui est atteint. Pas
+        // de récursion : sur un maillage raffiné, la pile d'appels déborderait. `clippy`
+        // (étape 6) vous proposera `while let Some(k) = pile.pop()` à la place du test.
+        // Variante : `std::collections::VecDeque` (`push_back`/`pop_front`) donne un
+        // parcours en largeur.
         // SOLUTION-BEGIN
         let mut queue = std::collections::VecDeque::from([start]);
         seen[start] = true;
@@ -313,6 +341,9 @@ fn parse_row(
 fn cell_of(ch: char, line: usize, col: usize) -> Result<bool, MeshError> {
     // TODO-STEP:3 Associer `FLUID` à `true`, `SOLID` à `false` et tout autre caractère
     // à `MeshError::InvalidChar`, avec les coordonnées reçues.
+    // HINT : les constantes `FLUID` et `SOLID` servent directement de motifs dans un `match`.
+    // Piège : un nom en minuscules dans un motif (`fluid =>`) n'est pas une comparaison mais
+    // une nouvelle variable, qui attrape tout. Le dernier bras, `ch => Err(…)`, en profite.
     // SOLUTION-BEGIN
     match ch {
         FLUID => Ok(true),
@@ -328,6 +359,7 @@ fn cell_of(ch: char, line: usize, col: usize) -> Result<bool, MeshError> {
 fn check_width(width: usize, expected: Option<usize>, line_no: usize) -> Result<(), MeshError> {
     // TODO-STEP:3 Comparer la largeur à la largeur attendue, si elle existe, et
     // construire `RaggedMask` avec les coordonnées fournies.
+    // HINT : en édition 2024, `if let Some(expected) = expected && width != expected { … }`.
     // SOLUTION-BEGIN
     if let Some(expected) = expected
         && width != expected
@@ -353,6 +385,10 @@ fn parse_row(
 ) -> Result<usize, MeshError> {
     // TODO-STEP:3 Calculer et vérifier la largeur, convertir les caractères avec
     // `cell_of`, puis renvoyer la largeur.
+    // HINT : `line.len()` compte des **octets**, pas des caractères : `line.chars().count()`.
+    // `?` après `check_width(…)` et `cell_of(…)` remonte leur erreur telle quelle ;
+    // `for (col, ch) in line.chars().enumerate()` compte à partir de 0, les colonnes
+    // affichées à partir de 1 (`col + 1`).
     // SOLUTION-BEGIN
     let width = line.chars().count();
     check_width(width, expected, line_no)?;

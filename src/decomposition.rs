@@ -113,6 +113,9 @@ impl Bands {
         // que possible : chaque bande reçoit `cols / parts` colonnes, et les
         // `cols % parts` premières en reçoivent une de plus. Renvoyer l'intervalle des
         // colonnes de la bande `part`.
+        // HINT : avec width = cols / parts et reste = cols % parts :
+        //     début = part·width + min(part, reste)
+        //     fin   = début + width + (1 si part < reste, sinon 0)    — `usize::from(bool)`
         // SOLUTION-BEGIN
         let width = self.cols / self.parts;
         let remainder = self.cols % self.parts;
@@ -187,6 +190,9 @@ impl Layout {
     pub fn new(mask: &Mask, bands: &Bands, part: usize) -> Layout {
         // TODO-STEP:11 Parcourir les cellules fluides de la bande étendue dans l'ordre
         // ligne/colonne et confier leur classement à `place`.
+        // HINT : partir de `Layout::empty(bands, part)` ; un compteur `next` numérote les
+        // cellules fluides dans l'ordre (`CellId(next)`). `layout.extended` est un `Range` :
+        // itérer dessus le consommerait, d'où `layout.extended.clone()`.
         // SOLUTION-BEGIN
         let mut layout = Layout::empty(bands, part);
         let mut next = 0u32;
@@ -252,6 +258,9 @@ impl Layout {
 fn place(layout: &mut Layout, col: usize, id: CellId, bands: &Bands) {
     // TODO-STEP:11 Classer la cellule selon sa plage possédée, puis déléguer les
     // cellules possédées aux listes d'envoi.
+    // HINT : avec owned = `bands.owned(layout.part)` :
+    //     col < owned.start → `recv_left`     col >= owned.end → `recv_right`
+    //     sinon → `owned`, puis `mark_sends`
     // SOLUTION-BEGIN
     let owned = bands.owned(layout.part);
     if col < owned.start {
@@ -270,6 +279,9 @@ fn place(layout: &mut Layout, col: usize, id: CellId, bands: &Bands) {
 fn mark_sends(layout: &mut Layout, col: usize, id: CellId, bands: &Bands) {
     // TODO-STEP:11 Tester si la cellule se trouve dans le halo possédé de gauche
     // ou de droite et l'ajouter à la liste d'envoi correspondante.
+    // HINT : deux `if` indépendants (une bande étroite envoie des deux côtés) :
+    //     part > 0          et col < owned.start + halo → `send_left`
+    //     part + 1 < parts  et col + halo >= owned.end  → `send_right`
     // SOLUTION-BEGIN
     let owned = bands.owned(layout.part);
     let halo = bands.halo();

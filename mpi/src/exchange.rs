@@ -71,6 +71,7 @@ impl Halo {
 fn pack_all(c: &Field, layout: &Layout, to_left: &mut Vec<f64>, to_right: &mut Vec<f64>) {
     // TODO-STEP:11 Remplir les deux tampons d'envoi à partir des listes de cellules
     // possédées correspondantes.
+    // HINT : `pack_into` fait le travail pour un côté.
     // SOLUTION-BEGIN
     pack_into(c, &layout.send_left, to_left);
     pack_into(c, &layout.send_right, to_right);
@@ -86,8 +87,18 @@ fn transfer(
     from_left: &mut [f64],
     from_right: &mut [f64],
 ) {
-    // TODO-STEP:11 Dans `multiple_scope`, poster les réceptions avant les envois,
-    // puis attendre toutes les requêtes sans annoter leurs types génériques.
+    // TODO-STEP:11 Dans `multiple_scope`, poster pour chaque voisin existant la
+    // réception puis l'envoi immédiats, et attendre toutes les requêtes d'un coup.
+    // HINT : squelette, le reste est à vous :
+    //     mpi::request::multiple_scope(4, |scope, requests| {
+    //         // pour chaque voisin (`layout.left()`, `layout.right()` : des `Option`) :
+    //         //     let peer = world.process_at_rank(rang as i32);
+    //         //     requests.add(peer.immediate_receive_into(scope, tampon_reçu));
+    //         //     requests.add(peer.immediate_send(scope, tampon_envoyé));
+    //         requests.wait_all(&mut Vec::with_capacity(4));
+    //     });
+    // Une fermeture locale `let mut post = |rang, reçu, envoyé| { … };` évite d'écrire
+    // deux fois le même code ; n'annotez pas les types des requêtes, l'inférence s'en charge.
     // SOLUTION-BEGIN
     mpi::request::multiple_scope(4, |scope, requests| {
         let mut post = |rank, receive, send| {
@@ -108,6 +119,7 @@ fn transfer(
 fn unpack_all(c: &mut Field, layout: &Layout, from_left: &[f64], from_right: &[f64]) {
     // TODO-STEP:11 Recopier chaque tampon reçu dans les cellules fantômes du côté
     // correspondant.
+    // HINT : `unpack` fait le travail pour un côté.
     // SOLUTION-BEGIN
     unpack(c, &layout.recv_left, from_left);
     unpack(c, &layout.recv_right, from_right);
@@ -124,6 +136,8 @@ fn unpack_all(c: &mut Field, layout: &Layout, from_left: &[f64], from_right: &[f
 pub fn global_dt_max(world: &SimpleCommunicator, local: f64) -> f64 {
     // TODO-STEP:11 Réduire `local` sur tous les rangs avec l'opérateur MIN
     // (`all_reduce_into`, `SystemOperation::min()`), et renvoyer le résultat.
+    // HINT : `all_reduce_into(&local, &mut global, …)` écrit dans `global` : il doit exister
+    // avant l'appel, `let mut global = 0.0;` (la valeur initiale est écrasée).
     // SOLUTION-BEGIN
     let mut global = 0.0;
     world.all_reduce_into(&local, &mut global, SystemOperation::min());

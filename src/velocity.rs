@@ -96,6 +96,7 @@ impl VelocityField for Uniform {
         // TODO-STEP:4 La fonction de courant d'un écoulement uniforme. Elle est imposée
         // par `u = (∂ψ/∂y, −∂ψ/∂x)` : cherchez le `ψ` dont les deux dérivées partielles
         // redonnent `value`, et fixez la constante d'intégration à zéro.
+        // HINT : ψ = value.x·y − value.y·x convient : ∂ψ/∂y = value.x et −∂ψ/∂x = value.y.
         // SOLUTION-BEGIN
         self.value.x * p.y - self.value.y * p.x
         // SOLUTION-END

@@ -136,6 +136,8 @@ fn cells_size(mesh: &Mesh) -> usize {
 fn write_cell_line(w: &mut impl Write, cell: &Cell) -> io::Result<()> {
     // TODO-STEP:3 Écrire le nombre de sommets, leurs indices séparés par des espaces,
     // puis terminer la ligne.
+    // HINT : `write!` n'ajoute pas de fin de ligne, `writeln!(w)` termine ; `?` après
+    // chaque écriture.
     // SOLUTION-BEGIN
     let vertices = cell.kind.vertices();
     write!(w, "{}", vertices.len())?;

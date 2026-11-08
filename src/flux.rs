@@ -97,6 +97,10 @@ impl FluxScheme for Muscl {
         // TODO-STEP:7 Extrapoler linéairement la valeur amont jusqu'à la face à
         // partir de son gradient limité ; sans voisin intérieur de ce côté, retenir la
         // valeur de bord telle quelle
+        // HINT :
+        //     un ≥ 0 → c_left + grad_left · to_face_left
+        //     sinon  → `grad_right` est une `Option` : `Some(g)` → c_right + g · to_face_right,
+        //              `None` (face de bord) → c_right
         // SOLUTION-BEGIN
         if s.un >= 0.0 {
             s.c_left + s.grad_left.dot(s.to_face_left)

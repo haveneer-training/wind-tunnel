@@ -134,6 +134,8 @@ impl std::error::Error for MeshError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         // TODO-STEP:3 Renvoyer l'erreur sous-jacente pour la variante qui en porte une,
         // et `None` pour toutes les autres
+        // HINT : un `match self` avec un bras attrape-tout `_` ; `Some(e)` se convertit seul
+        // en `Option<&dyn Error>`.
         // SOLUTION-BEGIN
         match self {
             MeshError::Io(e) => Some(e),

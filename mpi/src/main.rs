@@ -71,9 +71,10 @@ fn time_loop<F: FluxScheme>(
         )
     };
 
-    // TODO-STEP:11 Avancer chaque pas avec `advance_step`, puis appeler le rapporteur
-    // à la cadence demandée.
-    // HINT : `advance_step` gère les halos ; traiter ensuite `every` et `report`.
+    // TODO-STEP:11 Avancer chaque pas avec la fermeture `advance` ci-dessus, puis appeler
+    // le rapporteur à la cadence demandée.
+    // HINT : `advance(c, halo)?` enveloppe `advance_step` et ses dix arguments, halos
+    // compris ; `report(step, c, halo)?` tous les `every` pas (`every == 0` : jamais).
     // SOLUTION-BEGIN
     for step in 1..=config.max_steps {
         advance(c, halo)?;

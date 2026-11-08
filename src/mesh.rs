@@ -431,6 +431,8 @@ impl Mesh {
     fn build_cell_faces(&mut self) {
         // TODO-STEP:2 (pour aller plus loin) Compter les faces, calculer les offsets
         // cumulés, puis remplir les indices de faces par cellule.
+        // HINT : enchaîner `face_counts`, `offsets_from_counts`, `fill_cell_faces`, puis ranger
+        // les deux tableaux dans `self.cell_face_offsets` et `self.cell_face_indices`.
         // SOLUTION-BEGIN
         let counts = face_counts(self.cells.len(), &self.faces);
         let offsets = offsets_from_counts(&counts);
@@ -446,6 +448,9 @@ impl Mesh {
 fn face_counts(cell_count: usize, faces: &[Face]) -> Vec<u32> {
     // TODO-STEP:2 Compter chaque face pour sa cellule gauche et, si elle est interne,
     // aussi pour sa cellule droite.
+    // HINT : `vec![0; cell_count + 1]`, et compter la cellule `i` dans la case `i + 1` : la
+    // case 0 reste nulle, et la somme préfixe donnera directement les débuts de liste.
+    // Cellule de droite : `if let Side::Inner(right) = face.right`.
     // SOLUTION-BEGIN
     let mut counts = vec![0; cell_count + 1];
     for face in faces {
@@ -463,6 +468,8 @@ fn face_counts(cell_count: usize, faces: &[Face]) -> Vec<u32> {
 fn offsets_from_counts(counts: &[u32]) -> Vec<u32> {
     // TODO-STEP:2 Construire les sommes préfixes : chaque offset indique le début
     // de la liste de la cellule correspondante.
+    // HINT : `counts` commence par un 0 (voir `face_counts`) : copier (`to_vec`), puis
+    // `offsets[i] += offsets[i - 1]` pour i de 1 à la fin. Le dernier offset est le total.
     // SOLUTION-BEGIN
     let mut offsets = counts.to_vec();
     for i in 1..offsets.len() {
@@ -477,6 +484,9 @@ fn offsets_from_counts(counts: &[u32]) -> Vec<u32> {
 fn fill_cell_faces(faces: &[Face], offsets: &[u32]) -> Vec<FaceId> {
     // TODO-STEP:2 Parcourir les faces et écrire leur identifiant dans les tranches
     // de leurs cellules, en avançant un curseur distinct par cellule.
+    // HINT : curseurs = `offsets[..offsets.len() - 1].to_vec()` (une copie, qu'on avance) ;
+    // résultat = `vec![FaceId(0); total]` ; `place_face` pour `face.left`, et pour la droite
+    // si `Side::Inner`. L'identifiant de la i-ième face est `FaceId(i as u32)`.
     // SOLUTION-BEGIN
     let mut cursor = offsets[..offsets.len() - 1].to_vec();
     let mut indices = vec![FaceId(0); offsets[offsets.len() - 1] as usize];
@@ -527,6 +537,10 @@ fn cell_corners(
     let tl = (row, col);
     // TODO-STEP:2 Renvoyer les quatre coins dans le sens direct (bl, br, tr, tl), en
     // retirant celui qui est coincé entre deux parois perpendiculaires
+    // HINT : un `match` sur le quadruplet `(down, right, up, left)` :
+    //     bas + droite seuls → sans `br`      droite + haut seuls → sans `tr`
+    //     haut + gauche seuls → sans `tl`     gauche + bas seuls → sans `bl`
+    //     tout autre cas (`_`) → les quatre coins
     // SOLUTION-BEGIN
     match (down, right, up, left) {
         (true, true, false, false) => vec![bl, tr, tl], // bas + droite : plus de br
@@ -577,6 +591,8 @@ fn edge_key(a: VertexId, b: VertexId) -> (u32, u32) {
 fn build_faces(cells: &[Cell], vertices: &[Point]) -> Result<Vec<Face>, MeshError> {
     // TODO-STEP:2 Parcourir les arêtes et déléguer à `pair_edge` leur création ou leur
     // appariement ; renvoyer immédiatement la première erreur.
+    // HINT : les arêtes d'une cellule sont `verts[k]` → `verts[(k + 1) % verts.len()]` ;
+    // `?` après `pair_edge(…)` remonte la première erreur ; finir par `Ok(faces)`.
     // SOLUTION-BEGIN
     let mut faces: Vec<Face> = Vec::new();
     let mut seen: HashMap<(u32, u32), FaceId> = HashMap::new();
@@ -603,6 +619,13 @@ fn pair_edge(
 ) -> Result<(), MeshError> {
     // TODO-STEP:2 Chercher la clé canonique : créer la face si elle est nouvelle,
     // apparier la seconde cellule, ou signaler une troisième rencontre.
+    // HINT : piège d'emprunt — `seen.get(&key)` rend une référence *dans* `seen` ; tant
+    // qu'elle vit, le bras `None` ne peut pas appeler `seen.insert` (erreur E0502).
+    // `.copied()` en fait une `Option<FaceId>` et libère l'emprunt. Puis :
+    //     None     → pousser `boundary_face(a, b, cell, vertices)`, retenir son
+    //                identifiant `FaceId((faces.len() - 1) as u32)` dans `seen`
+    //     Some(id) → selon `faces[id.index()].right` : `Boundary` → la passer à
+    //                `Side::Inner(cell)` ; `Inner` → `NonManifoldEdge { a: key.0, b: key.1 }`
     // SOLUTION-BEGIN
     let key = edge_key(a, b);
     match seen.get(&key).copied() {

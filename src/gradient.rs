@@ -49,6 +49,9 @@ fn least_squares_gradient(mesh: &Mesh, c: &Field, id: CellId) -> Vec2 {
     // Cramer, en renvoyant le vecteur nul plutôt qu'un quotient par zéro quand le
     // déterminant est négligeable — moins de deux directions indépendantes, il n'y a
     // rien à reconstruire.
+    // HINT :
+    //     det = sxx·syy − sxy²        si |det| < 1e-300 → `Vec2::ZERO`
+    //     ∇c  = ((syy·sxc − sxy·syc) / det, (sxx·syc − sxy·sxc) / det)
     // SOLUTION-BEGIN
     let det = sys.sxx * sys.syy - sys.sxy * sys.sxy;
     if det.abs() < 1e-300 {
@@ -157,6 +160,8 @@ fn barth_jespersen(mesh: &Mesh, c: &Field, gradient: Vec2, id: CellId) -> f64 {
 pub fn limited_gradients(mesh: &Mesh, c: &Field, out: &mut [Vec2]) {
     // TODO-STEP:9 Paralléliser avec rayon : chaque cellule ne lit que `mesh` et `c`
     // (partagés, en lecture seule) et n'écrit que sa propre case de `out`.
+    // HINT : comme `Solver::residual` : `out.par_iter_mut().enumerate()`, puis `for_each`
+    // sur `(i, slot)` ; `take(mesh.n_cells())` borne le parcours aux cellules.
     // SOLUTION-BEGIN
     out.par_iter_mut()
         .enumerate()

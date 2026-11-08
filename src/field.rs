@@ -101,6 +101,9 @@ impl Field {
     #[cfg_attr(not(feature = "step6"), allow(unused_variables))] // trou étape 6
     pub fn mean_abs_error(&self, other: &Field, mesh: &Mesh) -> f64 {
         // TODO-STEP:6 Écart moyen pondéré par l'aire entre les deux champs
+        // HINT : Σ |aᵢ − bᵢ|·aireᵢ / Σ aireᵢ — deux accumulateurs et une boucle sur les
+        // indices : `self.data[i]`, `other.data[i]`, `mesh.cells()[i].area`.
+        // Variante : `zip` des trois, puis un seul `fold` sur (numérateur, dénominateur).
         // SOLUTION-BEGIN
         let (num, den) = self
             .data

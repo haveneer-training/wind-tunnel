@@ -161,6 +161,8 @@ impl RenderBuffers {
 fn contains(polygon: &[Point], p: Point) -> bool {
     // TODO-STEP:3 (pour aller plus loin) Inverser le résultat à chaque arête qui
     // traverse le rayon horizontal partant de `p`.
+    // HINT : les arêtes sont `(polygon[k], polygon[(k + 1) % n])` ; `inside = !inside` à
+    // chaque arête pour laquelle `crosses` répond vrai.
     // SOLUTION-BEGIN
     let mut inside = false;
     let n = polygon.len();
@@ -179,6 +181,10 @@ fn contains(polygon: &[Point], p: Point) -> bool {
 fn crosses(a: Point, b: Point, p: Point) -> bool {
     // TODO-STEP:3 Tester le changement de côté vertical, puis comparer l'abscisse
     // du point d'intersection avec celle de `p`.
+    // HINT : si `(a.y > p.y) == (b.y > p.y)`, l'arête ne coupe pas l'horizontale de `p`
+    // → `false`. Sinon l'intersection est en
+    //     x = a.x + (p.y − a.y) / (b.y − a.y) · (b.x − a.x)
+    // et l'arête compte si `p.x < x`.
     // SOLUTION-BEGIN
     if (a.y > p.y) == (b.y > p.y) {
         return false;
@@ -230,6 +236,8 @@ fn render_chunk(
 ) {
     // TODO-STEP:10 Réutiliser les tampons du thread, rendre chaque cellule, puis
     // envoyer le nombre de cellules traitées.
+    // HINT : `RenderBuffers::new()` une fois pour la tranche ; l'identifiant global d'une
+    // cellule est `CellId((base + local) as u32)` ; `tx.send(n)` rend un `Result`.
     // SOLUTION-BEGIN
     let mut buffers = RenderBuffers::new();
     for (local, cell) in cells.iter().enumerate() {
@@ -255,6 +263,10 @@ fn render_cell(
 ) {
     // TODO-STEP:10 Utiliser `Raster` pour obtenir les pixels de la cellule, puis les
     // écrire avec `paint` en réutilisant les tampons.
+    // HINT : `cell_pixels` veut trois `&mut` à la fois : `&mut buffers.polygon`,
+    // `&mut buffers.corners`, `&mut buffers.pixels`. Le compilateur l'accepte car ce sont des
+    // **champs distincts** (emprunts disjoints) — il refuserait la même chose à travers une
+    // méthode `&mut self` de `RenderBuffers`. Puis `paint(image, &buffers.pixels, color)`.
     // SOLUTION-BEGIN
     let color = raster.cell_pixels(
         mesh,
@@ -274,6 +286,8 @@ fn render_cell(
 fn chunk_size(n: usize, threads: usize) -> usize {
     // TODO-STEP:10 Répartir les cellules aussi également que possible et éviter
     // une taille nulle, même si `threads` vaut zéro.
+    // HINT : `usize::div_ceil` arrondit au-dessus ; `max(1)` évite le zéro, avant la
+    // division comme après.
     // SOLUTION-BEGIN
     n.div_ceil(threads.max(1)).max(1)
     // SOLUTION-END
@@ -284,6 +298,8 @@ fn chunk_size(n: usize, threads: usize) -> usize {
 #[cfg_attr(not(feature = "step11"), allow(dead_code))] // appelée depuis render_chunk
 fn paint(image: &Mutex<RgbImage>, pixels: &[(u32, u32)], color: Rgb<u8>) {
     // TODO-STEP:10 Verrouiller l'image une fois et écrire chaque pixel calculé.
+    // HINT : `image.lock().unwrap()` rend un garde : le verrou tient tant qu'il vit. Le
+    // prendre une seule fois avant la boucle, puis `put_pixel(x, y, color)`.
     // SOLUTION-BEGIN
     let mut image = image.lock().unwrap();
     for &(x, y) in pixels {
@@ -304,6 +320,11 @@ fn render_all(
 ) -> usize {
     // TODO-STEP:10 Lancer un thread scoped par tranche, récupérer les comptes via
     // le canal et renvoyer leur somme.
+    // HINT : `let (tx, rx) = mpsc::channel::<usize>()` ; dans `thread::scope(|scope| …)`,
+    // une tranche par élément de `mesh.cells().chunks(chunk)`, lancée par
+    // `scope.spawn(move || render_chunk(…))` avec son propre clone de `tx`.
+    // Piège : `rx.iter()` ne s'arrête que quand *tous* les `Sender` sont détruits —
+    // `drop(tx)` sur l'original avant de lire, sinon l'appel attend pour toujours.
     // SOLUTION-BEGIN
     let (tx, rx) = mpsc::channel::<usize>();
     thread::scope(|scope| {

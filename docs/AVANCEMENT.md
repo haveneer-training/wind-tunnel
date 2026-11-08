@@ -447,6 +447,10 @@ l'étape en cours. Le scan se refait en régénérant `travail/` puis, pour chaq
    `// SOLUTION-BEGIN`** : `step_of` (`xtask/src/blocks.rs`) remonte jusqu'au premier
    code ; s'il ne trouve pas le marqueur, il échoue explicitement au lieu d'attribuer le
    trou à l'étape 0. Une consigne longue va dans la documentation de la fonction.
+   **Le `// HINT :`**, dans ce même bloc, sous la consigne, donne l'outil Rust ou le
+   piège du compilateur que la consigne ne nomme pas (`checked_sub`, `.copied()`,
+   `drop(tx)`…), et le pseudo-code quand l'algorithme ou la formule n'est pas l'objet
+   de l'exercice : le stagiaire doit buter sur le Rust, pas sur les maths.
    **Le trou « vide »**, second type de trou : `// SOLUTION-BEGIN vide` remplace le bloc
    par **rien du tout** au lieu d'un `todo!()`, et son marqueur dit « à écrire de zéro »
    dans `travail/`. Il sert quand le stagiaire doit écrire des *définitions* — types,

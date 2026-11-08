@@ -144,6 +144,10 @@ fn adjacency(mesh: &Mesh) -> Adjacency {
 fn obstacle_level(mesh: &Mesh, options: &StreamOptions) -> Option<f64> {
     // TODO-STEP:12 Calculer la valeur constante de ψ sur l'obstacle à partir de
     // l'ordonnée moyenne de ses sommets. Renvoyer `None` s'il n'y a pas d'obstacle.
+    // HINT :
+    //     ψ_obstacle = speed · (ȳ − ymin)
+    // ȳ : moyenne des `y` des deux sommets de chaque face du groupe `BoundaryKind::Obstacle`
+    // (`mesh.groups().get(…)?` rend `None` pour vous) ; `ymin` : 2ᵉ valeur de `mesh.bounds()`.
     // SOLUTION-BEGIN
     let (_, ymin, _, _) = mesh.bounds();
     let groups = mesh.groups();
@@ -164,8 +168,10 @@ fn obstacle_level(mesh: &Mesh, options: &StreamOptions) -> Option<f64> {
 /// donnée par [`obstacle_level`], et la sortie reste libre (condition de Neumann).
 #[cfg_attr(not(feature = "step12"), allow(unused_variables))] // trou étape 12
 fn boundary_values(mesh: &Mesh, options: &StreamOptions) -> Vec<Option<f64>> {
-    // TODO-STEP:12 Initialiser tous les sommets libres, fixer les parois et l'entrée
-    // avec ψ₀, puis fixer l'obstacle à sa valeur constante.
+    // TODO-STEP:12 Initialiser tous les sommets libres, fixer l'obstacle à sa valeur
+    // constante, puis l'entrée et les parois avec ψ₀.
+    // HINT : ψ₀(p) = speed · (p.y − ymin) s'écrit en fermeture `|p: Point| …` et se passe
+    // telle quelle à `fix_group` ; départ : `vec![None; mesh.n_vertices()]`.
     // SOLUTION-BEGIN
     let (_, ymin, _, _) = mesh.bounds();
     let psi0 = |p: Point| options.speed * (p.y - ymin);
@@ -189,6 +195,8 @@ fn fix_group(
 ) {
     // TODO-STEP:12 Parcourir les faces du groupe et imposer la valeur calculée
     // aux deux sommets de chaque face.
+    // HINT : `mesh.groups().get(&kind)` est une `Option<&Vec<FaceId>>` ;
+    // `.into_iter().flatten()` parcourt ses faces, ou rien si le groupe n'existe pas.
     // SOLUTION-BEGIN
     let groups = mesh.groups();
     for id in groups.get(&kind).into_iter().flatten() {
@@ -224,6 +232,7 @@ fn residual_inf(adjacency: &Adjacency, fixed: &[Option<f64>], psi: &[f64], scale
 fn sweep(adjacency: &Adjacency, fixed: &[Option<f64>], psi: &[f64], next: &mut [f64]) {
     // TODO-STEP:12 En parallèle, recopier les valeurs imposées et déléguer le calcul
     // des valeurs libres à `weighted_mean`.
+    // HINT : `next.par_iter_mut().enumerate()` ; `fixed[i].unwrap_or_else(|| …)`.
     // SOLUTION-BEGIN
     next.par_iter_mut().enumerate().for_each(|(i, slot)| {
         *slot = fixed[i].unwrap_or_else(|| weighted_mean(adjacency, psi, i));
@@ -236,6 +245,8 @@ fn sweep(adjacency: &Adjacency, fixed: &[Option<f64>], psi: &[f64], next: &mut [
 fn weighted_mean(adjacency: &Adjacency, psi: &[f64], i: usize) -> f64 {
     // TODO-STEP:12 Calculer la somme pondérée et son poids total ; conserver `psi[i]`
     // si le sommet n'a aucun poids incident.
+    // HINT : `adjacency.of(VertexId(i as u32))` rend `(voisins, poids)` ;
+    //     ψ_i = Σ wₖ·ψ[voisinₖ] / Σ wₖ        (Σ wₖ = 0 → garder psi[i])
     // SOLUTION-BEGIN
     let (neighbours, weights) = adjacency.of(VertexId(i as u32));
     let total: f64 = weights.iter().sum();
@@ -268,6 +279,7 @@ fn jacobi(
 ) -> Result<(usize, f64), SolverError> {
     // TODO-STEP:12 Cloner un tampon de travail, répéter le balayage et l'échange des
     // tampons, tester le résidu après chaque itération, puis signaler la non-convergence.
+    // HINT : `std::mem::swap(psi, &mut next)` échange les deux tampons sans rien copier.
     // SOLUTION-BEGIN
     let mut next = psi.clone();
     for iter in 1..=options.max_iters {

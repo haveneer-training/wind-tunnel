@@ -163,6 +163,9 @@ fn edges(points: &[Point]) -> impl Iterator<Item = (&Point, &Point)> {
 /// ```
 pub fn polygon_area(points: &[Point]) -> f64 {
     // TODO-STEP:0 Aire signée par la formule du lacet : ½ Σ (xᵢ·yᵢ₊₁ − xᵢ₊₁·yᵢ)
+    // HINT : `edges(points)` donne les arêtes `(a, b)`, polygone refermé. Une boucle
+    // suffit : `let mut sum = 0.0; for (a, b) in edges(points) { sum += …; }`.
+    // Variante en chaîne : `map` puis `sum::<f64>()` (le type de la somme doit être nommé).
     // SOLUTION-BEGIN
     0.5 * edges(points)
         .map(|(a, b)| a.x * b.y - b.x * a.y)
@@ -183,6 +186,11 @@ pub fn polygon_area(points: &[Point]) -> f64 {
 pub fn polygon_centroid(points: &[Point]) -> Point {
     // TODO-STEP:0 Si l'aire est négligeable, renvoyer la moyenne des sommets ; sinon
     // sommer les contributions des arêtes puis diviser par `6 * area`.
+    // HINT : seuil d'aire `1e-16`. Pour chaque arête (a, b) :
+    //     cross = a.x·b.y − b.x·a.y
+    //     Sx += (a.x + b.x)·cross ;  Sy += (a.y + b.y)·cross
+    // puis centroïde = (Sx, Sy) / (6·aire). Deux accumulateurs `let mut` et une boucle
+    // `for (a, b) in edges(points)` suffisent ; variante : `fold(Vec2::ZERO, …)`.
     // SOLUTION-BEGIN
     let area = polygon_area(points);
     if area.abs() < 1e-16 {
@@ -200,6 +208,8 @@ pub fn polygon_centroid(points: &[Point]) -> Point {
 #[cfg_attr(not(feature = "step1"), allow(dead_code))] // appelée depuis le trou du centroïde
 fn vertex_mean(points: &[Point]) -> Point {
     // TODO-STEP:0 Additionner les coordonnées des sommets et diviser par leur nombre.
+    // HINT : une boucle `for p in points` qui cumule `x` et `y`, puis diviser par
+    // `points.len() as f64` ; variante : `fold(Vec2::ZERO, …)`.
     // SOLUTION-BEGIN
     let sum = points
         .iter()

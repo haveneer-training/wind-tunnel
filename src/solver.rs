@@ -411,6 +411,9 @@ impl<'m, F: FluxScheme> Solver<'m, F> {
     #[cfg_attr(not(feature = "step5"), allow(unused_variables))] // trou étape 5
     fn step_euler(&self, c: &mut Field, work: &mut Field) {
         // TODO-STEP:5 Calculer le résidu dans `work`, puis avancer `c` de `dt · résidu`
+        // HINT : `self.residual(c, work)`, puis une boucle sur les indices des deux tranches
+        // `c.as_mut_slice()` et `work.as_slice()` : `c[i] += self.dt * work[i]`.
+        // Variante (J3, itérateurs) : `iter_mut().zip(…)`.
         // SOLUTION-BEGIN
         self.residual(c, work);
         for (value, rate) in c.as_mut_slice().iter_mut().zip(work.as_slice()) {
@@ -425,6 +428,8 @@ impl<'m, F: FluxScheme> Solver<'m, F> {
     fn step_rk2(&self, c: &mut Field, work: &mut Field) {
         // TODO-STEP:8 k1 = résidu(c) dans `work` ; prédicteur = c + dt·k1 ; k2 =
         // résidu(prédicteur) ; déléguer la combinaison de Heun à `heun_combine`.
+        // HINT : le prédicteur part de `c.clone()` ; k2 a son propre tampon,
+        // `Field::zeros(c.len())`.
         // SOLUTION-BEGIN
         self.residual(c, work);
         let mut predictor = c.clone();
@@ -552,6 +557,12 @@ fn compute_face_flux<S: StreamSource + ?Sized>(mesh: &Mesh, velocity: &S) -> Vec
 fn max_stable_dt(mesh: &Mesh, face_flux: &[f64], diffusivity: f64) -> Option<f64> {
     // TODO-STEP:5 Calculer le transport de chaque cellule avec `cell_transport`, puis
     // retenir le plus petit rapport aire/transport ; ignorer les sommes nulles.
+    // HINT : une boucle `for` sur les cellules (`CellId(i as u32)` pour la i-ième), et le
+    // minimum courant dans une `Option<f64>` qui part de `None` :
+    //     si transport > 0 : candidat = aire / transport
+    //         best = Some(candidat) si best vaut None, sinon Some(best.min(candidat))
+    // Variante (J3, itérateurs) : `filter_map` puis `reduce(f64::min)`, qui rend
+    // directement l'`Option`.
     // SOLUTION-BEGIN
     mesh.cells()
         .iter()
@@ -569,6 +580,9 @@ fn max_stable_dt(mesh: &Mesh, face_flux: &[f64], diffusivity: f64) -> Option<f64
 fn cell_transport(mesh: &Mesh, id: CellId, face_flux: &[f64], diffusivity: f64) -> f64 {
     // TODO-STEP:5 Additionner pour les faces de cette cellule le débit absolu et le
     // terme diffusif `2 * D * longueur / distance`.
+    // HINT : `for &fid in mesh.cell_faces(id)` parcourt les `FaceId` ; `mesh.face(fid)`
+    // donne la face (`length`, `distance`), `face_flux[fid.index()]` son débit, `abs()`
+    // sa valeur absolue. Un accumulateur `let mut total = 0.0` suffit.
     // SOLUTION-BEGIN
     mesh.cell_faces(id)
         .iter()
@@ -584,6 +598,8 @@ fn cell_transport(mesh: &Mesh, id: CellId, face_flux: &[f64], diffusivity: f64) 
 #[cfg_attr(not(feature = "step9"), allow(dead_code))] // appelée depuis le trou de step_rk2
 fn heun_combine(c: &mut Field, dt: f64, k1: &Field, k2: &Field) {
     // TODO-STEP:8 Mettre à jour chaque valeur avec `dt / 2 * (k1 + k2)`.
+    // HINT : trois tableaux ensemble :
+    // `c.as_mut_slice().iter_mut().zip(k1.as_slice()).zip(k2.as_slice())`.
     // SOLUTION-BEGIN
     for ((value, first), second) in c
         .as_mut_slice()
