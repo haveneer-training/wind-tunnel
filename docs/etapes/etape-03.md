@@ -17,15 +17,20 @@ régression : `Mask::parse` passe par la fonction que vous allez écrire.
 
 | Fonction | Fichier | Ce qu'elle doit faire |
 |---|---|---|
-| `parse_row` | `mask.rs` | valider une ligne du masque, et **nommer** ce qui cloche |
-| `write_cells` | `io/vtk.rs` | les sections `CELLS` et `CELL_TYPES` du fichier |
+| `cell_of` | `mask.rs` | convertir un caractère et porter ses coordonnées dans l'erreur |
+| `check_width` | `mask.rs` | comparer une largeur à la largeur attendue et situer l'erreur |
+| `parse_row` | `mask.rs` | orchestrer la validation de largeur et la conversion des caractères |
+| `cells_size` | `io/vtk.rs` | compter les entiers de connectivité requis par VTK |
+| `write_cell_line` | `io/vtk.rs` | écrire le compte des sommets et leurs indices |
+| `write_cells` | `io/vtk.rs` | écrire les en-têtes `CELLS` et `CELL_TYPES` et déléguer les lignes |
 | `MeshError::source` | `error.rs` | l'erreur d'origine, quand il y en a une sous celle-ci |
 | `From<io::Error> for MeshError` | `error.rs` | la conversion qui fait marcher le `?` |
 
 ### Les erreurs de lecture du masque
 
-`parse_row` est l'endroit où le format dessiné à la main est validé — donc l'endroit
-exact où le programme reçoit des données fausses. Elle a trois choses à dire :
+`cell_of` isole la décision locale — fluide, solide ou caractère invalide avec ses
+coordonnées. `check_width` vérifie la largeur avant que `parse_row` parcoure les
+caractères et empile les cellules. La ligne entière a trois choses à dire :
 
 - la ligne n'a pas la largeur attendue → `MeshError::RaggedMask { line, expected, got }` ;
 - un caractère n'est ni `.` ni `#` → `MeshError::InvalidChar { line, col, ch }` ;
@@ -50,8 +55,10 @@ une capacité, et rien ne garantirait le contraire.
 Le format VTK legacy ASCII est volontairement daté : il tient en cinquante lignes, se lit
 dans un éditeur de texte, et Paraview comme Tecplot l'ouvrent sans discuter.
 `write_dataset` l'écrit en trois temps — `write_points`, `write_cells`,
-`write_cell_data` — dont le premier et le dernier vous sont **donnés** : ils vous servent
-de modèle, il ne reste que la connectivité, où sont les deux pièges du format.
+`write_cell_data` — dont le premier et le dernier vous sont **donnés**. `write_cells`
+orchestre les deux en-têtes ; `cells_size` calcule le compte VTK et `write_cell_line` écrit
+une cellule. Ces petits contrats isolent les deux pièges de format au lieu de demander de
+produire toute la sérialisation en une fois.
 
 Ces fonctions écrivent dans un `&mut impl Write`, pas dans un fichier : ouvrir le fichier
 est le travail de `write_vtk`, qui les appelle, et écrire dans un tampon mémoire celui
@@ -156,9 +163,9 @@ répondu, et rien n'est recopié de l'un dans l'autre. Le test `a_missing_file` 
 ## Pour aller plus loin
 
 **`contains`**, dans `src/io/png.rs`, est aussi à trous : le test d'appartenance d'un
-point à un polygone par lancer de rayon. Un rayon horizontal partant du point ; on compte
-les arêtes traversées ; un nombre impair signifie « à l'intérieur ». Le rendu PNG en
-dépend entièrement.
+point à un polygone par lancer de rayon. Le fragment `crosses` décide si une arête traverse
+le rayon horizontal ; `contains` inverse alors son résultat. Un nombre impair de
+traversées signifie « à l'intérieur ». Le rendu PNG en dépend entièrement.
 
 Puis essayez de casser le programme volontairement :
 

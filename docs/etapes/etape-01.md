@@ -60,10 +60,11 @@ que l'indice est valide — et nous mesurerons cela à l'étape 9.
 
 ## Pour aller plus loin
 
-**`Mask::check_connected`** est également à trous. Un obstacle mal dessiné peut couper la
-veine en deux morceaux ; le calcul n'aurait alors aucun sens. Comptez les composantes
-connexes du fluide par un parcours en largeur, et renvoyez
-`MeshError::Disconnected { components }` s'il y en a plus d'une.
+**`Mask::check_connected`** est également à trous. L'exploration est divisée en deux
+fragments : `fluid_neighbours` donne les indices fluides à quatre connexités, puis
+`explore` marque une composante depuis une cellule de départ. `check_connected` lance ces
+explorations et compte les composantes ; un obstacle mal dessiné qui coupe la veine en
+deux doit produire `MeshError::Disconnected { components }`.
 
 Le test `a_domain_split_in_two` de `tests/errors.rs` vous attend.
 

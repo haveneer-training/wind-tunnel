@@ -72,9 +72,16 @@ distinction qui manque à beaucoup de codes.
 
 | Bloc | Fonction | Ce qu'il doit devenir |
 |---|---|---|
-| 1 | `adjacency` | Le voisinage pondéré des sommets au format CSR : compter les arêtes de chaque sommet (faces internes seulement, chacune comptant pour ses **deux** extrémités), cumuler en offsets, puis remplir en avançant un curseur par sommet. Poids `w = distance / length`. Même schéma que `Mesh::build_cell_faces` |
-| 2 | `boundary_values` | Un `Option<f64>` par sommet : `ψ₀(y) = speed × (y − ymin)` sur `Inlet` et `Wall`, **une constante** sur `Obstacle` (`ψ₀` de l'ordonnée moyenne de son contour), `None` sur `Outlet`. Les groupes viennent de `mesh.groups()` |
-| 3 | `jacobi` | La boucle : un balayage `ψ_v ← (Σ w ψ_voisin) / (Σ w)` sur les sommets libres, écrit dans un second tampon puis échangé — jamais sur place ; le résidu par `residual_inf` ; l'arrêt sous `options.tol` ; `SolverError::NotConverged` si le budget s'épuise |
+| 1 | `obstacle_level` | Calculer le niveau constant du corps à partir de ses sommets, ou `None` en l'absence d'obstacle |
+| 2 | `fix_group` | imposer une valeur calculée aux sommets des faces d'un groupe de bord |
+| 3 | `boundary_values` | orchestrer `ψ₀(y)` sur `Inlet` et `Wall`, la constante de l'obstacle et `None` sur `Outlet` |
+| 4 | `weighted_mean` | calculer la moyenne des voisins, en conservant la valeur d'un sommet isolé |
+| 5 | `sweep` | recopier les valeurs fixées et calculer en parallèle les sommets libres dans un tampon distinct |
+| 6 | `jacobi` | appeler `sweep`, échanger les tampons, mesurer `residual_inf`, arrêter sous la tolérance ou renvoyer `NotConverged` |
+
+Le voisinage `adjacency` est donné : son CSR reprend le schéma déjà vu à l'étape 2.
+Les fragments isolent la valeur d'un groupe de bord, le calcul local d'une moyenne, le
+balayage parallèle et la boucle d'arrêt ; chaque contrat se teste séparément.
 
 Ne rien assembler sur les faces de bord suffit à imposer la sortie libre : un sommet de
 sortie n'a plus qu'un voisin, son équation devient `ψ_v = ψ_voisin`, c'est-à-dire

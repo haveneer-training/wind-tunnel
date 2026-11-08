@@ -12,7 +12,7 @@ use std::path::Path;
 
 use crate::field::Field;
 use crate::geom::Vec2;
-use crate::mesh::Mesh;
+use crate::mesh::{Cell, Mesh};
 
 /// Un flottant sous une forme que le lecteur VTK legacy sait relire.
 ///
@@ -103,30 +103,46 @@ fn write_points(w: &mut impl Write, mesh: &Mesh) -> io::Result<()> {
 /// triangle) attendu par `CELL_TYPES`.
 #[cfg_attr(not(feature = "step3"), allow(unused_variables))] // trou étape 3
 fn write_cells(w: &mut impl Write, mesh: &Mesh) -> io::Result<()> {
-    // TODO-STEP:3 Écrire la section CELLS — l'en-tête `CELLS n_cellules n_entiers`,
-    // puis une ligne par cellule : son nombre de sommets, puis leurs indices — suivie
-    // de la section CELL_TYPES, un code par cellule.
+    // TODO-STEP:3 Écrire les deux en-têtes et déléguer chaque ligne de connectivité
+    // et chaque code de type à leur helper.
     // SOLUTION-BEGIN
-    let entries: usize = mesh
-        .cells()
-        .iter()
-        .map(|c| c.kind.vertices().len() + 1)
-        .sum();
-    writeln!(w, "CELLS {} {}", mesh.n_cells(), entries)?;
+    writeln!(w, "CELLS {} {}", mesh.n_cells(), cells_size(mesh))?;
     for cell in mesh.cells() {
-        let vertices = cell.kind.vertices();
-        write!(w, "{}", vertices.len())?;
-        for v in vertices {
-            write!(w, " {}", v.index())?;
-        }
-        writeln!(w)?;
+        write_cell_line(w, cell)?;
     }
-
     writeln!(w, "CELL_TYPES {}", mesh.n_cells())?;
     for cell in mesh.cells() {
         writeln!(w, "{}", cell.kind.vtk_code())?;
     }
     Ok(())
+    // SOLUTION-END
+}
+
+/// Nombre d'entiers écrits dans les lignes de connectivité VTK.
+#[cfg_attr(not(feature = "step4"), allow(dead_code))] // appelée depuis le trou de write_cells
+fn cells_size(mesh: &Mesh) -> usize {
+    // TODO-STEP:3 Compter un entier pour le nombre de sommets et un pour chaque
+    // indice de chaque cellule.
+    // SOLUTION-BEGIN
+    mesh.cells()
+        .iter()
+        .map(|cell| 1 + cell.kind.vertices().len())
+        .sum()
+    // SOLUTION-END
+}
+
+/// Écrit une ligne de connectivité : nombre de sommets puis indices.
+#[cfg_attr(not(feature = "step4"), allow(dead_code))] // appelée depuis le trou de write_cells
+fn write_cell_line(w: &mut impl Write, cell: &Cell) -> io::Result<()> {
+    // TODO-STEP:3 Écrire le nombre de sommets, leurs indices séparés par des espaces,
+    // puis terminer la ligne.
+    // SOLUTION-BEGIN
+    let vertices = cell.kind.vertices();
+    write!(w, "{}", vertices.len())?;
+    for vertex in vertices {
+        write!(w, " {}", vertex.index())?;
+    }
+    writeln!(w)
     // SOLUTION-END
 }
 
@@ -242,4 +258,24 @@ pub fn write_series(path: impl AsRef<Path>, frames: &[(String, f64)]) -> io::Res
     writeln!(w, "  ]")?;
     writeln!(w, "}}")?;
     w.flush()
+}
+
+#[cfg(all(test, feature = "step3"))]
+mod tests {
+    use super::*;
+    use crate::mask::Mask;
+
+    #[test]
+    fn cells_size_counts_vertex_indices_and_prefixes() {
+        let mesh = Mesh::from_mask(&Mask::parse("..\n").unwrap(), 1.0).unwrap();
+        assert_eq!(cells_size(&mesh), 10);
+    }
+
+    #[test]
+    fn write_cell_line_outputs_count_and_indices() {
+        let mesh = Mesh::from_mask(&Mask::parse(".\n").unwrap(), 1.0).unwrap();
+        let mut output = Vec::new();
+        write_cell_line(&mut output, &mesh.cells()[0]).unwrap();
+        assert_eq!(String::from_utf8(output).unwrap(), "4 0 1 2 3\n");
+    }
 }

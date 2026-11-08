@@ -100,10 +100,7 @@ impl Adjacency {
 ///
 /// Comme pour la connectivité du maillage, deux passes : compter les arêtes de chaque
 /// sommet pour construire `offsets`, puis remplir en avançant un curseur par sommet.
-#[cfg_attr(not(feature = "step12"), allow(unused_variables))] // trou étape 12
 fn adjacency(mesh: &Mesh) -> Adjacency {
-    // TODO-STEP:12 Construire le CSR décrit ci-dessus : compter, cumuler, remplir.
-    // SOLUTION-BEGIN
     let n = mesh.n_vertices();
     let mut counts = vec![0u32; n + 1];
     for face in mesh.faces() {
@@ -139,63 +136,67 @@ fn adjacency(mesh: &Mesh) -> Adjacency {
         neighbours,
         weights,
     }
+}
+
+/// Niveau constant de la fonction de courant imposé sur l'obstacle.
+#[cfg_attr(not(feature = "step12"), allow(unused_variables))] // trou étape 12
+#[cfg_attr(not(feature = "step13"), allow(dead_code))] // appelée depuis le trou de boundary_values
+fn obstacle_level(mesh: &Mesh, options: &StreamOptions) -> Option<f64> {
+    // TODO-STEP:12 Calculer la valeur constante de ψ sur l'obstacle à partir de
+    // l'ordonnée moyenne de ses sommets. Renvoyer `None` s'il n'y a pas d'obstacle.
+    // SOLUTION-BEGIN
+    let (_, ymin, _, _) = mesh.bounds();
+    let groups = mesh.groups();
+    let faces = groups.get(&BoundaryKind::Obstacle)?;
+    let (sum, count) = faces.iter().fold((0.0, 0.0), |(sum, count), id| {
+        let face = mesh.face(*id);
+        let a = mesh.vertices()[face.a.index()].y;
+        let b = mesh.vertices()[face.b.index()].y;
+        (sum + a + b, count + 2.0)
+    });
+    Some(options.speed * (sum / count - ymin))
     // SOLUTION-END
 }
 
 /// Valeur imposée à chaque sommet, `None` si elle est libre.
 ///
-/// L'écoulement de référence est horizontal et de débit `speed` par unité de hauteur, de
-/// fonction de courant `ψ₀(y) = speed × (y − ymin)`. On impose :
-///
-/// * `Inlet` : `ψ₀(y)` du sommet — le profil d'entrée ;
-/// * `Wall` : `ψ₀(y)` du sommet aussi, ce qui donne `0` en bas et le débit total en haut,
-///   les deux étant bien constants le long de leur paroi ;
-/// * `Obstacle` : une **constante**, la même pour tous ses sommets — c'est elle qui rend
-///   l'obstacle étanche. Sa valeur est indéterminée par le problème (elle répartit le
-///   débit entre le dessus et le dessous) ; on prend `ψ₀` de l'ordonnée moyenne de son
-///   contour, exacte pour un obstacle symétrique en `y`.
-/// * `Outlet` : rien, la sortie est libre.
-///
-/// L'entrée et les parois se partagent la même formule, donc les coins où elles se
-/// rencontrent sont cohérents sans cas particulier.
+/// L'entrée et les parois portent `ψ₀(y) = speed × (y − ymin)`, l'obstacle une constante
+/// donnée par [`obstacle_level`], et la sortie reste libre (condition de Neumann).
 #[cfg_attr(not(feature = "step12"), allow(unused_variables))] // trou étape 12
 fn boundary_values(mesh: &Mesh, options: &StreamOptions) -> Vec<Option<f64>> {
-    // TODO-STEP:12 Renvoyer un tableau par sommet, rempli groupe de bord par groupe de
-    // bord (`mesh.groups()`), en suivant la liste du commentaire ci-dessus.
+    // TODO-STEP:12 Initialiser tous les sommets libres, fixer les parois et l'entrée
+    // avec ψ₀, puis fixer l'obstacle à sa valeur constante.
     // SOLUTION-BEGIN
     let (_, ymin, _, _) = mesh.bounds();
-    let vertices = mesh.vertices();
     let psi0 = |p: Point| options.speed * (p.y - ymin);
-
     let mut fixed = vec![None; mesh.n_vertices()];
-    let mut set = |group: Option<&Vec<crate::mesh::FaceId>>, value: &dyn Fn(Point) -> f64| {
-        for id in group.into_iter().flatten() {
-            let face = mesh.face(*id);
-            for v in [face.a, face.b] {
-                fixed[v.index()] = Some(value(vertices[v.index()]));
-            }
-        }
-    };
-    let groups = mesh.groups();
-    set(groups.get(&BoundaryKind::Inlet), &psi0);
-    set(groups.get(&BoundaryKind::Wall), &psi0);
-
-    // L'obstacle n'est pas traité par la même formule : il lui faut *une* constante,
-    // sinon ses faces ne sont pas étanches. On la prend au milieu de ses sommets.
-    if let Some(faces) = groups.get(&BoundaryKind::Obstacle) {
-        let mut sum = 0.0;
-        let mut count = 0.0;
-        for id in faces {
-            let face = mesh.face(*id);
-            for v in [face.a, face.b] {
-                sum += vertices[v.index()].y;
-                count += 1.0;
-            }
-        }
-        let value = psi0(Point::new(0.0, sum / count));
-        set(Some(faces), &|_| value);
+    if let Some(value) = obstacle_level(mesh, options) {
+        fix_group(mesh, &mut fixed, BoundaryKind::Obstacle, |_| value);
     }
+    fix_group(mesh, &mut fixed, BoundaryKind::Inlet, psi0);
+    fix_group(mesh, &mut fixed, BoundaryKind::Wall, psi0);
     fixed
+    // SOLUTION-END
+}
+
+/// Applique une fonction de valeur imposée à tous les sommets d'un groupe de bord.
+#[cfg_attr(not(feature = "step13"), allow(dead_code))] // appelée depuis boundary_values
+fn fix_group(
+    mesh: &Mesh,
+    fixed: &mut [Option<f64>],
+    kind: BoundaryKind,
+    value: impl Fn(Point) -> f64,
+) {
+    // TODO-STEP:12 Parcourir les faces du groupe et imposer la valeur calculée
+    // aux deux sommets de chaque face.
+    // SOLUTION-BEGIN
+    let groups = mesh.groups();
+    for id in groups.get(&kind).into_iter().flatten() {
+        let face = mesh.face(*id);
+        for vertex in [face.a, face.b] {
+            fixed[vertex.index()] = Some(value(mesh.vertices()[vertex.index()]));
+        }
+    }
     // SOLUTION-END
 }
 
@@ -217,6 +218,40 @@ fn residual_inf(adjacency: &Adjacency, fixed: &[Option<f64>], psi: &[f64], scale
     worst / scale
 }
 
+/// Effectue un seul balayage de Jacobi dans le tampon `next`.
+#[cfg_attr(not(feature = "step12"), allow(unused_variables))] // trou étape 12
+#[cfg_attr(not(feature = "step13"), allow(dead_code))] // appelé depuis le trou de jacobi
+fn sweep(adjacency: &Adjacency, fixed: &[Option<f64>], psi: &[f64], next: &mut [f64]) {
+    // TODO-STEP:12 En parallèle, recopier les valeurs imposées et déléguer le calcul
+    // des valeurs libres à `weighted_mean`.
+    // SOLUTION-BEGIN
+    next.par_iter_mut().enumerate().for_each(|(i, slot)| {
+        *slot = fixed[i].unwrap_or_else(|| weighted_mean(adjacency, psi, i));
+    });
+    // SOLUTION-END
+}
+
+/// Moyenne des valeurs voisines pondérée par les poids du graphe.
+#[cfg_attr(not(feature = "step13"), allow(dead_code))] // appelée depuis sweep
+fn weighted_mean(adjacency: &Adjacency, psi: &[f64], i: usize) -> f64 {
+    // TODO-STEP:12 Calculer la somme pondérée et son poids total ; conserver `psi[i]`
+    // si le sommet n'a aucun poids incident.
+    // SOLUTION-BEGIN
+    let (neighbours, weights) = adjacency.of(VertexId(i as u32));
+    let total: f64 = weights.iter().sum();
+    if total == 0.0 {
+        psi[i]
+    } else {
+        neighbours
+            .iter()
+            .zip(weights)
+            .map(|(n, w)| w * psi[n.index()])
+            .sum::<f64>()
+            / total
+    }
+    // SOLUTION-END
+}
+
 /// Balayages de Jacobi jusqu'au résidu visé. Renvoie le nombre d'itérations et le résidu.
 ///
 /// Un balayage remplace la valeur de chaque sommet libre par la moyenne pondérée de ses
@@ -231,31 +266,12 @@ fn jacobi(
     scale: f64,
     options: &StreamOptions,
 ) -> Result<(usize, f64), SolverError> {
-    // TODO-STEP:12 Boucler jusqu'à `options.max_iters` : un balayage écrit dans un second
-    // tampon, le résidu par `residual_inf`, et l'arrêt dès qu'il passe sous
-    // `options.tol`. Si le budget s'épuise, c'est `SolverError::NotConverged`.
+    // TODO-STEP:12 Cloner un tampon de travail, répéter le balayage et l'échange des
+    // tampons, tester le résidu après chaque itération, puis signaler la non-convergence.
     // SOLUTION-BEGIN
     let mut next = psi.clone();
     for iter in 1..=options.max_iters {
-        next.par_iter_mut().enumerate().for_each(|(i, slot)| {
-            *slot = match fixed[i] {
-                Some(value) => value,
-                None => {
-                    let (neighbours, weights) = adjacency.of(VertexId(i as u32));
-                    let sum: f64 = neighbours
-                        .iter()
-                        .zip(weights)
-                        .map(|(n, w)| w * psi[n.index()])
-                        .sum();
-                    let total: f64 = weights.iter().sum();
-                    if total > 0.0 {
-                        sum / total
-                    } else {
-                        psi[i]
-                    }
-                }
-            };
-        });
+        sweep(adjacency, fixed, psi, &mut next);
         std::mem::swap(psi, &mut next);
 
         let residual = residual_inf(adjacency, fixed, psi, scale);
@@ -322,4 +338,105 @@ pub fn residual_of(mesh: &Mesh, options: &StreamOptions, psi: &[f64]) -> f64 {
     let adjacency = adjacency(mesh);
     let fixed = boundary_values(mesh, options);
     residual_inf(&adjacency, &fixed, psi, scale_of(mesh, options))
+}
+
+#[cfg(all(test, feature = "step12"))]
+mod tests {
+    use super::*;
+    use crate::mask::Mask;
+
+    fn mesh_of(text: &str) -> Mesh {
+        Mesh::from_mask(&Mask::parse(text).unwrap(), 1.0).unwrap()
+    }
+
+    #[test]
+    fn obstacle_level_is_constant_and_missing_without_an_obstacle() {
+        let options = StreamOptions {
+            speed: 2.0,
+            ..StreamOptions::default()
+        };
+        let mesh = mesh_of("....\n..#.\n....\n");
+        assert_eq!(obstacle_level(&mesh, &options), Some(3.0));
+        assert_eq!(obstacle_level(&mesh_of("....\n....\n"), &options), None);
+    }
+
+    #[test]
+    fn boundary_values_fix_solid_walls_and_leave_the_outlet_free() {
+        let mesh = mesh_of("....\n..#.\n....\n");
+        let fixed = boundary_values(&mesh, &StreamOptions::default());
+        let groups = mesh.groups();
+        let obstacle_values: Vec<f64> = groups[&BoundaryKind::Obstacle]
+            .iter()
+            .flat_map(|id| {
+                let face = mesh.face(*id);
+                [
+                    fixed[face.a.index()].unwrap(),
+                    fixed[face.b.index()].unwrap(),
+                ]
+            })
+            .collect();
+        assert!(obstacle_values
+            .iter()
+            .all(|value| *value == obstacle_values[0]));
+        let outlet_middle = mesh.face(groups[&BoundaryKind::Outlet][1]);
+        assert_eq!(fixed[outlet_middle.a.index()], None);
+        assert_eq!(fixed[outlet_middle.b.index()], None);
+    }
+
+    #[test]
+    fn sweep_preserves_fixed_values_and_updates_free_vertices() {
+        let mesh = mesh_of("..\n..\n");
+        let adjacency = adjacency(&mesh);
+        let mut fixed = vec![None; mesh.n_vertices()];
+        fixed[0] = Some(17.0);
+        let psi: Vec<f64> = (0..mesh.n_vertices()).map(|i| i as f64).collect();
+        let mut next = vec![0.0; psi.len()];
+        sweep(&adjacency, &fixed, &psi, &mut next);
+        assert_eq!(next[0], 17.0);
+        for i in 1..psi.len() {
+            let (neighbours, weights) = adjacency.of(VertexId(i as u32));
+            let sum: f64 = neighbours
+                .iter()
+                .zip(weights)
+                .map(|(id, weight)| weight * psi[id.index()])
+                .sum();
+            let total: f64 = weights.iter().sum();
+            let expected = if total == 0.0 { psi[i] } else { sum / total };
+            assert!((next[i] - expected).abs() < 1e-12);
+        }
+    }
+
+    #[test]
+    fn fix_group_applies_a_value_to_each_endpoint() {
+        let mesh = mesh_of("...\n...\n");
+        let mut fixed = vec![None; mesh.n_vertices()];
+        fix_group(&mesh, &mut fixed, BoundaryKind::Wall, |point| point.y);
+        let groups = mesh.groups();
+        for id in &groups[&BoundaryKind::Wall] {
+            let face = mesh.face(*id);
+            for vertex in [face.a, face.b] {
+                assert_eq!(
+                    fixed[vertex.index()],
+                    Some(mesh.vertices()[vertex.index()].y)
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn weighted_mean_handles_weighted_neighbours_and_isolated_vertices() {
+        let adjacency = Adjacency {
+            offsets: vec![0, 2, 2, 2],
+            neighbours: vec![VertexId(1), VertexId(2)],
+            weights: vec![1.0, 3.0],
+        };
+        assert_eq!(weighted_mean(&adjacency, &[0.0, 4.0, 8.0], 0), 7.0);
+
+        let isolated = Adjacency {
+            offsets: vec![0, 0],
+            neighbours: Vec::new(),
+            weights: Vec::new(),
+        };
+        assert_eq!(weighted_mean(&isolated, &[9.0], 0), 9.0);
+    }
 }

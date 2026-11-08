@@ -25,10 +25,14 @@ dossier de travail : les passages à écrire y deviennent des `todo!()`, tout le
 fourni.
 
 ```shell
-cargo xtask start      # crée travail/ (30 trous à combler)
+cargo xtask start      # crée travail/ (43 blocs d'exercice)
 cd travail
 cargo test             # quatre tests rouges : l'étape 0 vous attend
 ```
+
+Depuis le corrigé, `cargo xtask update` reporte ses évolutions dans `travail/` en
+conservant les réponses déjà écrites ; dans le dossier de travail, `cargo xtask next`
+passe à l'étape suivante.
 <!-- CORRIGE-ONLY-END -->
 
 Le déroulement d'une étape — la boucle `cargo test` / `goto`, les commandes, où écrire —
@@ -248,6 +252,7 @@ Et à côté du code lui-même :
 | `xtask/`                     | l'outil qui engendre `travail/` et pilote les étapes               |
 | `scripts/`                   | vérifications automatiques du dispositif d'étapes et du pilote MPI |
 | `docs/BONUS-OPTIMISATION.md` | bonus transversal : mesurer et supprimer les allocations           |
+| `docs/RAPPORT-PROGRESSION.md` | inventaire de la taille et de la complexité des exercices          |
 | `examples/alloc_count.rs`    | compte les allocations de chaque phase du calcul                   |
 | `docs/AVANCEMENT.md`         | état du projet, ce qui reste, décisions à ne pas défaire           |
 

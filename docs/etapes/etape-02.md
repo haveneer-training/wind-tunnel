@@ -14,7 +14,9 @@ fonctionnerait donc à l'identique sur un maillage lu depuis un fichier.
 
 ## Socle
 
-Deux trous : la forme d'une cellule, puis l'appariement de leurs arêtes.
+Le socle sépare trois objectifs : la forme d'une cellule, la clé canonique d'une arête,
+puis la création ou l'appariement d'une arête. L'extension ajoute le stockage CSR des
+faces par cellule en fragments distincts.
 
 **`cell_corners`** — les quatre coins d'une cellule, dans le sens direct, *sauf* quand
 deux parois perpendiculaires se rejoignent : le coin qu'elles encadrent disparaît et la
@@ -28,16 +30,18 @@ exactement.
 Attention à l'orientation : dans le sens direct, avec `y` vers le haut, l'ordre est
 `bl → br → tr → tl`. Retirer un coin de cette liste conserve l'orientation.
 
-**`build_faces`** — l'appariement des arêtes. On parcourt toutes les cellules, et pour
-chaque arête `(a, b)` :
+**`build_faces`** parcourt les cellules et délègue chaque arête à `pair_edge`. La décision
+locale est ainsi isolée et peut être testée sans écrire toute l'orchestration :
 
 - première rencontre : on crée une face, provisoirement de bord — `boundary_face` vous
   est donnée, elle en calcule la normale, la longueur et le milieu ;
 - deuxième rencontre : la face devient interne, `Side::Inner(cellule)` ;
 - troisième rencontre : le maillage n'est pas une surface, `MeshError::NonManifoldEdge`.
 
-La clé est la paire de sommets **triée**, sans quoi les deux cellules adjacentes ne
-tomberaient pas sur la même entrée du `HashMap`.
+**`edge_key`** fournit la paire de sommets **triée**, sans quoi les deux cellules
+adjacentes ne tomberaient pas sur la même entrée du `HashMap`. Le helper isole une notion
+de représentation importante — l'orientation ne change pas l'identité d'une arête — et
+laisse `pair_edge` se concentrer sur ses trois cas de rencontre.
 
 Le `match` imbriqué de cette fonction mérite d'être regardé pour lui-même : le premier
 niveau distingue « arête déjà vue » de « arête nouvelle », le second, sur la face déjà
@@ -47,8 +51,10 @@ l'énumération des cas possibles.
 
 ## Extension
 
-**`Mesh::build_cell_faces`** — la connectivité inverse, cellule → faces, au format CSR
-décrit plus bas. Trois temps, et c'est un schéma qui revient partout en calcul :
+**`Mesh::build_cell_faces`** orchestre la connectivité inverse, cellule → faces, au format
+CSR décrit plus bas. `face_counts`, `offsets_from_counts`, `place_face` et
+`fill_cell_faces` isolent le comptage, la somme préfixe et l'insertion dans une tranche,
+un schéma qui revient partout en calcul :
 
 1. compter les faces de chaque cellule (une face interne compte pour ses **deux**
    cellules) ;

@@ -102,7 +102,8 @@ Restent deux mots sur la forme de l'expression :
 | Fonction | Fichier | Ce qu'elle doit faire |
 |---|---|---|
 | `Upwind::interface_value` | `flux.rs` | retenir la valeur du côté d'où vient le fluide |
-| `max_stable_dt` | `solver.rs` | la formule CFL ci-dessus, ou `None` si aucune cellule n'a de somme strictement positive |
+| `cell_transport` | `solver.rs` | sommer advection absolue et diffusion pour une cellule |
+| `max_stable_dt` | `solver.rs` | réduire les rapports aire/transport, ou rendre `None` si aucun transport n'existe |
 | `Solver::step` | `solver.rs` | calculer le résidu, puis avancer de `dt · résidu` |
 
 `Solver::residual`, plus longue, vous est donnée : lisez-la, c'est elle qui met tout le

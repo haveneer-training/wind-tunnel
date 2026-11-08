@@ -157,6 +157,20 @@ pub struct Layout {
 }
 
 impl Layout {
+    /// État vide des listes pour une bande ; les cellules seront classées ensuite.
+    fn empty(bands: &Bands, part: usize) -> Layout {
+        let extended = bands.extended(part);
+        Layout {
+            part,
+            parts: bands.parts(),
+            extended,
+            owned: Vec::new(),
+            send_left: Vec::new(),
+            recv_left: Vec::new(),
+            send_right: Vec::new(),
+            recv_right: Vec::new(),
+        }
+    }
     /// Construit le plan de la bande `part` à partir du masque global.
     ///
     /// L'ordre des listes est celui du parcours ligne par ligne, colonne par colonne, du
@@ -171,54 +185,20 @@ impl Layout {
     /// (pour celui de droite). Un rang de bord n'a pas de voisin de ce côté : ses
     /// listes y restent vides.
     pub fn new(mask: &Mask, bands: &Bands, part: usize) -> Layout {
-        // TODO-STEP:11 Parcourir les cellules fluides de la bande étendue ligne par
-        // ligne puis colonne par colonne — l'ordre même dans lequel `Mesh::from_mask`
-        // numérote les cellules — en tenant un compteur d'identifiant local, et ranger
-        // chaque cellule dans les listes ci-dessus d'après sa colonne globale.
+        // TODO-STEP:11 Parcourir les cellules fluides de la bande étendue dans l'ordre
+        // ligne/colonne et confier leur classement à `place`.
         // SOLUTION-BEGIN
-        let extended = bands.extended(part);
-        let owned_cols = bands.owned(part);
-        let halo = bands.halo();
-
-        let mut owned = Vec::new();
-        let (mut send_left, mut recv_left) = (Vec::new(), Vec::new());
-        let (mut send_right, mut recv_right) = (Vec::new(), Vec::new());
+        let mut layout = Layout::empty(bands, part);
         let mut next = 0u32;
-
         for row in 0..mask.rows() {
-            for col in extended.clone() {
-                if !mask.is_fluid(row, col) {
-                    continue;
-                }
-                let id = CellId(next);
-                next += 1;
-
-                if col < owned_cols.start {
-                    recv_left.push(id);
-                } else if col >= owned_cols.end {
-                    recv_right.push(id);
-                } else {
-                    owned.push(id);
-                    if part > 0 && col < owned_cols.start + halo {
-                        send_left.push(id);
-                    }
-                    if part + 1 < bands.parts() && col + halo >= owned_cols.end {
-                        send_right.push(id);
-                    }
+            for col in layout.extended.clone() {
+                if mask.is_fluid(row, col) {
+                    place(&mut layout, col, CellId(next), bands);
+                    next += 1;
                 }
             }
         }
-
-        Layout {
-            part,
-            parts: bands.parts(),
-            extended,
-            owned,
-            send_left,
-            recv_left,
-            send_right,
-            recv_right,
-        }
+        layout
         // SOLUTION-END
     }
 
@@ -264,6 +244,42 @@ impl Layout {
         }
         ids
     }
+}
+
+/// Range une cellule de la bande dans ses listes de propriété et d'échange.
+#[cfg_attr(not(feature = "step11"), allow(unused_variables))] // trou étape 11
+#[cfg_attr(not(feature = "step12"), allow(dead_code))] // appelée depuis Layout::new
+fn place(layout: &mut Layout, col: usize, id: CellId, bands: &Bands) {
+    // TODO-STEP:11 Classer la cellule selon sa plage possédée, puis déléguer les
+    // cellules possédées aux listes d'envoi.
+    // SOLUTION-BEGIN
+    let owned = bands.owned(layout.part);
+    if col < owned.start {
+        layout.recv_left.push(id);
+    } else if col >= owned.end {
+        layout.recv_right.push(id);
+    } else {
+        layout.owned.push(id);
+        mark_sends(layout, col, id, bands);
+    }
+    // SOLUTION-END
+}
+
+/// Ajoute une cellule possédée aux envois requis par ses coupures voisines.
+#[cfg_attr(not(feature = "step12"), allow(dead_code))] // appelée depuis le trou de place
+fn mark_sends(layout: &mut Layout, col: usize, id: CellId, bands: &Bands) {
+    // TODO-STEP:11 Tester si la cellule se trouve dans le halo possédé de gauche
+    // ou de droite et l'ajouter à la liste d'envoi correspondante.
+    // SOLUTION-BEGIN
+    let owned = bands.owned(layout.part);
+    let halo = bands.halo();
+    if layout.part > 0 && col < owned.start + halo {
+        layout.send_left.push(id);
+    }
+    if layout.part + 1 < bands.parts() && col + halo >= owned.end {
+        layout.send_right.push(id);
+    }
+    // SOLUTION-END
 }
 
 /// Masse de traceur portée par les cellules **possédées** : `Σ cᵢ · |Ωᵢ|`.
@@ -324,5 +340,41 @@ pub fn unpack(field: &mut Field, ids: &[CellId], values: &[f64]) {
     );
     for (&id, &value) in ids.iter().zip(values) {
         field[id] = value;
+    }
+}
+
+#[cfg(all(test, feature = "step11"))]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn empty_layout_records_band_bounds_and_starts_with_empty_lists() {
+        let bands = Bands::new(8, 2, 2).unwrap();
+        let layout = Layout::empty(&bands, 0);
+        assert_eq!(layout.extended, 0..6);
+        assert!(layout.owned.is_empty());
+        assert!(layout.send_right.is_empty());
+    }
+
+    #[test]
+    fn place_classifies_owned_and_ghost_cells() {
+        let bands = Bands::new(8, 2, 2).unwrap();
+        let mut layout = Layout::empty(&bands, 0);
+        place(&mut layout, 3, CellId(0), &bands);
+        place(&mut layout, 4, CellId(1), &bands);
+        assert_eq!(layout.owned, [CellId(0)]);
+        assert_eq!(layout.send_right, [CellId(0)]);
+        assert_eq!(layout.recv_right, [CellId(1)]);
+    }
+
+    #[test]
+    fn mark_sends_uses_only_existing_neighbours() {
+        let bands = Bands::new(8, 2, 2).unwrap();
+        let mut layout = Layout::empty(&bands, 0);
+        mark_sends(&mut layout, 0, CellId(0), &bands);
+        assert!(layout.send_left.is_empty());
+        assert!(layout.send_right.is_empty());
+        mark_sends(&mut layout, 3, CellId(1), &bands);
+        assert_eq!(layout.send_right, [CellId(1)]);
     }
 }

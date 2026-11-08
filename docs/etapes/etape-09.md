@@ -26,7 +26,8 @@ difficulté :
    fournie par l'appelant : il faut paralléliser une écriture, pas seulement une
    lecture.
 3. `Solver::residual` fait la même chose mais lit en plus `self` (le maillage, les
-   débits, le schéma, la config) à chaque itération : le cas le plus complet.
+   débits, le schéma, la config) à chaque itération : le cas le plus complet. Le calcul
+   d'une cellule (`cell_rate`) est fourni et commun aux versions séquentielle et parallèle.
 
 ## Le piège à éviter
 
@@ -43,7 +44,7 @@ compile pas.
 |---|---|---|
 | `face_flux` dans `Solver::new` | `solver.rs` | le même `map`, en `par_iter()` |
 | `limited_gradients` | `gradient.rs` | la boucle en `par_iter_mut().enumerate().for_each(...)` |
-| la boucle principale de `Solver::residual` | `solver.rs` | `par_iter()` sur les cellules, `zip`é avec `out` en écriture, `enumerate()` pour l'identifiant de cellule |
+| l'itération de `Solver::residual` | `solver.rs` | `par_iter()` sur les cellules, `zip`é avec `out` en écriture, `enumerate()` pour l'identifiant, `for_each` pour écrire chaque résidu |
 
 `Cargo.toml` déclare déjà `rayon` en dépendance ; il ne reste qu'à `use
 rayon::prelude::*;` dans chaque fichier concerné.

@@ -7,7 +7,7 @@ comment vous y travaillez, est expliqué ci-dessous.
 
 ## Le déroulement d'une étape
 
-Le squelette est là, les tests aussi : ce qui manque, ce sont **30 `todo!()`**, répartis
+Le squelette est là, les tests aussi : ce qui manque, ce sont **43 blocs d'exercice**, répartis
 sur treize étapes (0 à 12). Le corrigé complet est le dépôt d'où `travail/` a été
 engendré (`cargo xtask start`) — consultez-le quand vous voulez, mais essayez d'abord.
 
@@ -18,6 +18,7 @@ qui disent si c'est juste. Le principe est toujours le même :
 
 ```shell
 cargo xtask goto 2   # ouvrir l'étape 2 (et compléter les précédentes restées vides)
+cargo xtask next     # passer à l'étape suivante
 cargo test           # rouge : voici ce qu'il faut écrire, fichier et ligne à l'appui
 #   ... remplacer le todo!() entre les marqueurs >>> et <<< ...
 cargo test           # vert  : l'étape est finie
@@ -38,8 +39,11 @@ facultative : personne n'attend son voisin. L'énoncé de chaque étape est dans
 |---|---|
 | `cargo xtask status` | avancement étape par étape |
 | `cargo xtask goto <n>` | passer à l'étape n ; remplit au passage les trous des étapes précédentes **restés vides** |
+| `cargo xtask next` | passer à l'étape suivante, selon le manifeste actif |
 | `cargo xtask solve <n>` | remplir les trous de l'étape n à votre place (rattrapage) |
 | `cargo xtask reset <n>` | rouvrir les trous de l'étape n pour la refaire |
+| `cargo xtask start [--dir <p>]` | depuis le corrigé, créer un dossier de travail |
+| `cargo xtask update [--dir <p>]` | depuis le corrigé, reporter ses changements sans écraser les réponses |
 | `cargo test` | vérifier |
 | `cargo run --release -- domains/tunnel.dom` | faire tourner le calcul (à partir de l'étape 5) |
 
@@ -47,6 +51,11 @@ facultative : personne n'attend son voisin. L'énoncé de chaque étape est dans
 occupés par un `todo!()`. Si vous décrochez sur une étape, `goto` la suivante et vous
 repartez d'un code cohérent. Si vous voulez explicitement la réponse d'une étape,
 `solve <n>` — et `reset <n>` si vous changez d'avis.
+
+`update` reconstruit les fichiers depuis le corrigé, reporte les changements de sujet et
+préserve les trous déjà remplis ; s'il détecte du travail qui disparaîtrait, il s'arrête
+au lieu de l'effacer. `start` refuse également d'écraser un dossier non vide sans
+`--force`.
 
 ### Où écrire
 
@@ -104,17 +113,17 @@ laquelle domine à chaque étape.
 |---|---|---|---|---|---|
 | [0](docs/etapes/etape-00.md) | Géométrie de base | J1 | 20 min | types, fonctions, `Vec`, itérateurs | `derive`, doc-tests |
 | [1](docs/etapes/etape-01.md) | Le masque du domaine | J1 | 35 min | indexation, `Vec`, boucles, `&self -> Mask` | propriété, déplacement, emprunts |
-| [2](docs/etapes/etape-02.md) | Maillage et connectivité | J2 | 45 min | `match` exhaustif, `HashMap`, `enum` `Side`, CSR | indices typés, pointeurs vs indices |
-| [3](docs/etapes/etape-03.md) | Écrire les résultats, et les erreurs | J2 | 25 min | `match` sur caractère, `Option`, `Err(...)`, `write!`/`?`, `From`, `Error::source` | `enum` d'erreurs, chaîne des causes |
+| [2](docs/etapes/etape-02.md) | Maillage et connectivité | J2 | 45 min | `match` exhaustif, `HashMap`, clé canonique, `enum` `Side`, CSR | indices typés, pointeurs vs indices |
+| [3](docs/etapes/etape-03.md) | Écrire les résultats, et les erreurs | J2 | 25 min | `match` sur caractère, helper typé, `Option`, `Err(...)`, `write!`/`?`, `From`, `Error::source` | `enum` d'erreurs, chaîne des causes |
 | [4](docs/etapes/etape-04.md) | L'écoulement porteur | J2 | 20 min | `impl Trait for`, implémentation couvrante, `?Sized` | `Sync`, un trait comme besoin |
 | [5](docs/etapes/etape-05.md) | Le solveur | J2 | 45 min | itérateurs, `Option`, `&`/`&mut` | *gather* vs *scatter*, CFL vérifiée avant |
 | [6](docs/etapes/etape-06.md) | Qualité : conservation, ordre, `clippy` | J2 | 30 min | `fold` à accumulateur | tests de propriété, `clippy`, `cargo doc` |
 | [7](docs/etapes/etape-07.md) | Passer à l'ordre 2 en espace | J2/J3 | 30 min | `match` sur `Option`, cas dégénéré | moindres carrés, limiteur, `dyn` vs générique |
 | [8](docs/etapes/etape-08.md) | RK2 : pourquoi l'ordre n'avait pas bougé | J3 | 20 min | tampons, `clone`, `zip` | `enum` de schéma, relecture critique d'un résultat |
-| [9](docs/etapes/etape-09.md) | Paralléliser avec `rayon` | J3 | 40 min | `par_iter`, fermetures, `Send`/`Sync` | ce que le compilateur refuse de paralléliser |
-| [10](docs/etapes/etape-10.md) | Threads : écriture concurrente, suivi | J3 | 45 min | `thread::scope`, `Mutex`, `mpsc`, `chunks` | `Arc` et la propriété partagée |
-| [11](docs/etapes/etape-11.md) | *Bonus* : passage à l'échelle en MPI | J3 | 60 min | découpage, possession, échanges immédiats | processus, messages, réductions |
-| [12](docs/etapes/etape-12.md) | *Bonus* : calculer l'écoulement | J3 | 40 min | CSR aux sommets, `Option<f64>`, tampons échangés | algorithme itératif, résidu ≠ erreur |
+| [9](docs/etapes/etape-09.md) | Paralléliser avec `rayon` | J3 | 40 min | `par_iter`, fermetures, `Send`/`Sync`, écriture disjointe | ce que le compilateur refuse de paralléliser |
+| [10](docs/etapes/etape-10.md) | Threads : écriture concurrente, suivi | J3 | 45 min | `thread::scope`, `Mutex`, `mpsc`, `chunks`, tampons réutilisés | `Arc` et la propriété partagée |
+| [11](docs/etapes/etape-11.md) | *Bonus* : passage à l'échelle en MPI | J3 | 60 min | découpage, tri d'une cellule, possession, échanges immédiats | processus, messages, réductions |
+| [12](docs/etapes/etape-12.md) | *Bonus* : calculer l'écoulement | J3 | 40 min | CSR aux sommets, Dirichlet/Neumann, Jacobi, résidu ≠ erreur | helpers, tampons, convergence |
 | — | [*Bonus* : concevoir les types soi-même](docs/etapes/etape-02-conception.md) | J2 | 30 min | `struct`, `enum`, dérivations — **tout**, dans un fichier vide | le contrat d'un type, et ce que `mesh.rs` a choisi |
 | — | [*Bonus* : chasse aux allocations](docs/BONUS-OPTIMISATION.md) | — | 45 min | tampons réutilisés, emprunts par champ | `GlobalAlloc`, mesure |
 

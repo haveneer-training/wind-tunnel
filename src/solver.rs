@@ -26,7 +26,7 @@ use crate::geom::Vec2;
 #[cfg(feature = "step7")]
 use crate::gradient;
 #[cfg_attr(not(feature = "step10"), allow(unused_imports))] // collatéral du trou étape 9
-use crate::mesh::{BoundaryKind, CellId, FaceId, Mesh, Side};
+use crate::mesh::{BoundaryKind, Cell, CellId, FaceId, Mesh, Side};
 use crate::velocity::StreamSource;
 
 /// Schéma d'intégration en temps.
@@ -254,6 +254,47 @@ impl<'m, F: FluxScheme> Solver<'m, F> {
         self.config.bc.get(&kind).copied().unwrap_or(Bc::NoFlux)
     }
 
+    /// Résidu d'une cellule, avec les gradients reconstruits à l'étape 7.
+    #[cfg(feature = "step7")]
+    fn cell_rate(&self, id: CellId, cell: &Cell, c: &Field, gradients: &[Vec2]) -> f64 {
+        let ci = c[id];
+        let mut sum = 0.0;
+        for &fid in self.mesh.cell_faces(id) {
+            let face = self.mesh.face(fid);
+            let outward = if face.left == id { 1.0 } else { -1.0 };
+            let flux = self.face_flux[fid.index()] * outward;
+            let to_face_left = face.midpoint - cell.centroid;
+            let (c_other, grad_right, to_face_right) = match face.right {
+                Side::Inner(other) => {
+                    let neighbour = if face.left == id { other } else { face.left };
+                    let centroid = self.mesh.cell(neighbour).centroid;
+                    (
+                        c[neighbour],
+                        Some(gradients[neighbour.index()]),
+                        face.midpoint - centroid,
+                    )
+                }
+                Side::Boundary(kind) => match self.bc(kind) {
+                    Bc::NoFlux => continue,
+                    Bc::Fixed(value) => (value, None, Vec2::ZERO),
+                    Bc::ZeroGradient => (ci, None, Vec2::ZERO),
+                },
+            };
+            let c_face = self.scheme.interface_value(&FaceState {
+                c_left: ci,
+                c_right: c_other,
+                un: flux / face.length,
+                grad_left: gradients[id.index()],
+                to_face_left,
+                grad_right,
+                to_face_right,
+            });
+            sum += flux * c_face
+                - self.config.diffusivity * (c_other - ci) / face.distance * face.length;
+        }
+        -sum / cell.area
+    }
+
     /// Calcule `dc/dt` dans `out`.
     ///
     /// `c` est emprunté en lecture, `out` en écriture exclusive : le compilateur refuse
@@ -272,9 +313,8 @@ impl<'m, F: FluxScheme> Solver<'m, F> {
         gradient::limited_gradients(self.mesh, c, &mut gradients);
 
         // TODO-STEP:9 Paralléliser cette boucle avec rayon. Chaque cellule ne lit que
-        // `self`, `c` et `gradients` (partagés, en lecture seule) et n'écrit que sa
-        // propre case de `out` : `par_iter()` sur les cellules, `zip`é avec `out` en
-        // écriture (`par_iter_mut()`), `enumerate()` pour retrouver l'identifiant.
+        // les données partagées en lecture, et n'écrit que sa case de `out`.
+        // HINT : `par_iter`, `par_iter_mut`, `zip`, `enumerate`, puis `for_each`.
         // SOLUTION-BEGIN
         self.mesh
             .cells()
@@ -282,52 +322,7 @@ impl<'m, F: FluxScheme> Solver<'m, F> {
             .zip(out.as_mut_slice().par_iter_mut())
             .enumerate()
             .for_each(|(i, (cell, out_value))| {
-                let id = CellId(i as u32);
-                let ci = c[id];
-                let mut sum = 0.0;
-
-                for &fid in self.mesh.cell_faces(id) {
-                    let face = self.mesh.face(fid);
-                    // Le débit stocké est sortant de `face.left` : on le retourne si la
-                    // cellule courante se trouve de l'autre côté.
-                    let outward = if face.left == id { 1.0 } else { -1.0 };
-                    let flux = self.face_flux[fid.index()] * outward;
-                    let un = flux / face.length;
-                    let to_face_left = face.midpoint - cell.centroid;
-
-                    let (c_other, grad_right, to_face_right) = match face.right {
-                        Side::Inner(other) => {
-                            let neighbour = if face.left == id { other } else { face.left };
-                            let n_centroid = self.mesh.cell(neighbour).centroid;
-                            (
-                                c[neighbour],
-                                Some(gradients[neighbour.index()]),
-                                face.midpoint - n_centroid,
-                            )
-                        }
-                        Side::Boundary(kind) => match self.bc(kind) {
-                            Bc::NoFlux => continue,
-                            Bc::Fixed(value) => (value, None, Vec2::ZERO),
-                            Bc::ZeroGradient => (ci, None, Vec2::ZERO),
-                        },
-                    };
-
-                    let c_face = self.scheme.interface_value(&FaceState {
-                        c_left: ci,
-                        c_right: c_other,
-                        un,
-                        grad_left: gradients[id.index()],
-                        to_face_left,
-                        grad_right,
-                        to_face_right,
-                    });
-                    // Le terme convectif utilise le débit tel quel : c'est lui qui se
-                    // télescope exactement sur le contour de la cellule.
-                    sum += flux * c_face
-                        - self.config.diffusivity * (c_other - ci) / face.distance * face.length;
-                }
-
-                *out_value = -sum / cell.area;
+                *out_value = self.cell_rate(CellId(i as u32), cell, c, &gradients);
             });
         // SOLUTION-END
     }
@@ -345,51 +340,7 @@ impl<'m, F: FluxScheme> Solver<'m, F> {
 
         for (i, cell) in self.mesh.cells().iter().enumerate() {
             let id = CellId(i as u32);
-            let ci = c[id];
-            let mut sum = 0.0;
-
-            for &fid in self.mesh.cell_faces(id) {
-                let face = self.mesh.face(fid);
-                // Le débit stocké est sortant de `face.left` : on le retourne si la
-                // cellule courante se trouve de l'autre côté.
-                let outward = if face.left == id { 1.0 } else { -1.0 };
-                let flux = self.face_flux[fid.index()] * outward;
-                let un = flux / face.length;
-                let to_face_left = face.midpoint - cell.centroid;
-
-                let (c_other, grad_right, to_face_right) = match face.right {
-                    Side::Inner(other) => {
-                        let neighbour = if face.left == id { other } else { face.left };
-                        let n_centroid = self.mesh.cell(neighbour).centroid;
-                        (
-                            c[neighbour],
-                            Some(gradients[neighbour.index()]),
-                            face.midpoint - n_centroid,
-                        )
-                    }
-                    Side::Boundary(kind) => match self.bc(kind) {
-                        Bc::NoFlux => continue,
-                        Bc::Fixed(value) => (value, None, Vec2::ZERO),
-                        Bc::ZeroGradient => (ci, None, Vec2::ZERO),
-                    },
-                };
-
-                let c_face = self.scheme.interface_value(&FaceState {
-                    c_left: ci,
-                    c_right: c_other,
-                    un,
-                    grad_left: gradients[id.index()],
-                    to_face_left,
-                    grad_right,
-                    to_face_right,
-                });
-                // Le terme convectif utilise le débit tel quel : c'est lui qui se
-                // télescope exactement sur le contour de la cellule.
-                sum += flux * c_face
-                    - self.config.diffusivity * (c_other - ci) / face.distance * face.length;
-            }
-
-            out[id] = -sum / cell.area;
+            out[id] = self.cell_rate(id, cell, c, &gradients);
         }
     }
 
@@ -473,26 +424,16 @@ impl<'m, F: FluxScheme> Solver<'m, F> {
     #[cfg_attr(not(feature = "step8"), allow(unused_variables))] // trou étape 8
     fn step_rk2(&self, c: &mut Field, work: &mut Field) {
         // TODO-STEP:8 k1 = résidu(c) dans `work` ; prédicteur = c + dt·k1 ; k2 =
-        // résidu(prédicteur) ; avancer c de dt/2 · (k1 + k2)
+        // résidu(prédicteur) ; déléguer la combinaison de Heun à `heun_combine`.
         // SOLUTION-BEGIN
         self.residual(c, work);
-
         let mut predictor = c.clone();
         for (value, k1) in predictor.as_mut_slice().iter_mut().zip(work.as_slice()) {
             *value += self.dt * k1;
         }
-
         let mut k2 = Field::zeros(c.len());
         self.residual(&predictor, &mut k2);
-
-        for ((value, k1), k2) in c
-            .as_mut_slice()
-            .iter_mut()
-            .zip(work.as_slice())
-            .zip(k2.as_slice())
-        {
-            *value += 0.5 * self.dt * (k1 + k2);
-        }
+        heun_combine(c, self.dt, work, &k2);
         // SOLUTION-END
     }
 
@@ -608,30 +549,49 @@ fn compute_face_flux<S: StreamSource + ?Sized>(mesh: &Mesh, velocity: &S) -> Vec
 /// à transporter, et le minimum porterait sur un ensemble vide.
 #[cfg_attr(not(feature = "step5"), allow(unused_variables))] // trou étape 5
 fn max_stable_dt(mesh: &Mesh, face_flux: &[f64], diffusivity: f64) -> Option<f64> {
-    // TODO-STEP:5 Pour chaque cellule, sommer sur ses faces `|débit| + 2·D·L/d`, puis
-    // retenir le plus petit rapport `aire / somme` du maillage. Renvoyer `None` si
-    // aucune cellule n'a de somme strictement positive.
+    // TODO-STEP:5 Calculer le transport de chaque cellule avec `cell_transport`, puis
+    // retenir le plus petit rapport aire/transport ; ignorer les sommes nulles.
     // SOLUTION-BEGIN
-    // `filter_map` écarte les cellules sans transport, `reduce` prend le minimum de ce
-    // qui reste — et renvoie `None` s'il ne reste rien, sans qu'on ait à le traiter à
-    // part. C'est là tout l'intérêt de `reduce` face à `fold` : pas de valeur initiale
-    // à inventer, donc pas de sentinelle à faire passer pour un résultat.
     mesh.cells()
         .iter()
         .enumerate()
         .filter_map(|(i, cell)| {
-            let id = CellId(i as u32);
-            let outflow: f64 = mesh
-                .cell_faces(id)
-                .iter()
-                .map(|&fid| {
-                    let face = mesh.face(fid);
-                    face_flux[fid.index()].abs() + 2.0 * diffusivity * face.length / face.distance
-                })
-                .sum();
-            (outflow > 0.0).then(|| cell.area / outflow)
+            let transport = cell_transport(mesh, CellId(i as u32), face_flux, diffusivity);
+            (transport > 0.0).then(|| cell.area / transport)
         })
         .reduce(f64::min)
+    // SOLUTION-END
+}
+
+/// Dénominateur CFL d'une cellule : advection absolue et diffusion.
+#[cfg_attr(not(feature = "step6"), allow(dead_code))] // appelée depuis max_stable_dt
+fn cell_transport(mesh: &Mesh, id: CellId, face_flux: &[f64], diffusivity: f64) -> f64 {
+    // TODO-STEP:5 Additionner pour les faces de cette cellule le débit absolu et le
+    // terme diffusif `2 * D * longueur / distance`.
+    // SOLUTION-BEGIN
+    mesh.cell_faces(id)
+        .iter()
+        .map(|&fid| {
+            let face = mesh.face(fid);
+            face_flux[fid.index()].abs() + 2.0 * diffusivity * face.length / face.distance
+        })
+        .sum()
+    // SOLUTION-END
+}
+
+/// Ajoute la moyenne des deux pentes de Heun au champ courant.
+#[cfg_attr(not(feature = "step9"), allow(dead_code))] // appelée depuis le trou de step_rk2
+fn heun_combine(c: &mut Field, dt: f64, k1: &Field, k2: &Field) {
+    // TODO-STEP:8 Mettre à jour chaque valeur avec `dt / 2 * (k1 + k2)`.
+    // SOLUTION-BEGIN
+    for ((value, first), second) in c
+        .as_mut_slice()
+        .iter_mut()
+        .zip(k1.as_slice())
+        .zip(k2.as_slice())
+    {
+        *value += 0.5 * dt * (first + second);
+    }
     // SOLUTION-END
 }
 
@@ -679,6 +639,24 @@ mod tests {
             Err(other) => panic!("erreur inattendue : {other}"),
             Ok(solver) => panic!("pas de temps {} accepté sans transport", solver.dt()),
         }
+    }
+
+    #[test]
+    fn cell_transport_sums_absolute_face_fluxes() {
+        let mesh = test_mesh();
+        let fluxes = vec![1.0; mesh.n_faces()];
+        assert_eq!(cell_transport(&mesh, CellId(0), &fluxes, 0.0), 4.0);
+    }
+
+    #[cfg(feature = "step8")]
+    #[test]
+    fn heun_combine_averages_the_two_slopes() {
+        let mut c = Field::zeros(2);
+        let k1 = Field::filled(2, 1.0);
+        let k2 = Field::filled(2, 3.0);
+        heun_combine(&mut c, 0.2, &k1, &k2);
+        assert_eq!(c[CellId(0)], 0.4);
+        assert_eq!(c[CellId(1)], 0.4);
     }
 
     #[test]

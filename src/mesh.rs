@@ -429,41 +429,78 @@ impl Mesh {
     /// **deux** cellules.
     #[cfg_attr(not(feature = "step2"), allow(unused_variables))] // trou étape 2
     fn build_cell_faces(&mut self) {
-        // TODO-STEP:2 (pour aller plus loin) Remplir `cell_face_offsets` et
-        // `cell_face_indices` au format CSR : compter, cumuler, puis remplir avec un
-        // curseur par cellule
-        // HINT: c'est beaucoup de machinerie en "bonus"; n'hésitez pas à le passer
+        // TODO-STEP:2 (pour aller plus loin) Compter les faces, calculer les offsets
+        // cumulés, puis remplir les indices de faces par cellule.
         // SOLUTION-BEGIN
-        let mut counts = vec![0u32; self.cells.len() + 1];
-        for face in &self.faces {
-            counts[face.left.index() + 1] += 1;
-            if let Side::Inner(right) = face.right {
-                counts[right.index() + 1] += 1;
-            }
-        }
-        for i in 1..counts.len() {
-            counts[i] += counts[i - 1];
-        }
-        let offsets = counts;
-
-        let mut cursor = offsets.clone();
-        let mut indices = vec![FaceId(0); offsets[self.cells.len()] as usize];
-        for (i, face) in self.faces.iter().enumerate() {
-            let fid = FaceId(i as u32);
-            let slot = &mut cursor[face.left.index()];
-            indices[*slot as usize] = fid;
-            *slot += 1;
-            if let Side::Inner(right) = face.right {
-                let slot = &mut cursor[right.index()];
-                indices[*slot as usize] = fid;
-                *slot += 1;
-            }
-        }
-
+        let counts = face_counts(self.cells.len(), &self.faces);
+        let offsets = offsets_from_counts(&counts);
+        let indices = fill_cell_faces(&self.faces, &offsets);
         self.cell_face_offsets = offsets;
         self.cell_face_indices = indices;
         // SOLUTION-END
     }
+}
+
+/// Compte les faces incidents de chaque cellule, avec une case initiale pour les offsets.
+#[cfg_attr(not(feature = "step3"), allow(dead_code))] // appelée depuis le trou CSR
+fn face_counts(cell_count: usize, faces: &[Face]) -> Vec<u32> {
+    // TODO-STEP:2 Compter chaque face pour sa cellule gauche et, si elle est interne,
+    // aussi pour sa cellule droite.
+    // SOLUTION-BEGIN
+    let mut counts = vec![0; cell_count + 1];
+    for face in faces {
+        counts[face.left.index() + 1] += 1;
+        if let Side::Inner(right) = face.right {
+            counts[right.index() + 1] += 1;
+        }
+    }
+    counts
+    // SOLUTION-END
+}
+
+/// Transforme les comptes en offsets CSR par somme préfixe.
+#[cfg_attr(not(feature = "step3"), allow(dead_code))] // appelée depuis le trou CSR
+fn offsets_from_counts(counts: &[u32]) -> Vec<u32> {
+    // TODO-STEP:2 Construire les sommes préfixes : chaque offset indique le début
+    // de la liste de la cellule correspondante.
+    // SOLUTION-BEGIN
+    let mut offsets = counts.to_vec();
+    for i in 1..offsets.len() {
+        offsets[i] += offsets[i - 1];
+    }
+    offsets
+    // SOLUTION-END
+}
+
+/// Remplit les indices CSR en avançant un curseur par cellule.
+#[cfg_attr(not(feature = "step3"), allow(dead_code))] // appelée depuis le trou CSR
+fn fill_cell_faces(faces: &[Face], offsets: &[u32]) -> Vec<FaceId> {
+    // TODO-STEP:2 Parcourir les faces et écrire leur identifiant dans les tranches
+    // de leurs cellules, en avançant un curseur distinct par cellule.
+    // SOLUTION-BEGIN
+    let mut cursor = offsets[..offsets.len() - 1].to_vec();
+    let mut indices = vec![FaceId(0); offsets[offsets.len() - 1] as usize];
+    for (i, face) in faces.iter().enumerate() {
+        let id = FaceId(i as u32);
+        place_face(face.left, id, &mut cursor, &mut indices);
+        if let Side::Inner(right) = face.right {
+            place_face(right, id, &mut cursor, &mut indices);
+        }
+    }
+    indices
+    // SOLUTION-END
+}
+
+/// Insère une face dans la tranche CSR d'une cellule et avance son curseur.
+#[cfg_attr(not(feature = "step3"), allow(dead_code))] // appelée depuis fill_cell_faces
+fn place_face(cell: CellId, face: FaceId, cursor: &mut [u32], indices: &mut [FaceId]) {
+    // TODO-STEP:2 Écrire l'identifiant dans le prochain emplacement de la cellule,
+    // puis avancer son curseur.
+    // SOLUTION-BEGIN
+    let slot = cursor[cell.index()] as usize;
+    indices[slot] = face;
+    cursor[cell.index()] += 1;
+    // SOLUTION-END
 }
 
 /// Sommets de la cellule `(row, col)` du masque, dans le sens direct.
@@ -521,45 +558,68 @@ fn vertex_id(
     VertexId(table[k])
 }
 
+/// Clé indépendante du sens de parcours d'une arête.
+#[cfg_attr(not(feature = "step3"), allow(dead_code))] // appelée depuis le trou de l'étape 2
+#[cfg_attr(not(feature = "step2"), allow(unused_variables))] // trou étape 2
+fn edge_key(a: VertexId, b: VertexId) -> (u32, u32) {
+    // TODO-STEP:2 Ordonner les deux indices : l'arête a→b et l'arête b→a doivent
+    // produire la même clé.
+    // SOLUTION-BEGIN
+    if a.0 < b.0 {
+        (a.0, b.0)
+    } else {
+        (b.0, a.0)
+    }
+    // SOLUTION-END
+}
+
 /// Apparie les arêtes des cellules pour en faire des faces.
 ///
 /// Une arête vue une seule fois est une face de bord ; vue deux fois, une face interne ;
 /// vue trois fois, un maillage cassé — d'où le `HashMap` d'arêtes en cours d'appariement.
 #[cfg_attr(not(feature = "step2"), allow(unused_variables))] // trou étape 2
 fn build_faces(cells: &[Cell], vertices: &[Point]) -> Result<Vec<Face>, MeshError> {
-    // TODO-STEP:2 Apparier les arêtes : première rencontre ⇒ nouvelle face de bord
-    // provisoire, construite par `boundary_face` ; seconde rencontre ⇒ la face devient
-    // interne (`Side::Inner`) ; troisième ⇒ `NonManifoldEdge`.
-    // La clé d'une arête est la paire de sommets triée, pour que les deux cellules adjacentes
-    // tombent bien sur la même entrée du `HashMap`.
-    // HINT: * n'oubliez pas de définir une relation d'équivalence sur les arêtes (vu des deux côtés)
-    //       * commencez par ajouter des "boundary_face" qui évolue au fil des cellules appairées
-    //       * vous pouvez utiliser un tableau annexe "face_seen" pour accélérer l'appariement
+    // TODO-STEP:2 Parcourir les arêtes et déléguer à `pair_edge` leur création ou leur
+    // appariement ; renvoyer immédiatement la première erreur.
     // SOLUTION-BEGIN
     let mut faces: Vec<Face> = Vec::new();
     let mut seen: HashMap<(u32, u32), FaceId> = HashMap::new();
-
     for (i, cell) in cells.iter().enumerate() {
-        let id = CellId(i as u32);
         let verts = cell.kind.vertices();
         for (k, &a) in verts.iter().enumerate() {
             let b = verts[(k + 1) % verts.len()];
-            let key = if a.0 < b.0 { (a.0, b.0) } else { (b.0, a.0) };
-            match seen.get(&key) {
-                Some(&fid) => match faces[fid.index()].right {
-                    Side::Inner(_) => {
-                        return Err(MeshError::NonManifoldEdge { a: key.0, b: key.1 })
-                    }
-                    Side::Boundary(_) => faces[fid.index()].right = Side::Inner(id),
-                },
-                None => {
-                    faces.push(boundary_face(a, b, id, vertices));
-                    seen.insert(key, FaceId((faces.len() - 1) as u32));
-                }
-            }
+            pair_edge(&mut faces, &mut seen, a, b, CellId(i as u32), vertices)?;
         }
     }
     Ok(faces)
+    // SOLUTION-END
+}
+
+/// Crée une face à la première rencontre, ou complète la face existante.
+#[cfg_attr(not(feature = "step3"), allow(dead_code))] // appelée depuis le trou de build_faces
+fn pair_edge(
+    faces: &mut Vec<Face>,
+    seen: &mut HashMap<(u32, u32), FaceId>,
+    a: VertexId,
+    b: VertexId,
+    cell: CellId,
+    vertices: &[Point],
+) -> Result<(), MeshError> {
+    // TODO-STEP:2 Chercher la clé canonique : créer la face si elle est nouvelle,
+    // apparier la seconde cellule, ou signaler une troisième rencontre.
+    // SOLUTION-BEGIN
+    let key = edge_key(a, b);
+    match seen.get(&key).copied() {
+        None => {
+            faces.push(boundary_face(a, b, cell, vertices));
+            seen.insert(key, FaceId((faces.len() - 1) as u32));
+        }
+        Some(id) => match faces[id.index()].right {
+            Side::Boundary(_) => faces[id.index()].right = Side::Inner(cell),
+            Side::Inner(_) => return Err(MeshError::NonManifoldEdge { a: key.0, b: key.1 }),
+        },
+    }
+    Ok(())
     // SOLUTION-END
 }
 
@@ -601,6 +661,84 @@ mod tests {
         assert_eq!(m.n_cells(), 4);
         assert_eq!(m.n_faces(), 12); // 4 cellules × 4 arêtes − 4 arêtes internes partagées
         assert!((m.total_area() - 4.0).abs() < 1e-12);
+    }
+
+    #[test]
+    fn edge_key_is_independent_of_orientation() {
+        assert_eq!(edge_key(VertexId(3), VertexId(8)), (3, 8));
+        assert_eq!(edge_key(VertexId(8), VertexId(3)), (3, 8));
+    }
+
+    #[test]
+    fn face_counts_include_both_cells_of_an_inner_face() {
+        let m = mesh_of("..\n");
+        assert_eq!(face_counts(m.n_cells(), m.faces()), [0, 4, 4]);
+    }
+
+    #[test]
+    fn offsets_are_prefix_sums_of_face_counts() {
+        assert_eq!(offsets_from_counts(&[0, 4, 4]), [0, 4, 8]);
+    }
+
+    #[test]
+    fn place_face_advances_only_the_selected_cell_cursor() {
+        let mut cursor = [0, 1];
+        let mut indices = [FaceId(0); 2];
+        place_face(CellId(1), FaceId(7), &mut cursor, &mut indices);
+        assert_eq!(cursor, [0, 2]);
+        assert_eq!(indices, [FaceId(0), FaceId(7)]);
+    }
+
+    #[test]
+    fn fill_cell_faces_places_each_face_in_its_incident_cells() {
+        let m = mesh_of("..\n");
+        let offsets = offsets_from_counts(&face_counts(m.n_cells(), m.faces()));
+        let indices = fill_cell_faces(m.faces(), &offsets);
+        assert_eq!(indices.len(), 8);
+        for cell in 0..m.n_cells() {
+            let id = CellId(cell as u32);
+            for &face_id in &indices[offsets[cell] as usize..offsets[cell + 1] as usize] {
+                let face = m.face(face_id);
+                assert!(face.left == id || face.right == Side::Inner(id));
+            }
+        }
+    }
+
+    #[test]
+    fn pair_edge_creates_pairs_and_rejects_a_third_cell() {
+        let vertices = [Point::new(0.0, 0.0), Point::new(1.0, 0.0)];
+        let (mut faces, mut seen) = (Vec::new(), HashMap::new());
+        pair_edge(
+            &mut faces,
+            &mut seen,
+            VertexId(0),
+            VertexId(1),
+            CellId(0),
+            &vertices,
+        )
+        .unwrap();
+        pair_edge(
+            &mut faces,
+            &mut seen,
+            VertexId(1),
+            VertexId(0),
+            CellId(1),
+            &vertices,
+        )
+        .unwrap();
+        assert_eq!(faces.len(), 1);
+        assert_eq!(faces[0].right, Side::Inner(CellId(1)));
+        assert!(matches!(
+            pair_edge(
+                &mut faces,
+                &mut seen,
+                VertexId(0),
+                VertexId(1),
+                CellId(2),
+                &vertices,
+            ),
+            Err(MeshError::NonManifoldEdge { a: 0, b: 1 })
+        ));
     }
 
     #[test]

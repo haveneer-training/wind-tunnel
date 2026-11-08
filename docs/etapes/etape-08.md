@@ -103,7 +103,8 @@ Deux remarques :
 
 | Fonction | Fichier | Ce qu'elle doit faire |
 |---|---|---|
-| `Solver::step_rk2` | `solver.rs` | le calcul ci-dessus : `k1`, prédicteur, `k2`, puis la mise à jour de `c` |
+| `Solver::step_rk2` | `solver.rs` | calculer `k1`, le prédicteur et `k2`, puis déléguer la recombinaison |
+| `heun_combine` | `solver.rs` | ajouter `dt/2 · (k1 + k2)` au champ courant |
 
 `TimeScheme` (`Euler` par défaut, `Rk2`) est un nouveau champ de `Config`, déjà branché
 sur `--time-scheme euler\|rk2` en CLI et sur `Solver::step`, qui bascule vers

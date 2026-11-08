@@ -8,14 +8,15 @@ ressemble du Rust ordinaire.
 
 ## Socle
 
-Quatre trous à combler, tous d'une ou deux lignes :
+Quatre fonctions du socle, plus un fragment dédié à la moyenne utilisée par le centroïde :
 
 | Fonction | Ce qu'elle doit faire |
 |---|---|
 | `Vec2::dot` | produit scalaire |
 | `Vec2::perp_cw` | rotation de −90°, pour obtenir une normale sortante |
 | `polygon_area` | aire signée par la formule du lacet : `½ Σ (xᵢ·yᵢ₊₁ − xᵢ₊₁·yᵢ)` |
-| `polygon_centroid` | centroïde : `(1/6A) Σ (pᵢ + pᵢ₊₁)·(xᵢ·yᵢ₊₁ − xᵢ₊₁·yᵢ)` |
+| `vertex_mean` | moyenne arithmétique des coordonnées, utilisée lorsque l'aire est négligeable |
+| `polygon_centroid` | centroïde par arêtes ; déléguer le cas d'aire négligeable à `vertex_mean` |
 
 La fonction utilitaire `edges` vous donne déjà les couples `(sommet, sommet suivant)` en
 refermant le polygone : vous n'avez pas à gérer le retour au premier sommet.

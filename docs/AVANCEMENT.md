@@ -3,8 +3,7 @@
 Document de passation. Il dit où en est le fil rouge, ce qui reste à faire, et les
 décisions qu'il ne faut pas défaire sans le savoir. À tenir à jour.
 
-Dernière mise à jour : 2026-09-21 (contrôle de chronologie : un trou n'exige que des
-notions déjà enseignées).
+Dernière mise à jour : 2026-11-07 (mécanismes `xtask` modularisés et exercices fragmentés).
 
 ## Contexte
 
@@ -27,6 +26,23 @@ boucles en *gather* du solveur (étape 9), puis le rendu PNG parallélisé « à
 avec `thread::scope`, `Mutex` et `mpsc` (étape 10), et enfin la décomposition de domaine
 MPI (étape 11, bonus), et l'écoulement calculé sur le maillage (étape 12, bonus). Le code
 tourne et produit l'animation.
+
+**Révision 2026-11-07 — outillage et granularité.** `xtask` est maintenant séparé en
+`cli`, `blocks`, `files`, `starter`, `steps` et `update` : le CLI valide les arguments,
+`next` s'appuie sur `LAST_STEP`, défini dans `steps.rs`, et `check-steps.sh` déduit la
+dernière étape de la sentinelle `step13` dans `Cargo.toml`. Le parcours de sources couvre
+`src/`, `mpi/src/` et `design/src/` ; `start` efface la sentinelle MPI dans le dossier
+stagiaire, et `update` reporte le corrigé en associant les réponses aux fonctions plutôt
+qu'à des ordinaux fragiles.
+
+Le nombre d'exercices passe à **43 blocs**, dont le nouveau helper `edge_key` (2), le
+decodeur local `cell_of` (3), la rastérisation par tranche (10), le tri unitaire `place`
+(11), puis `obstacle_level` et `sweep` (12). `cell_rate`/`Raster` et l'étape temporelle
+MPI sont fournis pour isoler les opérations à écrire. Les tests ajoutés verrouillent les
+nouveaux helpers et la conservation d'une réponse stagiaire lors d'une insertion.
+L'inventaire des lignes et l'analyse de complexité sont dans
+[`RAPPORT-PROGRESSION.md`](RAPPORT-PROGRESSION.md), avec son générateur
+`scripts/progression-inventory.py`.
 
 **Rééquilibrage 2026-09-20.** Le découpage des trous a été révisé pour que le temps du
 stagiaire achète du Rust plutôt que de la transcription de formules. Mesuré trou par
@@ -81,11 +97,12 @@ compile que si `Side` est bien une énumération à deux cas (la variante « `Op
 drapeau » ne passerait pas), et `the_enum_costs_no_more_than_a_flag` vérifie que la
 version sûre est aussi la plus petite.
 
-- 88 tests verts, `cargo clippy --all-targets --all-features -- -D warnings` propre,
-  `cargo fmt` appliqué ; plus 8 tests dans `design/` (`cargo test -p wind-tunnel-design`)
-- 37 trous répartis : 4 en étape 0, 3 en 1, **4** en 2, 4 en 3, 3 en 4, 3 en 5, 1 en 6,
-  2 en 7, 1 en 8, 3 en 9, 1 en 10, 5 en 11, 3 en 12 — le quatrième de l'étape 2 est le
-  **trou vide** du bonus de conception (voir plus bas)
+- Tests verts et clippy strict propre ; plus 8 tests dans `design/`
+  (`cargo test -p wind-tunnel-design`). Le nombre à jour est celui de la dernière
+  validation ci-dessous.
+- 43 blocs d'exercice répartis : 4 en étape 0, 3 en 1, **5** en 2, 6 en 3, 3 en 4,
+  3 en 5, 1 en 6, 2 en 7, 1 en 8, 3 en 9, 2 en 10, 6 en 11 et 4 en 12. Le premier
+  de l'étape 2 est le **trou vide** du bonus de conception.
 - **Étape 11 (bonus)** décompose le domaine en **bandes verticales**, une par rang MPI.
   Chaque rang extrait sa tranche de colonnes du masque (`Mask::columns`, nouveau),
   appelle `Mesh::from_mask` dessus et translate le maillage à sa place (`Mesh::translate`,
@@ -96,7 +113,8 @@ version sûre est aussi la plus petite.
   - `src/decomposition.rs` (feature `step11`) porte tout ce qui ne parle pas de MPI :
     `Bands` (découpage des colonnes), `Layout` (qui possède quoi, qui envoie quoi à qui),
     `pack`/`unpack`, et les réductions restreintes aux cellules possédées
-    (`owned_mass`, `owned_min_max`). Deux trous, testables sans MPI installé.
+    (`owned_mass`, `owned_min_max`). Trois trous, testables sans MPI installé : répartition,
+    parcours/classement des cellules et rangement d'une cellule (`place`).
   - `mpi/` est membre du workspace (`members = ["xtask", "mpi"]`), le seul à dépendre de
     `rsmpi`, mais pas du groupe *par défaut* : un workspace non virtuel ne construit que
     son paquet racine sans `-p`/`--workspace`. `cargo build`, `cargo test` et surtout
@@ -179,9 +197,9 @@ version sûre est aussi la plus petite.
   de l'étape 5 est inchangé, déplacé tel quel dans `step_euler` ; `step_rk2` (le trou)
   alloue son prédicteur et son second résidu à chaque appel, comme `residual` alloue son
   tampon de gradients depuis l'étape 7 — même choix, même renvoi en extension
-- le dispositif de travail (`cargo xtask start` puis `goto` / `solve` / `reset` /
-  `status`) est en place et vérifié depuis un clone neuf, `LAST_STEP` à jour dans
-  `xtask/src/main.rs`
+- le dispositif de travail (`cargo xtask start`, `update`, `status`, `goto`, `next`,
+  `solve`, `reset`) est modularisé sous `xtask/src/` et vérifié par `cargo test -p xtask` ;
+  `LAST_STEP` vit dans `steps.rs`, le manifeste porte la sentinelle `step13`
 - **Étape 9** parallélise trois boucles en *gather* avec `rayon` : le calcul des débits
   de face dans `Solver::new` (un simple `map`), `gradient::limited_gradients`, et la
   boucle principale de `Solver::residual`. Aucune n'écrit chez le voisin, donc aucune ne
@@ -361,14 +379,14 @@ avertissement aide-t-il le stagiaire qui travaille sur cette étape ?*
 Le commentaire de fin de ligne (`// trou étape 3`, `// collatéral du trou étape 9`) est
 obligatoire : sans lui, personne ne retrouve à quel trou l'attribut se rapporte.
 
-Dans le corrigé, `default = ["step12"]` rend **toutes** ces conditions fausses : les
+Dans le corrigé, `default = ["step13"]` rend **toutes** ces conditions fausses : les
 attributs y sont inertes, et rien n'y est caché. Idem dans un `travail/` entièrement
 résolu.
 
 ### La feature sentinelle
 
-`step12` est la clé de voûte : c'est l'étape *suivant* la dernière implémentée
-(`LAST_STEP` vaut 11, et `cargo xtask goto 12` est refusé). Aucun code n'en dépend, elle
+`step13` est la clé de voûte : c'est l'étape *suivant* la dernière implémentée
+(`LAST_STEP` vaut 12, et `cargo xtask goto 13` est refusé). Aucun code n'en dépend, elle
 n'ouvre aucun test — elle existe pour que la condition `not(feature = "stepN+1")` de la
 seconde ligne du tableau ait un sens quand `N` est la dernière étape. Sans elle, le
 collatéral du trou de l'étape 11 (`Halo`, `mpi/src/exchange.rs`, dont les quatre tampons
@@ -377,13 +395,14 @@ ne sont lus que par le corps troué) n'aurait aucune condition à laquelle se ra
 Elle est activée par défaut dans les deux manifestes du corrigé, et retirée du dossier
 de travail :
 
-- `Cargo.toml` racine : `default = ["step12"]`. `cargo xtask goto <n>` réécrit cette
+- `Cargo.toml` racine : `default = ["step13"]`, avec `step13 = ["step12"]`.
+  `cargo xtask goto <n>` réécrit cette
   ligne, donc `travail/` ne l'a jamais.
-- `mpi/Cargo.toml` : `default = ["step12"]`, avec `step12 = ["wind-tunnel/step12"]` — le
+- `mpi/Cargo.toml` : `default = ["step13"]`, avec `step13 = ["wind-tunnel/step13"]` — le
   crate `mpi` n'a pas d'étapes à lui, il lui faut sa propre déclaration pour pouvoir
   écrire `#[cfg(feature = ...)]`. Comme `goto` ne touche pas ce manifeste-là,
   `make_starter` y remet `default = []` au moment d'engendrer `travail/`
-  (`rewrite_default`, dans `xtask/src/main.rs`).
+  (`starter.rs`).
 
 Vérification que la sentinelle ne cache rien : ajouter un champ jamais lu à `Halo` dans
 le corrigé doit produire « field is never read » malgré l'attribut. C'est le test à
@@ -417,12 +436,10 @@ l'étape en cours. Le scan se refait en régénérant `travail/` puis, pour chaq
    l'étape précédente jusqu'à celle-ci, pas seulement pendant celle-ci.
    **`scripts/check-steps.sh`** vérifie automatiquement cette propriété sur toutes les
    étapes ; le relancer après avoir touché du code partagé entre étapes.
-   **Le `// TODO-STEP:<n>` doit tenir dans les 8 lignes qui précèdent
-   `// SOLUTION-BEGIN`** : `step_of` (`xtask/src/main.rs`) ne remonte pas plus haut, et
-   un bloc dont il ne trouve pas le marqueur est silencieusement attribué à l'étape 0.
-   Symptôme : `cargo xtask status` compte trop de trous en étape 0 et pas assez dans la
-   vôtre. Une consigne plus longue va dans le commentaire de documentation de la
-   fonction, que le stagiaire lit de toute façon.
+   **Le `// TODO-STEP:<n>` doit être dans le bloc contigu de commentaires au-dessus de
+   `// SOLUTION-BEGIN`** : `step_of` (`xtask/src/blocks.rs`) remonte jusqu'au premier
+   code ; s'il ne trouve pas le marqueur, il échoue explicitement au lieu d'attribuer le
+   trou à l'étape 0. Une consigne longue va dans la documentation de la fonction.
    **Le trou « vide »**, second type de trou : `// SOLUTION-BEGIN vide` remplace le bloc
    par **rien du tout** au lieu d'un `todo!()`, et son marqueur dit « à écrire de zéro »
    dans `travail/`. Il sert quand le stagiaire doit écrire des *définitions* — types,
@@ -434,10 +451,11 @@ l'étape en cours. Le scan se refait en régénérant `travail/` puis, pour chaq
    `#![cfg(feature = "stepN")]` en tête d'un fichier de `tests/`. Les features sont
    chaînées dans `Cargo.toml` (`stepN = ["stepN-1"]`), ce qui fait que `cargo test` ne
    montre au stagiaire que les étapes déjà ouvertes.
-3. **Relever `LAST_STEP`** dans `xtask/src/main.rs`. Si l'étape ajoute un crate à part,
-   l'ajouter aussi à la liste de copie de `make_starter` **et** à `SOURCE_DIRS` — sans
-   quoi `start`/`goto`/`solve`/`reset`/`status` ne verront jamais ses trous (c'est ce
-   qu'a demandé `mpi/src` à l'étape 11).
+3. **Relever `LAST_STEP`** dans `xtask/src/steps.rs` et déplacer la sentinelle `stepN`
+   dans les manifestes. Si l'étape ajoute un crate à part, l'ajouter à
+   `starter::STARTER_ENTRIES` et à `files::SOURCE_DIRS` — sans quoi `start`/`goto`/
+   `solve`/`reset`/`status` ne verront jamais ses trous (c'est ce qu'a demandé `mpi/src`
+   à l'étape 11).
 4. **Un énoncé** `docs/etapes/etape-NN.md`, avec un socle court et une extension
    facultative — l'écart de niveau dans le groupe va de 6 à 9 sur 17 au quiz d'entrée.
 5. **Langue** : identifiants et noms de fichiers de code en anglais, prose en français
@@ -517,7 +535,7 @@ en dépendance « pour factoriser », et ne le faites pas entrer dans le groupe 
 workspace — son état rouge normal casserait alors `cargo test` à la racine.
 
 **Un seul `README.md`, servi tel quel au stagiaire.** `make_starter` le copie sans jamais
-le remplacer (`xtask/src/main.rs`) : les passages qui ne valent que pour le dépôt corrigé
+le remplacer (`xtask/src/starter.rs`) : les passages qui ne valent que pour le dépôt corrigé
 (« comment engendrer `travail/` », par exemple) sont encadrés par
 `<!-- CORRIGE-ONLY-BEGIN/END -->`, que `make_starter` retire de tout fichier Markdown
 copié avant de le livrer. `ETAPES.md` porte la mécanique des étapes — la boucle

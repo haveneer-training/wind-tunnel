@@ -50,7 +50,17 @@ Calculez d'abord, sans toucher à l'image ; ne prenez le verrou que pour la sect
 
 | Bloc | Fichier | Ce qu'il doit devenir |
 |---|---|---|
-| la boucle de `write_png` | `png.rs` | `mesh.cells()` réparti en tranches (`.chunks(...)`), un `thread::scope` avec un thread par tranche, un `Mutex<RgbImage>` verrouillé le temps de recopier les pixels déjà calculés, et un `mpsc::channel` cloné par thread pour annoncer combien de cellules il a traitées |
+| `paint` | `png.rs` | écrire une liste de pixels sous un seul verrou |
+| `render_cell` | `png.rs` | rastériser une cellule et écrire ses pixels avec les tampons du thread |
+| `render_chunk` | `png.rs` | calculer les pixels de chaque cellule, les peindre et envoyer le compte traité |
+| `chunk_size` | `png.rs` | répartir les cellules en tranches non vides |
+| `render_all` | `png.rs` | lancer les threads scoped et agréger leurs comptes par `mpsc` |
+
+La structure `Raster` vous est donnée : elle rassemble projection et palette et calcule
+les pixels d'une cellule dans des tampons réutilisables. `write_png` est également
+fourni : il prépare l'image, choisit la taille des tranches, appelle `render_all` et
+sauvegarde le résultat. Les fragments portent sur l'écriture protégée, le travail d'un
+thread et l'orchestration concurrente, sans refaire la rastérisation.
 
 ## Pourquoi pas `Arc<Mutex<...>>` ?
 

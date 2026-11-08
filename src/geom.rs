@@ -185,22 +185,31 @@ pub fn polygon_area(points: &[Point]) -> f64 {
 /// assert!((g.x - 1.0).abs() < 1e-12 && (g.y - 1.0).abs() < 1e-12);
 /// ```
 pub fn polygon_centroid(points: &[Point]) -> Point {
-    // TODO-STEP:0 Centroïde : (1/6A) Σ (pᵢ + pᵢ₊₁)·(xᵢ·yᵢ₊₁ − xᵢ₊₁·yᵢ), avec repli sur la
-    // moyenne des sommets quand l'aire est négligeable
+    // TODO-STEP:0 Si l'aire est négligeable, renvoyer la moyenne des sommets ; sinon
+    // sommer les contributions des arêtes puis diviser par `6 * area`.
     // SOLUTION-BEGIN
     let area = polygon_area(points);
     if area.abs() < 1e-16 {
-        let n = points.len() as f64;
-        let sum = points
-            .iter()
-            .fold(Vec2::ZERO, |acc, p| acc + Vec2::new(p.x, p.y));
-        return Point::new(sum.x / n, sum.y / n);
+        return vertex_mean(points);
     }
     let sum = edges(points).fold(Vec2::ZERO, |acc, (a, b)| {
         let cross = a.x * b.y - b.x * a.y;
         acc + Vec2::new((a.x + b.x) * cross, (a.y + b.y) * cross)
     });
     Point::new(sum.x / (6.0 * area), sum.y / (6.0 * area))
+    // SOLUTION-END
+}
+
+/// Moyenne arithmétique des sommets d'un polygone.
+#[cfg_attr(not(feature = "step1"), allow(dead_code))] // appelée depuis le trou du centroïde
+fn vertex_mean(points: &[Point]) -> Point {
+    // TODO-STEP:0 Additionner les coordonnées des sommets et diviser par leur nombre.
+    // SOLUTION-BEGIN
+    let sum = points
+        .iter()
+        .fold(Vec2::ZERO, |acc, p| acc + Vec2::new(p.x, p.y));
+    let n = points.len() as f64;
+    Point::new(sum.x / n, sum.y / n)
     // SOLUTION-END
 }
 
@@ -241,6 +250,12 @@ mod tests {
         let g = polygon_centroid(&square);
         assert!((g.x - 1.0).abs() < 1e-12);
         assert!((g.y - 1.0).abs() < 1e-12);
+    }
+
+    #[test]
+    fn vertex_mean_averages_coordinates() {
+        let points = [Point::new(0.0, 1.0), Point::new(4.0, 3.0)];
+        assert_eq!(vertex_mean(&points), Point::new(2.0, 2.0));
     }
 
     #[test]

@@ -13,7 +13,7 @@ use image::{ImageError, Rgb, RgbImage};
 
 use crate::field::Field;
 use crate::geom::Point;
-use crate::mesh::{CellId, Mesh};
+use crate::mesh::{Cell, CellId, Mesh};
 
 /// Couleur du fond, c'est-à-dire du solide.
 ///
@@ -43,25 +43,148 @@ pub fn colormap(t: f64) -> Rgb<u8> {
     ])
 }
 
+/// Projection et palette d'un rendu, partagées entre les chemins séquentiel et parallèle.
+struct Raster {
+    xmin: f64,
+    ymax: f64,
+    scale: f64,
+    width: u32,
+    height: u32,
+    lo: f64,
+    span: f64,
+}
+
+impl Raster {
+    fn new(mesh: &Mesh, width: u32, range: (f64, f64)) -> Raster {
+        let (xmin, ymin, xmax, ymax) = mesh.bounds();
+        let scale = width as f64 / (xmax - xmin);
+        let height = (((ymax - ymin) * scale).round() as u32).max(1);
+        let (lo, hi) = range;
+        let span = if (hi - lo).abs() < f64::EPSILON {
+            1.0
+        } else {
+            hi - lo
+        };
+        Raster {
+            xmin,
+            ymax,
+            scale,
+            width,
+            height,
+            lo,
+            span,
+        }
+    }
+
+    fn cell_pixels(
+        &self,
+        mesh: &Mesh,
+        value: f64,
+        cell: &Cell,
+        polygon: &mut Vec<Point>,
+        corners: &mut Vec<(f64, f64)>,
+        pixels: &mut Vec<(u32, u32)>,
+    ) -> Rgb<u8> {
+        polygon.clear();
+        polygon.extend(
+            cell.kind
+                .vertices()
+                .iter()
+                .map(|vertex| mesh.vertices()[vertex.index()]),
+        );
+        let color = colormap((value - self.lo) / self.span);
+        let to_pixel = |point: Point| {
+            (
+                (point.x - self.xmin) * self.scale,
+                (self.ymax - point.y) * self.scale,
+            )
+        };
+        corners.clear();
+        corners.extend(polygon.iter().map(|&point| to_pixel(point)));
+        let px0 = corners
+            .iter()
+            .map(|corner| corner.0)
+            .fold(f64::MAX, f64::min)
+            .floor() as i64;
+        let px1 = corners
+            .iter()
+            .map(|corner| corner.0)
+            .fold(f64::MIN, f64::max)
+            .ceil() as i64;
+        let py0 = corners
+            .iter()
+            .map(|corner| corner.1)
+            .fold(f64::MAX, f64::min)
+            .floor() as i64;
+        let py1 = corners
+            .iter()
+            .map(|corner| corner.1)
+            .fold(f64::MIN, f64::max)
+            .ceil() as i64;
+        pixels.clear();
+        for py in py0.max(0)..=py1.min(self.height as i64 - 1) {
+            for px in px0.max(0)..=px1.min(self.width as i64 - 1) {
+                let sample = Point::new(
+                    self.xmin + (px as f64 + 0.5) / self.scale,
+                    self.ymax - (py as f64 + 0.5) / self.scale,
+                );
+                if contains(polygon, sample) {
+                    pixels.push((px as u32, py as u32));
+                }
+            }
+        }
+        color
+    }
+}
+
+#[cfg(feature = "step10")]
+struct RenderBuffers {
+    polygon: Vec<Point>,
+    corners: Vec<(f64, f64)>,
+    pixels: Vec<(u32, u32)>,
+}
+
+#[cfg(feature = "step10")]
+impl RenderBuffers {
+    fn new() -> RenderBuffers {
+        RenderBuffers {
+            polygon: Vec::with_capacity(4),
+            corners: Vec::with_capacity(4),
+            pixels: Vec::new(),
+        }
+    }
+}
+
 /// Le point est-il dans le polygone ? (lancer de rayon)
 #[cfg_attr(not(feature = "step3"), allow(unused_variables))] // trou étape 3
 #[cfg_attr(not(feature = "step11"), allow(dead_code))] // collatéral du trou étape 10
 fn contains(polygon: &[Point], p: Point) -> bool {
-    // TODO-STEP:3 (pour aller plus loin) Lancer un rayon horizontal depuis `p` et
-    // compter les arêtes traversées : un nombre impair signifie « à l'intérieur »
+    // TODO-STEP:3 (pour aller plus loin) Inverser le résultat à chaque arête qui
+    // traverse le rayon horizontal partant de `p`.
     // SOLUTION-BEGIN
     let mut inside = false;
     let n = polygon.len();
     for (k, a) in polygon.iter().enumerate() {
         let b = &polygon[(k + 1) % n];
-        if (a.y > p.y) != (b.y > p.y) {
-            let x = a.x + (p.y - a.y) / (b.y - a.y) * (b.x - a.x);
-            if p.x < x {
-                inside = !inside;
-            }
+        if crosses(*a, *b, p) {
+            inside = !inside;
         }
     }
     inside
+    // SOLUTION-END
+}
+
+/// Le segment `(a, b)` traverse-t-il le rayon horizontal lancé depuis `p` ?
+#[cfg_attr(not(feature = "step4"), allow(dead_code))] // appelée depuis le trou de contains
+fn crosses(a: Point, b: Point, p: Point) -> bool {
+    // TODO-STEP:3 Tester le changement de côté vertical, puis comparer l'abscisse
+    // du point d'intersection avec celle de `p`.
+    // SOLUTION-BEGIN
+    if (a.y > p.y) == (b.y > p.y) {
+        return false;
+    }
+    let x = a.x + (p.y - a.y) / (b.y - a.y) * (b.x - a.x);
+    p.x < x
     // SOLUTION-END
 }
 
@@ -78,102 +201,120 @@ pub fn write_png(
     width: u32,
     range: (f64, f64),
 ) -> Result<(), ImageError> {
-    let (xmin, ymin, xmax, ymax) = mesh.bounds();
-    let scale = width as f64 / (xmax - xmin);
-    let height = (((ymax - ymin) * scale).round() as u32).max(1);
-    let img = RgbImage::from_pixel(width, height, BACKGROUND);
-
-    let (lo, hi) = range;
-    let span = if (hi - lo).abs() < f64::EPSILON {
-        1.0
-    } else {
-        hi - lo
-    };
-
-    let to_pixel = |p: Point| ((p.x - xmin) * scale, (ymax - p.y) * scale);
-
-    // TODO-STEP:10 Toutes les cellules dessinent dans la même image : une écriture
-    // concurrente, pas indépendante comme à l'étape 9. Répartissez `mesh.cells()` en
-    // tranches, un `std::thread::scope` avec un thread par tranche (il peut emprunter
-    // `mesh`/`field`/`image`, pas d'`Arc`), un `Mutex<RgbImage>` verrouillé juste pour
-    // recopier les pixels déjà calculés, et un `mpsc::channel` cloné par thread pour
-    // annoncer le nombre de cellules traitées (voir `docs/etapes/etape-10.md`).
-    // Facultatif, mais recommandé : déclarer les tampons de travail (polygone, coins,
-    // pixels) au niveau du thread et les vider par `clear()` à chaque cellule, plutôt
-    // que de les réallouer une fois par cellule et par image. Étant par thread, ils
-    // restent privés et n'ont besoin d'aucun verrou — voir `docs/BONUS-OPTIMISATION.md`.
-    // SOLUTION-BEGIN
+    let raster = Raster::new(mesh, width, range);
+    let img = RgbImage::from_pixel(width, raster.height, BACKGROUND);
     let image = Mutex::new(img);
-    let (tx, rx) = mpsc::channel::<usize>();
-
     let n_threads = thread::available_parallelism().map_or(1, |n| n.get());
-    let chunk_size = mesh.n_cells().div_ceil(n_threads).max(1);
-
-    thread::scope(|scope| {
-        for (chunk_index, chunk) in mesh.cells().chunks(chunk_size).enumerate() {
-            let tx = tx.clone();
-            let image = &image;
-            scope.spawn(move || {
-                let base = chunk_index * chunk_size;
-                // Alloués une fois par thread, vidés à chaque cellule : le rendu d'une
-                // image n'alloue plus qu'une poignée de fois, au lieu de trois fois par
-                // cellule.
-                let mut polygon: Vec<Point> = Vec::with_capacity(4);
-                let mut corners: Vec<(f64, f64)> = Vec::with_capacity(4);
-                let mut pixels: Vec<(u32, u32)> = Vec::new();
-
-                for (local, cell) in chunk.iter().enumerate() {
-                    let id = CellId((base + local) as u32);
-                    polygon.clear();
-                    polygon.extend(
-                        cell.kind
-                            .vertices()
-                            .iter()
-                            .map(|v| mesh.vertices()[v.index()]),
-                    );
-                    let color = colormap((field[id] - lo) / span);
-
-                    corners.clear();
-                    corners.extend(polygon.iter().map(|&p| to_pixel(p)));
-                    let px0 = corners.iter().map(|c| c.0).fold(f64::MAX, f64::min).floor() as i64;
-                    let px1 = corners.iter().map(|c| c.0).fold(f64::MIN, f64::max).ceil() as i64;
-                    let py0 = corners.iter().map(|c| c.1).fold(f64::MAX, f64::min).floor() as i64;
-                    let py1 = corners.iter().map(|c| c.1).fold(f64::MIN, f64::max).ceil() as i64;
-
-                    pixels.clear();
-                    for py in py0.max(0)..=py1.min(height as i64 - 1) {
-                        for px in px0.max(0)..=px1.min(width as i64 - 1) {
-                            let sample = Point::new(
-                                xmin + (px as f64 + 0.5) / scale,
-                                ymax - (py as f64 + 0.5) / scale,
-                            );
-                            if contains(&polygon, sample) {
-                                pixels.push((px as u32, py as u32));
-                            }
-                        }
-                    }
-
-                    let mut image = image.lock().unwrap();
-                    for &(px, py) in &pixels {
-                        image.put_pixel(px, py, color);
-                    }
-                }
-                tx.send(chunk.len())
-                    .expect("le suivi ne doit pas fermer trop tôt");
-            });
-        }
-        drop(tx);
-
-        let drawn: usize = rx.iter().sum();
-        debug_assert_eq!(
-            drawn,
-            mesh.n_cells(),
-            "toutes les cellules doivent être rendues"
-        );
-    });
-
+    let chunk_size = chunk_size(mesh.n_cells(), n_threads);
+    let drawn = render_all(mesh, field, &raster, &image, chunk_size);
+    debug_assert_eq!(
+        drawn,
+        mesh.n_cells(),
+        "toutes les cellules doivent être rendues"
+    );
     let img = image.into_inner().unwrap();
     img.save(path)
+}
+
+/// Rendu d'une tranche par un seul thread, avec ses tampons de travail privés.
+#[cfg(feature = "step10")]
+#[cfg_attr(not(feature = "step11"), allow(dead_code))] // appelée depuis le trou de l'étape 10
+fn render_chunk(
+    cells: &[Cell],
+    base: usize,
+    mesh: &Mesh,
+    field: &Field,
+    raster: &Raster,
+    image: &Mutex<RgbImage>,
+    tx: mpsc::Sender<usize>,
+) {
+    // TODO-STEP:10 Réutiliser les tampons du thread, rendre chaque cellule, puis
+    // envoyer le nombre de cellules traitées.
+    // SOLUTION-BEGIN
+    let mut buffers = RenderBuffers::new();
+    for (local, cell) in cells.iter().enumerate() {
+        let id = CellId((base + local) as u32);
+        render_cell(cell, id, mesh, field, raster, image, &mut buffers);
+    }
+    tx.send(cells.len())
+        .expect("le suivi ne doit pas fermer trop tôt");
+    // SOLUTION-END
+}
+
+/// Calcule les pixels d'une cellule puis les écrit dans l'image protégée.
+#[cfg(feature = "step10")]
+#[cfg_attr(not(feature = "step11"), allow(dead_code))] // appelée depuis render_chunk
+fn render_cell(
+    cell: &Cell,
+    id: CellId,
+    mesh: &Mesh,
+    field: &Field,
+    raster: &Raster,
+    image: &Mutex<RgbImage>,
+    buffers: &mut RenderBuffers,
+) {
+    // TODO-STEP:10 Utiliser `Raster` pour obtenir les pixels de la cellule, puis les
+    // écrire avec `paint` en réutilisant les tampons.
+    // SOLUTION-BEGIN
+    let color = raster.cell_pixels(
+        mesh,
+        field[id],
+        cell,
+        &mut buffers.polygon,
+        &mut buffers.corners,
+        &mut buffers.pixels,
+    );
+    paint(image, &buffers.pixels, color);
+    // SOLUTION-END
+}
+
+/// Taille de tranche équilibrée, non nulle même pour une entrée vide.
+#[cfg(feature = "step10")]
+#[cfg_attr(not(feature = "step11"), allow(dead_code))] // appelée depuis le rendu
+fn chunk_size(n: usize, threads: usize) -> usize {
+    // TODO-STEP:10 Répartir les cellules aussi également que possible et éviter
+    // une taille nulle, même si `threads` vaut zéro.
+    // SOLUTION-BEGIN
+    n.div_ceil(threads.max(1)).max(1)
+    // SOLUTION-END
+}
+
+/// Écrit une couleur à tous les pixels d'une cellule sous un seul verrou.
+#[cfg(feature = "step10")]
+#[cfg_attr(not(feature = "step11"), allow(dead_code))] // appelée depuis render_chunk
+fn paint(image: &Mutex<RgbImage>, pixels: &[(u32, u32)], color: Rgb<u8>) {
+    // TODO-STEP:10 Verrouiller l'image une fois et écrire chaque pixel calculé.
+    // SOLUTION-BEGIN
+    let mut image = image.lock().unwrap();
+    for &(x, y) in pixels {
+        image.put_pixel(x, y, color);
+    }
+    // SOLUTION-END
+}
+
+/// Orchestration des tranches dans des threads scoped et collecte du compte rendu.
+#[cfg(feature = "step10")]
+#[cfg_attr(not(feature = "step11"), allow(dead_code))] // appelée depuis write_png
+fn render_all(
+    mesh: &Mesh,
+    field: &Field,
+    raster: &Raster,
+    image: &Mutex<RgbImage>,
+    chunk: usize,
+) -> usize {
+    // TODO-STEP:10 Lancer un thread scoped par tranche, récupérer les comptes via
+    // le canal et renvoyer leur somme.
+    // SOLUTION-BEGIN
+    let (tx, rx) = mpsc::channel::<usize>();
+    thread::scope(|scope| {
+        for (index, cells) in mesh.cells().chunks(chunk).enumerate() {
+            let tx = tx.clone();
+            let base = index * chunk;
+            scope.spawn(move || render_chunk(cells, base, mesh, field, raster, image, tx));
+        }
+        drop(tx);
+        rx.iter().sum()
+    })
     // SOLUTION-END
 }
 
@@ -191,54 +332,134 @@ pub fn write_png(
     width: u32,
     range: (f64, f64),
 ) -> Result<(), ImageError> {
-    let (xmin, ymin, xmax, ymax) = mesh.bounds();
-    let scale = width as f64 / (xmax - xmin);
-    let height = (((ymax - ymin) * scale).round() as u32).max(1);
-    let mut img = RgbImage::from_pixel(width, height, BACKGROUND);
-
-    let (lo, hi) = range;
-    let span = if (hi - lo).abs() < f64::EPSILON {
-        1.0
-    } else {
-        hi - lo
-    };
-
-    let to_pixel = |p: Point| ((p.x - xmin) * scale, (ymax - p.y) * scale);
-
-    // Alloués une fois pour toutes, vidés à chaque cellule : une cellule a au plus
-    // quatre sommets, mais il y en a des dizaines de milliers, et autant d'images.
-    let mut polygon: Vec<Point> = Vec::with_capacity(4);
-    let mut corners: Vec<(f64, f64)> = Vec::with_capacity(4);
-
+    let raster = Raster::new(mesh, width, range);
+    let mut img = RgbImage::from_pixel(width, raster.height, BACKGROUND);
+    let mut polygon = Vec::with_capacity(4);
+    let mut corners = Vec::with_capacity(4);
+    let mut pixels = Vec::new();
     for (i, cell) in mesh.cells().iter().enumerate() {
-        polygon.clear();
-        polygon.extend(
-            cell.kind
-                .vertices()
-                .iter()
-                .map(|v| mesh.vertices()[v.index()]),
+        let id = CellId(i as u32);
+        let color = raster.cell_pixels(
+            mesh,
+            field[id],
+            cell,
+            &mut polygon,
+            &mut corners,
+            &mut pixels,
         );
-        let color = colormap((field[CellId(i as u32)] - lo) / span);
-
-        corners.clear();
-        corners.extend(polygon.iter().map(|&p| to_pixel(p)));
-        let px0 = corners.iter().map(|c| c.0).fold(f64::MAX, f64::min).floor() as i64;
-        let px1 = corners.iter().map(|c| c.0).fold(f64::MIN, f64::max).ceil() as i64;
-        let py0 = corners.iter().map(|c| c.1).fold(f64::MAX, f64::min).floor() as i64;
-        let py1 = corners.iter().map(|c| c.1).fold(f64::MIN, f64::max).ceil() as i64;
-
-        for py in py0.max(0)..=py1.min(height as i64 - 1) {
-            for px in px0.max(0)..=px1.min(width as i64 - 1) {
-                let sample = Point::new(
-                    xmin + (px as f64 + 0.5) / scale,
-                    ymax - (py as f64 + 0.5) / scale,
-                );
-                if contains(&polygon, sample) {
-                    img.put_pixel(px as u32, py as u32, color);
-                }
-            }
+        for &(x, y) in &pixels {
+            img.put_pixel(x, y, color);
         }
     }
 
     img.save(path)
+}
+
+#[cfg(all(test, feature = "step3"))]
+mod contains_tests {
+    use super::*;
+
+    #[test]
+    fn crosses_only_when_the_ray_intersects_the_segment() {
+        assert!(crosses(
+            Point::new(1.0, -1.0),
+            Point::new(1.0, 1.0),
+            Point::new(0.0, 0.0)
+        ));
+        assert!(!crosses(
+            Point::new(-1.0, -1.0),
+            Point::new(-1.0, 1.0),
+            Point::new(0.0, 0.0)
+        ));
+    }
+
+    #[test]
+    fn contains_distinguishes_inside_and_outside_points() {
+        let square = [
+            Point::new(0.0, 0.0),
+            Point::new(1.0, 0.0),
+            Point::new(1.0, 1.0),
+            Point::new(0.0, 1.0),
+        ];
+        assert!(contains(&square, Point::new(0.5, 0.5)));
+        assert!(!contains(&square, Point::new(2.0, 0.5)));
+    }
+}
+
+#[cfg(all(test, feature = "step10"))]
+mod parallel_tests {
+    use super::*;
+    use crate::mask::Mask;
+
+    fn setup() -> (Mesh, Field, Raster) {
+        let mesh = Mesh::from_mask(&Mask::parse("..\n").unwrap(), 1.0).unwrap();
+        let field = Field::filled(mesh.n_cells(), 0.5);
+        let raster = Raster::new(&mesh, 16, (0.0, 1.0));
+        (mesh, field, raster)
+    }
+
+    #[test]
+    fn chunk_size_handles_empty_work_and_zero_threads() {
+        assert_eq!(chunk_size(0, 4), 1);
+        assert_eq!(chunk_size(7, 0), 7);
+        assert_eq!(chunk_size(10, 3), 4);
+    }
+
+    #[test]
+    fn paint_writes_only_the_requested_pixels() {
+        let image = Mutex::new(RgbImage::from_pixel(2, 1, BACKGROUND));
+        let color = Rgb([1, 2, 3]);
+        paint(&image, &[(1, 0)], color);
+        let image = image.lock().unwrap();
+        assert_eq!(*image.get_pixel(0, 0), BACKGROUND);
+        assert_eq!(*image.get_pixel(1, 0), color);
+    }
+
+    #[test]
+    fn render_chunk_reports_its_cell_count() {
+        let (mesh, field, raster) = setup();
+        let image = Mutex::new(RgbImage::from_pixel(
+            raster.width,
+            raster.height,
+            BACKGROUND,
+        ));
+        let (tx, rx) = mpsc::channel();
+        render_chunk(mesh.cells(), 0, &mesh, &field, &raster, &image, tx);
+        assert_eq!(rx.recv().unwrap(), mesh.n_cells());
+    }
+
+    #[test]
+    fn render_cell_populates_pixels_for_one_cell() {
+        let (mesh, field, raster) = setup();
+        let image = Mutex::new(RgbImage::from_pixel(
+            raster.width,
+            raster.height,
+            BACKGROUND,
+        ));
+        let mut buffers = RenderBuffers::new();
+        render_cell(
+            &mesh.cells()[0],
+            CellId(0),
+            &mesh,
+            &field,
+            &raster,
+            &image,
+            &mut buffers,
+        );
+        assert!(!buffers.pixels.is_empty());
+    }
+
+    #[test]
+    fn render_all_collects_all_cell_counts() {
+        let (mesh, field, raster) = setup();
+        let image = Mutex::new(RgbImage::from_pixel(
+            raster.width,
+            raster.height,
+            BACKGROUND,
+        ));
+        assert_eq!(
+            render_all(&mesh, &field, &raster, &image, 1),
+            mesh.n_cells()
+        );
+    }
 }

@@ -84,10 +84,19 @@ cargo build --release -p wind-tunnel-mpi
 | Bloc             | Fichier                | Ce qu'il doit devenir                                                                                   |
 |------------------|------------------------|---------------------------------------------------------------------------------------------------------|
 | `Bands::owned`   | `src/decomposition.rs` | la répartition des colonnes en bandes aussi égales que possible, le reste sur les premières             |
-| `Layout::new`    | `src/decomposition.rs` | le tri des cellules de la bande : possédées, à envoyer à gauche/droite, à recevoir de gauche/droite     |
-| `Halo::exchange` | `mpi/src/exchange.rs`  | `pack_into`, réceptions immédiates puis envois immédiats dans un `multiple_scope`, `wait_all`, `unpack` |
+| `mark_sends`     | `src/decomposition.rs` | ajouter aux envois les cellules possédées qui se trouvent dans le halo d'un voisin                     |
+| `place`          | `src/decomposition.rs` | classer une cellule possédée ou fantôme, puis déléguer les envois                                       |
+| `Layout::new`    | `src/decomposition.rs` | parcourir les cellules fluides dans l'ordre et déléguer leur classement à `place`                      |
+| `pack_all`       | `mpi/src/exchange.rs`  | remplir les tampons d'envoi dans l'ordre des cellules du layout                                        |
+| `transfer`       | `mpi/src/exchange.rs`  | réceptions immédiates puis envois dans `multiple_scope`, et `wait_all`                                 |
+| `unpack_all`     | `mpi/src/exchange.rs`  | recopier les tampons reçus dans les cellules fantômes                                                   |
 | `global_dt_max`  | `mpi/src/exchange.rs`  | `all_reduce_into` avec `SystemOperation::min()`                                                         |
-| `time_loop`      | `mpi/src/main.rs`      | la boucle en temps du pilote : un `halo.exchange` avant **chaque** `residual`                           |
+| `time_loop`      | `mpi/src/main.rs`      | appeler `advance_step`, puis déclencher le rapport périodique                                           |
+
+Le corps d'`advance_step` est fourni : il expose les échanges avant chaque résidu et le
+cas RK2 sans mélanger cette mécanique à la boucle à écrire. `Layout::empty` initialise
+les listes de la bande ; `Layout::new` se concentre sur le parcours et la numérotation,
+`place` sur la propriété et `mark_sends` sur les cellules du halo à envoyer.
 
 Les quatre tampons d'un échange — deux à envoyer, deux à recevoir — vivent dans une
 structure `Halo` créée une fois par rang, et non dans `exchange` : leur taille ne dépend

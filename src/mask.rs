@@ -199,45 +199,61 @@ impl Mask {
     /// Un parcours en largeur suffit : on part de la première cellule fluide, et si
     /// l'on n'a pas tout atteint, on compte les morceaux restants pour le message.
     fn check_connected(&self) -> Result<(), MeshError> {
-        // TODO-STEP:1 (pour aller plus loin) Compter les composantes connexes du fluide
-        // par parcours en largeur, et signaler `Disconnected` s'il y en a plus d'une
-        // HINT: Utiliser une queue pour y mettre les cellules à explorer et une marque des cellules visitées
+        // TODO-STEP:1 Compter les composantes : chaque cellule fluide encore non visitée
+        // démarre une exploration ; renvoyer `Disconnected` si le compte dépasse un.
         // SOLUTION-BEGIN
         let mut seen = vec![false; self.fluid.len()];
         let mut components = 0usize;
-        let mut queue = Vec::new();
-
         for start in 0..self.fluid.len() {
-            if !self.fluid[start] || seen[start] {
-                continue;
-            }
-            components += 1;
-            seen[start] = true;
-            queue.push(start);
-            while let Some(k) = queue.pop() {
-                let (row, col) = (k / self.cols, k % self.cols);
-                let neighbors = [
-                    (row.saturating_sub(1), col),
-                    (row + 1, col),
-                    (row, col.saturating_sub(1)),
-                    (row, col + 1),
-                ];
-                for (r, c) in neighbors {
-                    if r < self.rows && c < self.cols && self.is_fluid(r, c) {
-                        let n = r * self.cols + c;
-                        if !seen[n] {
-                            seen[n] = true;
-                            queue.push(n);
-                        }
-                    }
-                }
+            if self.fluid[start] && !seen[start] {
+                components += 1;
+                self.explore(start, &mut seen);
             }
         }
-
         if components > 1 {
             return Err(MeshError::Disconnected { components });
         }
         Ok(())
+        // SOLUTION-END
+    }
+
+    /// Indices des voisines fluides à quatre connexités.
+    #[cfg_attr(not(feature = "step2"), allow(dead_code))] // appelée depuis l'exploration
+    fn fluid_neighbours(&self, k: usize) -> Vec<usize> {
+        // TODO-STEP:1 Convertir l'indice à plat en ligne/colonne et collecter les
+        // voisines fluides situées dans la grille, sans diagonales.
+        // SOLUTION-BEGIN
+        let (row, col) = (k / self.cols, k % self.cols);
+        [
+            (row.checked_sub(1), Some(col)),
+            (row.checked_add(1), Some(col)),
+            (Some(row), col.checked_sub(1)),
+            (Some(row), col.checked_add(1)),
+        ]
+        .into_iter()
+        .filter_map(|(r, c)| Some((r?, c?)))
+        .filter(|&(r, c)| self.is_fluid(r, c))
+        .map(|(r, c)| r * self.cols + c)
+        .collect()
+        // SOLUTION-END
+    }
+
+    /// Marque et explore toute la composante contenant `start`.
+    #[cfg_attr(not(feature = "step2"), allow(dead_code))] // appelée depuis check_connected
+    fn explore(&self, start: usize, seen: &mut [bool]) {
+        // TODO-STEP:1 Parcourir la composante avec une file ; marquer chaque cellule
+        // avant de l'ajouter afin qu'elle ne soit mise en file qu'une seule fois.
+        // SOLUTION-BEGIN
+        let mut queue = std::collections::VecDeque::from([start]);
+        seen[start] = true;
+        while let Some(k) = queue.pop_front() {
+            for neighbour in self.fluid_neighbours(k) {
+                if !seen[neighbour] {
+                    seen[neighbour] = true;
+                    queue.push_back(neighbour);
+                }
+            }
+        }
         // SOLUTION-END
     }
 }
@@ -290,6 +306,42 @@ fn parse_row(
     Ok(width)
 }
 
+/// Convertit un caractère du masque en indicateur de fluide.
+#[cfg(feature = "step3")]
+#[cfg_attr(not(feature = "step4"), allow(dead_code))] // appelée depuis le trou de l'étape 3
+#[cfg_attr(not(feature = "step3"), allow(unused_variables))] // trou étape 3
+fn cell_of(ch: char, line: usize, col: usize) -> Result<bool, MeshError> {
+    // TODO-STEP:3 Associer `FLUID` à `true`, `SOLID` à `false` et tout autre caractère
+    // à `MeshError::InvalidChar`, avec les coordonnées reçues.
+    // SOLUTION-BEGIN
+    match ch {
+        FLUID => Ok(true),
+        SOLID => Ok(false),
+        ch => Err(MeshError::InvalidChar { line, col, ch }),
+    }
+    // SOLUTION-END
+}
+
+/// Vérifie que la largeur d'une ligne correspond à celle du masque.
+#[cfg(feature = "step3")]
+#[cfg_attr(not(feature = "step4"), allow(dead_code))] // appelée depuis le trou de parse_row
+fn check_width(width: usize, expected: Option<usize>, line_no: usize) -> Result<(), MeshError> {
+    // TODO-STEP:3 Comparer la largeur à la largeur attendue, si elle existe, et
+    // construire `RaggedMask` avec les coordonnées fournies.
+    // SOLUTION-BEGIN
+    if let Some(expected) = expected {
+        if width != expected {
+            return Err(MeshError::RaggedMask {
+                line: line_no,
+                expected,
+                got: width,
+            });
+        }
+    }
+    Ok(())
+    // SOLUTION-END
+}
+
 /// Analyse une ligne du masque et empile ses cellules dans `fluid` — version de l'étape
 /// 3. Voir la documentation de l'autre définition, juste au-dessus.
 #[cfg(feature = "step3")]
@@ -299,35 +351,14 @@ fn parse_row(
     expected: Option<usize>,
     fluid: &mut Vec<bool>,
 ) -> Result<usize, MeshError> {
-    // TODO-STEP:3 Vérifier la largeur de la ligne contre `expected` (`RaggedMask` si
-    // elle diffère), puis empiler `true` pour `FLUID` et `false` pour `SOLID` ; tout
-    // autre caractère est une `InvalidChar`. Renvoyer la largeur.
+    // TODO-STEP:3 Calculer et vérifier la largeur, convertir les caractères avec
+    // `cell_of`, puis renvoyer la largeur.
     // SOLUTION-BEGIN
     let width = line.chars().count();
-    if let Some(cols) = expected {
-        if width != cols {
-            return Err(MeshError::RaggedMask {
-                line: line_no,
-                expected: cols,
-                got: width,
-            });
-        }
-    }
-
+    check_width(width, expected, line_no)?;
     for (col, ch) in line.chars().enumerate() {
-        match ch {
-            FLUID => fluid.push(true),
-            SOLID => fluid.push(false),
-            other => {
-                return Err(MeshError::InvalidChar {
-                    line: line_no,
-                    col: col + 1,
-                    ch: other,
-                })
-            }
-        }
+        fluid.push(cell_of(ch, line_no, col + 1)?);
     }
-
     Ok(width)
     // SOLUTION-END
 }
@@ -358,5 +389,57 @@ mod tests {
         assert!(!m.is_obstacle(0, 5));
         assert!(m.is_obstacle(0, 1));
         assert!(!m.is_obstacle(0, 0));
+    }
+
+    #[test]
+    fn fluid_neighbours_are_four_connected_and_stay_in_bounds() {
+        let m = Mask {
+            rows: 2,
+            cols: 2,
+            fluid: vec![true, false, false, true],
+        };
+        assert!(m.fluid_neighbours(0).is_empty());
+        assert!(m.fluid_neighbours(3).is_empty());
+    }
+
+    #[test]
+    fn explore_marks_only_the_starting_component() {
+        let m = Mask {
+            rows: 2,
+            cols: 3,
+            fluid: vec![true, true, false, false, false, true],
+        };
+        let mut seen = vec![false; 6];
+        m.explore(0, &mut seen);
+        assert_eq!(seen, [true, true, false, false, false, false]);
+    }
+
+    #[cfg(feature = "step3")]
+    #[test]
+    fn check_width_accepts_first_row_and_reports_ragged_rows() {
+        assert!(check_width(3, None, 1).is_ok());
+        assert!(matches!(
+            check_width(2, Some(3), 4),
+            Err(MeshError::RaggedMask {
+                line: 4,
+                expected: 3,
+                got: 2,
+            })
+        ));
+    }
+
+    #[cfg(feature = "step3")]
+    #[test]
+    fn cell_of_reports_one_based_coordinates() {
+        assert!(cell_of(FLUID, 4, 7).unwrap());
+        assert!(!cell_of(SOLID, 4, 7).unwrap());
+        assert!(matches!(
+            cell_of('x', 4, 7),
+            Err(MeshError::InvalidChar {
+                line: 4,
+                col: 7,
+                ch: 'x'
+            })
+        ));
     }
 }

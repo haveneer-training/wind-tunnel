@@ -54,57 +54,78 @@ fn time_loop<F: FluxScheme>(
     halo: &mut Halo,
     report: &mut Reporter<'_>,
 ) -> Result<(), Box<dyn Error>> {
-    // TODO-STEP:11 Écrire la boucle en temps : `halo.exchange` avant CHAQUE évaluation
-    // de résidu — une fois par pas en Euler, deux fois en RK2, car le prédicteur a lui
-    // aussi des cellules fantômes à rafraîchir — puis `solver.residual` et la mise à
-    // jour du champ, et `report(step, c, halo)` tous les `every` pas.
-    // SOLUTION-BEGIN
-    let dt = solver.dt();
-    // Les trois tampons sont alloués avant la boucle, pas dedans : `predictor` et `k2`
-    // ne servent qu'en RK2, mais ils ne coûtent qu'un `Vec<f64>` chacun, une fois pour
-    // tout le calcul. Voir `docs/BONUS-OPTIMISATION.md`.
     let mut k1 = Field::zeros(c.len());
     let mut k2 = Field::zeros(c.len());
     let mut predictor = Field::zeros(c.len());
+    let mut advance = |c: &mut Field, halo: &mut Halo| {
+        advance_step(
+            world,
+            layout,
+            solver,
+            config,
+            c,
+            halo,
+            &mut k1,
+            &mut k2,
+            &mut predictor,
+        )
+    };
 
+    // TODO-STEP:11 Avancer chaque pas avec `advance_step`, puis appeler le rapporteur
+    // à la cadence demandée.
+    // HINT : `advance_step` gère les halos ; traiter ensuite `every` et `report`.
+    // SOLUTION-BEGIN
     for step in 1..=config.max_steps {
-        halo.exchange(world, layout, c);
-        solver.residual(c, &mut k1);
-
-        match config.time_scheme {
-            TimeScheme::Euler => {
-                for (value, rate) in c.as_mut_slice().iter_mut().zip(k1.as_slice()) {
-                    *value += dt * rate;
-                }
-            }
-            TimeScheme::Rk2 => {
-                // `copy_from` recopie dans un tampon existant, là où `c.clone()`
-                // allouerait un champ neuf à chaque pas de temps.
-                predictor.copy_from(c);
-                for (value, rate) in predictor.as_mut_slice().iter_mut().zip(k1.as_slice()) {
-                    *value += dt * rate;
-                }
-                // Le prédicteur est un champ comme un autre : ses cellules fantômes
-                // sont périmées tant qu'on ne les a pas redemandées aux voisins.
-                halo.exchange(world, layout, &mut predictor);
-                solver.residual(&predictor, &mut k2);
-                for ((value, a), b) in c
-                    .as_mut_slice()
-                    .iter_mut()
-                    .zip(k1.as_slice())
-                    .zip(k2.as_slice())
-                {
-                    *value += 0.5 * dt * (a + b);
-                }
-            }
-        }
-
+        advance(c, halo)?;
         if every > 0 && step % every == 0 {
             report(step, c, halo)?;
         }
     }
     Ok(())
     // SOLUTION-END
+}
+
+/// Avance un pas et rafraîchit les halos avant chaque résidu.
+#[allow(clippy::too_many_arguments)]
+#[cfg_attr(not(feature = "step13"), allow(dead_code))] // appelée depuis le trou de time_loop
+fn advance_step<F: FluxScheme>(
+    world: &SimpleCommunicator,
+    layout: &Layout,
+    solver: &Solver<'_, F>,
+    config: &Config,
+    c: &mut Field,
+    halo: &mut Halo,
+    k1: &mut Field,
+    k2: &mut Field,
+    predictor: &mut Field,
+) -> Result<(), Box<dyn Error>> {
+    let dt = solver.dt();
+    halo.exchange(world, layout, c);
+    solver.residual(c, k1);
+    match config.time_scheme {
+        TimeScheme::Euler => {
+            for (value, rate) in c.as_mut_slice().iter_mut().zip(k1.as_slice()) {
+                *value += dt * rate;
+            }
+        }
+        TimeScheme::Rk2 => {
+            predictor.copy_from(c);
+            for (value, rate) in predictor.as_mut_slice().iter_mut().zip(k1.as_slice()) {
+                *value += dt * rate;
+            }
+            halo.exchange(world, layout, predictor);
+            solver.residual(predictor, k2);
+            for ((value, a), b) in c
+                .as_mut_slice()
+                .iter_mut()
+                .zip(k1.as_slice())
+                .zip(k2.as_slice())
+            {
+                *value += 0.5 * dt * (a + b);
+            }
+        }
+    }
+    Ok(())
 }
 
 fn run() -> Result<(), Box<dyn Error>> {

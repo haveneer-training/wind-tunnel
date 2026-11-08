@@ -12,11 +12,12 @@ set -euo pipefail
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$root"
 
-last_step="$(sed -n 's/.*LAST_STEP: u8 = \([0-9][0-9]*\);.*/\1/p' xtask/src/main.rs)"
-if [ -z "$last_step" ]; then
-    echo "!! LAST_STEP introuvable dans xtask/src/main.rs" >&2
+sentinel="$(sed -n 's/^step\([0-9][0-9]*\) =.*/\1/p' Cargo.toml | sort -n | tail -1)"
+if [ -z "$sentinel" ]; then
+    echo "!! sentinelle stepN introuvable dans Cargo.toml" >&2
     exit 1
 fi
+last_step=$((sentinel - 1))
 
 domain="$root/domains/tunnel.dom"
 run_args=(--refine 2 --bands 3 --max-steps 3)
