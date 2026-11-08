@@ -27,13 +27,17 @@ avec `thread::scope`, `Mutex` et `mpsc` (étape 10), et enfin la décomposition 
 MPI (étape 11, bonus), et l'écoulement calculé sur le maillage (étape 12, bonus). Le code
 tourne et produit l'animation.
 
-**Révision 2026-11-07 — outillage et granularité.** `xtask` est maintenant séparé en
-`cli`, `blocks`, `files`, `starter`, `steps` et `update` : le CLI valide les arguments,
-`next` s'appuie sur `LAST_STEP`, défini dans `steps.rs`, et `check-steps.sh` déduit la
-dernière étape de la sentinelle `step13` dans `Cargo.toml`. Le parcours de sources couvre
-`src/`, `mpi/src/` et `design/src/` ; `start` efface la sentinelle MPI dans le dossier
-stagiaire, et `update` reporte le corrigé en associant les réponses aux fonctions plutôt
-qu'à des ordinaux fragiles.
+**Révision 2026-11-07 — outillage et granularité.** `xtask` est aligné sur celui de
+`../sentinelle` (`cli`, `blocks`, `files`, `starter`, `steps`, `update`, `exercises`,
+`verify`), en vue d'un crate partagé : les fichiers sont identiques à leurs constantes
+de configuration près — `SOURCE_DIRS`, `STARTER_ENTRIES`, `STEP_MANIFEST`, `LAST_STEP`,
+le titre, et des listes vides pour ce que la soufflerie n'a pas (`SHORT_EXERCISES`,
+`CORRIGE_TREES`, `CORRIGE_ONLY_PATHS`). Seul ajout propre à la soufflerie :
+`SENTINEL_MANIFESTS` (`starter.rs`), qui vide la sentinelle de `mpi/Cargo.toml` dans le
+dossier stagiaire, d'où `rewrite_default` rendu public. `check-steps.sh` déduit la
+dernière étape de la sentinelle `step13` dans `Cargo.toml`. `update` apparie les trous
+par leur rang au sein de leur étape, comme sentinelle : un trou ajouté **avant** un autre
+de la même étape, dans le même fichier, décale la correspondance.
 
 Le nombre d'exercices passe à **43 blocs**, dont le nouveau helper `edge_key` (2), le
 decodeur local `cell_of` (3), la rastérisation par tranche (10), le tri unitaire `place`
@@ -156,7 +160,7 @@ version sûre est aussi la plus petite.
   découlent. `help_text()` rend l'aide longue de `clap` — c'est elle qu'affichent les
   deux binaires, `USAGE` a disparu. `xtask`, lui, reste volontairement sans dépendance :
   quatre sous-commandes à un seul argument positionnel n'ont rien à gagner de `clap`,
-  voir le commentaire au-dessus de `xtask::main`.
+  voir l'en-tête de `xtask/src/cli.rs`.
 - **Le halo fait trois colonnes, et c'est une découverte de cette étape.** Une pour la
   valeur de la voisine, deux parce que MUSCL lit le *gradient* de la voisine, trois parce
   que ce gradient est un moindres carrés sur les **centroïdes** de la deuxième couche —
@@ -621,9 +625,6 @@ renvoyant une `String` : un fichier contient de l'ordre du million de nombres, e
   `--refine 2` — invisible à l'œil, mais à savoir avant d'en tirer un chiffre.
 - `travail/` n'est pas versionné (ignoré, exclu du workspace). Le participant peut y
   faire son propre `git init`.
-- `cargo clippy -p xtask --all-targets -- -D warnings` signale un `useless_format`
-  (message d'erreur de `make_starter`). Antérieur, sans rapport avec les étapes : la
-  vérification documentée ne couvre que le paquet racine et `mpi`, jamais `xtask`.
 
 ## Vérifier que tout va bien
 
@@ -641,7 +642,7 @@ cargo run --release -- domains/tunnel.dom --refine 4 --bands 9 --max-steps 960
 for n in $(seq 0 13); do cargo check --no-default-features --features "step$n" --all-targets; done
 
 cargo xtask start --force                    # régénère travail/
-cd travail && cargo test                     # 4 tests rouges : étape 0
+cd travail && cargo test                     # 5 tests rouges : étape 0
 cargo xtask goto 12 && cargo xtask solve 12  # ... et tout doit redevenir vert
 
 cd .. && scripts/check-steps.sh              # le même tour, automatisé, étape par étape

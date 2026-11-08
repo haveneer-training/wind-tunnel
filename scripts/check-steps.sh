@@ -45,7 +45,7 @@ echo "==> cargo xtask start --force"
 cargo xtask start --force >/dev/null
 cd "$root/travail"
 
-echo "==> état initial : 4 tests rouges attendus (étape 0)"
+echo "==> état initial : 5 tests rouges attendus (étape 0)"
 set +e
 initial_test_out="$(cargo test --lib 2>&1)"
 set -e

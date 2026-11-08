@@ -25,9 +25,9 @@ dossier de travail : les passages à écrire y deviennent des `todo!()`, tout le
 fourni.
 
 ```shell
-cargo xtask start      # crée travail/ (43 blocs d'exercice)
+cargo xtask start      # crée travail/ (65 blocs d'exercice)
 cd travail
-cargo test             # quatre tests rouges : l'étape 0 vous attend
+cargo test             # cinq tests rouges : l'étape 0 vous attend
 ```
 
 Depuis le corrigé, `cargo xtask update` reporte ses évolutions dans `travail/` en

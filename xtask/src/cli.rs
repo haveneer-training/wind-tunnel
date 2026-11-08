@@ -1,36 +1,58 @@
 //! Ligne de commande : analyse d'argv et aiguillage vers les commandes.
+//!
+//! Analyse à la main, volontairement : le workspace n'a aucune dépendance externe, et
+//! `cargo xtask start` est la toute première commande du stagiaire — elle doit marcher
+//! hors ligne, sans attendre la compilation d'une crate comme `clap`, et répondre en
+//! français. Ajouter une commande : une variante de [`Command`], un bras dans [`parse`],
+//! un dans [`run`], une ligne dans [`usage`].
 
-use crate::starter::{make_starter, WORKDIR};
-use crate::steps::{fill, goto, next, reset, status, LAST_STEP};
+use crate::starter::{WORKDIR, make_starter};
+use crate::steps::{LAST_STEP, fill, goto, next, reset, status};
 use crate::update::update;
+use crate::verify::verify;
 use std::path::{Path, PathBuf};
 
+/// Une commande de `cargo xtask`, une fois la ligne de commande analysée.
 #[derive(Debug, PartialEq)]
 pub enum Command {
-    Start { dir: Option<PathBuf>, force: bool },
-    Update { dir: Option<PathBuf> },
+    /// `start [--dir <p>] [--force]` ; sans `--dir`, `{WORKDIR}/`.
+    Start {
+        dir: Option<PathBuf>,
+        force: bool,
+    },
+    /// `update [--dir <p>]` ; sans `--dir`, `{WORKDIR}/`.
+    Update {
+        dir: Option<PathBuf>,
+    },
     Status,
     Goto(u8),
     Next,
     Solve(u8),
     Reset(u8),
+    Verify,
     Help,
 }
 
+/// Exécute une commande depuis le dépôt `root`.
 pub fn run(command: Command, root: &Path) -> Result<(), String> {
     let workdir = |dir: Option<PathBuf>| dir.unwrap_or_else(|| root.join(WORKDIR));
     match command {
         Command::Start { dir, force } => make_starter(root, &workdir(dir), force),
         Command::Update { dir } => update(root, &workdir(dir)),
         Command::Status => status(root),
-        Command::Goto(step) => goto(root, step),
+        Command::Goto(n) => goto(root, n),
         Command::Next => next(root),
-        Command::Solve(step) => fill(root, step, true),
-        Command::Reset(step) => reset(root, step),
+        Command::Solve(n) => fill(root, n, true),
+        Command::Reset(n) => reset(root, n),
+        Command::Verify => verify(root),
         Command::Help => Ok(()),
     }
 }
 
+/// Analyse la ligne de commande, nom de la commande compris.
+///
+/// Tout argument non reconnu est une erreur : un drapeau mal tapé (`--frce`) ne doit pas
+/// être ignoré en silence.
 pub fn parse(args: &[String]) -> Result<Command, String> {
     let Some((name, rest)) = args.split_first() else {
         return Ok(Command::Help);
@@ -42,7 +64,7 @@ pub fn parse(args: &[String]) -> Result<Command, String> {
     };
     let step = || match rest {
         [] => Err("il manque le numéro d'étape".to_string()),
-        [raw] => parse_step(raw),
+        [n] => parse_step(n),
         [_, arg, ..] => Err(unexpected(arg)),
     };
 
@@ -50,6 +72,7 @@ pub fn parse(args: &[String]) -> Result<Command, String> {
         "help" | "-h" | "--help" => no_args(Command::Help),
         "status" => no_args(Command::Status),
         "next" => no_args(Command::Next),
+        "verify" => no_args(Command::Verify),
         "goto" => step().map(Command::Goto),
         "solve" => step().map(Command::Solve),
         "reset" => step().map(Command::Reset),
@@ -61,20 +84,18 @@ pub fn parse(args: &[String]) -> Result<Command, String> {
                 match arg.as_str() {
                     "--dir" if dir.is_some() => return Err("--dir donné deux fois".to_string()),
                     "--dir" => match args.next() {
-                        Some(value) if !value.starts_with("--") => {
-                            dir = Some(PathBuf::from(value));
-                        }
+                        Some(value) if !value.starts_with("--") => dir = Some(PathBuf::from(value)),
                         _ => return Err("--dir attend un chemin".to_string()),
                     },
                     "--force" if name == "start" => force = true,
                     _ => return Err(unexpected(arg)),
                 }
             }
-            if name == "start" {
-                Ok(Command::Start { dir, force })
+            Ok(if name == "start" {
+                Command::Start { dir, force }
             } else {
-                Ok(Command::Update { dir })
-            }
+                Command::Update { dir }
+            })
         }
         _ => Err(format!("commande inconnue « {name} »")),
     }
@@ -89,23 +110,24 @@ pub fn usage() -> String {
            cargo xtask next                   passer à l'étape suivante\n\
            cargo xtask solve <n>              remplir les trous de l'étape n\n\
            cargo xtask reset <n>              rouvrir les trous de l'étape n\n\
-           cargo xtask start [--dir <p>]      créer le dossier de travail (par défaut : {WORKDIR}/)\n\
+           cargo xtask start [--dir <p>]      créer le dossier de travail \
+(par défaut : {WORKDIR}/)\n\
            cargo xtask update [--dir <p>]     y reporter les modifications du corrigé\n\
+           cargo xtask verify                 vérifier les exercices courts (corrigé)\n\
          \n\
-         `start` et `update` s'utilisent depuis le dépôt du corrigé, les autres depuis le dossier de travail.\n"
+         Les cinq premières commandes s'utilisent depuis le dossier de travail,\n\
+         `start`, `update` et `verify` depuis le dépôt du corrigé.\n"
     )
 }
 
 fn parse_step(raw: &str) -> Result<u8, String> {
-    let step: u8 = raw
+    let n: u8 = raw
         .parse()
         .map_err(|_| format!("« {raw} » n'est pas un numéro d'étape"))?;
-    if step > LAST_STEP {
-        return Err(format!(
-            "l'étape {step} n'existe pas encore (0 à {LAST_STEP})"
-        ));
+    if n > LAST_STEP {
+        return Err(format!("l'étape {n} n'existe pas encore (0 à {LAST_STEP})"));
     }
-    Ok(step)
+    Ok(n)
 }
 
 #[cfg(test)]
@@ -113,12 +135,8 @@ mod tests {
     use super::*;
 
     fn parse_line(line: &str) -> Result<Command, String> {
-        parse(
-            &line
-                .split_whitespace()
-                .map(String::from)
-                .collect::<Vec<_>>(),
-        )
+        let args: Vec<String> = line.split_whitespace().map(String::from).collect();
+        parse(&args)
     }
 
     #[test]
@@ -127,6 +145,7 @@ mod tests {
         assert_eq!(parse_line("--help"), Ok(Command::Help));
         assert_eq!(parse_line("status"), Ok(Command::Status));
         assert_eq!(parse_line("next"), Ok(Command::Next));
+        assert_eq!(parse_line("verify"), Ok(Command::Verify));
         assert_eq!(parse_line("goto 3"), Ok(Command::Goto(3)));
         assert_eq!(parse_line("solve 0"), Ok(Command::Solve(0)));
         assert_eq!(
@@ -156,13 +175,13 @@ mod tests {
     }
 
     #[test]
-    fn parse_rejects_unknown_and_malformed_arguments() {
+    fn parse_rejects_what_it_does_not_understand() {
         for line in [
             "bidule",
             "status x",
             "goto",
             "goto x",
-            "goto 13",
+            &format!("goto {}", LAST_STEP + 1),
             "goto 3 --force",
             "start --dir",
             "start --dir --force",
@@ -171,7 +190,7 @@ mod tests {
             "start p",
             "update --force",
         ] {
-            assert!(parse_line(line).is_err(), "`{line}` doit être refusé");
+            assert!(parse_line(line).is_err(), "`{line}` devrait être refusé");
         }
     }
 }

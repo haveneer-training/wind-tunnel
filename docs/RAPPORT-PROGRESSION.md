@@ -151,9 +151,10 @@ script d'inventaire.
 - `cargo xtask next` et l'analyse stricte de CLI complètent `start`, `update`, `status`,
   `goto`, `solve` et `reset`. `LAST_STEP` est défini dans `xtask/src/steps.rs` ; la feature
   `step13` est la sentinelle, et `scripts/check-steps.sh` la déduit du manifeste.
-- `cargo xtask update` associe les réponses aux fonctions, pas à l'ordinal du bloc : une
-  insertion dans un fichier ne décale donc pas le travail stagiaire vers un autre
-  exercice. Le test de non-régression couvre ce scénario.
+- `cargo xtask update` apparie les trous par leur rang au sein de leur étape (xtask aligné
+  sur celui de sentinelle) : un trou ajouté ou retiré à une étape ne décale pas ceux des
+  autres, mais un trou inséré **avant** un autre de la même étape, dans le même fichier,
+  décale la correspondance. Ne pas en insérer une fois des dossiers de travail distribués.
 - Vérification complète attendue : `cargo test`, `cargo test -p xtask`,
   `cargo clippy --all-targets --all-features --no-deps -- -D warnings`, `cargo fmt --all --check`,
   `scripts/check-steps.sh`, puis le contrôle MPI si `mpirun` est disponible.

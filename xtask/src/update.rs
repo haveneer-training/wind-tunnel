@@ -1,32 +1,44 @@
 //! Report des modifications du corrigé dans un dossier de travail (`cargo xtask update`).
 
-use crate::blocks::{find_blocks, is_empty, rewrite, Block, REGION_BEGIN, REGION_END};
+use crate::blocks::{Block, REGION_BEGIN, REGION_END, find_blocks, is_empty, rewrite};
+use crate::exercises::{DELIVERED, carry_over};
 use crate::files::{relative, source_files};
-use crate::starter::{ensure_reference, generate, STARTER_ENTRIES};
-use crate::steps::{current_step, load_reference, set_default_feature, REFERENCE};
-use std::collections::{BTreeMap, BTreeSet};
+use crate::starter::{STARTER_ENTRIES, ensure_reference, generate};
+use crate::steps::{REFERENCE, current_step, load_reference, set_default_feature};
+use std::collections::BTreeMap;
 use std::fs;
 use std::path::Path;
 
+/// Reporte les dernières modifications du corrigé dans un dossier de travail existant.
+///
+/// Sert pendant la mise au point des exercices : le dossier de travail est engendré à
+/// nouveau, à côté, puis ce que le stagiaire a écrit y est replacé avant qu'il ne remplace
+/// l'ancien. Sont conservés : les trous remplis (ceux remplis par `solve` reprennent le
+/// nouveau corrigé), les exercices courts modifiés (voir [`carry_over`]), l'étape
+/// courante, et tout ce qui n'est pas tiré du corrigé (`target/`, `data/`, un éventuel
+/// `.git/`). Tout le reste — documentation, tests, code hors des trous — est remplacé.
 pub fn update(root: &Path, out: &Path) -> Result<(), String> {
     ensure_reference(root)?;
     if !out.join(REFERENCE).is_file() {
         return Err(format!(
-            "{} n'est pas un dossier de travail ({REFERENCE} introuvable).\nCréez-le avec `cargo xtask start`.",
+            "{} n'est pas un dossier de travail ({REFERENCE} introuvable).\nCréez-le avec \
+             `cargo xtask start`.",
             out.display()
         ));
     }
-    let out = fs::canonicalize(out).map_err(|error| format!("{} : {error}", out.display()))?;
+    let out = fs::canonicalize(out).map_err(|e| format!("{} : {e}", out.display()))?;
     let name = out
         .file_name()
         .ok_or_else(|| format!("{} : chemin sans nom de dossier", out.display()))?;
+    // À côté du dossier de travail, pour que les renommages restent sur le même disque.
     let staging = out.with_file_name(format!(".{}-update", name.to_string_lossy()));
     if staging.exists() {
-        fs::remove_dir_all(&staging).map_err(|error| format!("{} : {error}", staging.display()))?;
+        fs::remove_dir_all(&staging).map_err(|e| format!("{} : {e}", staging.display()))?;
     }
-    fs::create_dir_all(&staging).map_err(|error| error.to_string())?;
+    fs::create_dir_all(&staging).map_err(|e| e.to_string())?;
+
     let result = update_into(root, &out, &staging);
-    let _ = fs::remove_dir_all(staging);
+    let _ = fs::remove_dir_all(&staging);
     result
 }
 
@@ -42,29 +54,33 @@ fn update_into(root: &Path, out: &Path, staging: &Path) -> Result<(), String> {
         let Ok(old_text) = fs::read_to_string(out.join(&key)) else {
             continue;
         };
-        let new_text = fs::read_to_string(&path).map_err(|error| error.to_string())?;
+        let new_text = fs::read_to_string(&path).map_err(|e| e.to_string())?;
         let old_blocks = find_blocks(&old_text, REGION_BEGIN, REGION_END);
         let new_blocks = find_blocks(&new_text, REGION_BEGIN, REGION_END);
-        let old_keys = block_keys(&old_text, &old_blocks);
-        let new_keys = block_keys(&new_text, &new_blocks);
-        let old_by_key: BTreeMap<(u8, String, usize), &Block> =
-            old_keys.iter().cloned().zip(&old_blocks).collect();
-        let mut matched = BTreeSet::new();
 
-        let (merged, changed) = rewrite(&new_text, &new_blocks, |block| {
-            let identity = &new_keys[block.ordinal];
-            let old = old_by_key.get(identity)?;
-            matched.insert(identity.clone());
+        // Les blocs se correspondent par leur rang au sein de leur étape : un trou ajouté
+        // ou retiré à une étape ne décale pas ceux des autres.
+        let old_ranks = step_ranks(&old_blocks);
+        let new_ranks = step_ranks(&new_blocks);
+        let old_by_rank: BTreeMap<(u8, usize), &Block> =
+            old_ranks.iter().copied().zip(&old_blocks).collect();
+        let mut matched = Vec::new();
+
+        let (merged, changed) = rewrite(&new_text, &new_blocks, |b| {
+            let rank = new_ranks[b.ordinal];
+            let old = old_by_rank.get(&rank)?;
+            matched.push(rank);
             if is_empty(old) {
                 return None;
             }
+            // Bloc rempli par `solve` : il suit le corrigé, nouvelle version comprise.
             if old_reference.get(&(key.clone(), old.ordinal)) == Some(&old.body) {
-                return new_reference.get(&(key.clone(), block.ordinal)).cloned();
+                return new_reference.get(&(key.clone(), b.ordinal)).cloned();
             }
             Some(old.body.clone())
         });
-        for (identity, old) in &old_by_key {
-            if !matched.contains(identity) && !is_empty(old) {
+        for (rank, old) in &old_by_rank {
+            if !matched.contains(rank) && !is_empty(old) {
                 lost.push(format!(
                     "{key} ligne {} (étape {}) : ce trou n'existe plus dans le corrigé",
                     old.start + 1,
@@ -73,7 +89,7 @@ fn update_into(root: &Path, out: &Path, staging: &Path) -> Result<(), String> {
             }
         }
         if changed > 0 {
-            fs::write(&path, merged).map_err(|error| error.to_string())?;
+            fs::write(&path, merged).map_err(|e| e.to_string())?;
             println!("  {key} : {changed} bloc(s) conservé(s)");
             kept += changed;
         }
@@ -83,159 +99,64 @@ fn update_into(root: &Path, out: &Path, staging: &Path) -> Result<(), String> {
         if staging.join(&key).exists() {
             continue;
         }
-        let text = fs::read_to_string(&path).map_err(|error| error.to_string())?;
+        let text = fs::read_to_string(&path).map_err(|e| e.to_string())?;
         if find_blocks(&text, REGION_BEGIN, REGION_END)
             .iter()
-            .any(|block| !is_empty(block))
+            .any(|b| !is_empty(b))
         {
             lost.push(format!("{key} : ce fichier n'existe plus dans le corrigé"));
         }
     }
+    let exercises = carry_over(out, staging)?;
+    lost.extend(exercises.lost);
+
+    // Un remplissage perdu en silence serait la pire issue : on s'arrête avant d'avoir
+    // touché au dossier de travail.
     if !lost.is_empty() {
         return Err(format!(
-            "mise à jour abandonnée, du travail serait perdu :\n  {}\nRouvrez ces trous (`cargo xtask reset <n>` dans le dossier de travail) ou sauvegardez votre travail, puis relancez.",
+            "mise à jour abandonnée, du travail serait perdu :\n  {}\nRecopiez-le \
+             ailleurs, rouvrez ces trous (`cargo xtask reset <n>` dans le dossier de \
+             travail) ou supprimez ces exercices, puis relancez.",
             lost.join("\n  ")
         ));
     }
 
     let step = current_step(out).unwrap_or(0);
     set_default_feature(staging, step)?;
-    for entry in STARTER_ENTRIES.into_iter().chain([REFERENCE]) {
+
+    for entry in STARTER_ENTRIES.into_iter().chain([REFERENCE, DELIVERED]) {
         let (from, to) = (staging.join(entry), out.join(entry));
         if to.is_dir() {
-            fs::remove_dir_all(&to).map_err(|error| format!("{} : {error}", to.display()))?;
+            fs::remove_dir_all(&to).map_err(|e| format!("{} : {e}", to.display()))?;
         } else if to.exists() {
-            fs::remove_file(&to).map_err(|error| format!("{} : {error}", to.display()))?;
+            fs::remove_file(&to).map_err(|e| format!("{} : {e}", to.display()))?;
         }
         if from.exists() {
-            fs::rename(&from, &to).map_err(|error| format!("{} : {error}", to.display()))?;
+            fs::rename(&from, &to).map_err(|e| format!("{} : {e}", to.display()))?;
         }
+    }
+
+    for line in &exercises.kept {
+        println!("  {line}");
     }
     let shown = out.strip_prefix(root).unwrap_or(out);
     println!(
-        "Dossier de travail mis à jour : {} ({holes} trous, {kept} rempli(s) conservé(s), étape {step}).",
+        "Dossier de travail mis à jour : {} ({holes} trous, {kept} rempli(s) conservé(s), \
+         étape {step}).",
         shown.display()
     );
     Ok(())
 }
 
-fn block_keys(text: &str, blocks: &[Block]) -> Vec<(u8, String, usize)> {
-    let lines: Vec<&str> = text.lines().collect();
-    let mut seen: BTreeMap<(u8, String), usize> = BTreeMap::new();
+/// Pour chaque bloc, `(étape, rang parmi les blocs de cette étape)`, dans l'ordre des blocs.
+fn step_ranks(blocks: &[Block]) -> Vec<(u8, usize)> {
+    let mut seen: BTreeMap<u8, usize> = BTreeMap::new();
     blocks
         .iter()
-        .map(|block| {
-            let name = lines[..block.start]
-                .iter()
-                .rev()
-                .find_map(|line| {
-                    let signature = line.trim();
-                    let signature = signature
-                        .strip_prefix("pub(crate) ")
-                        .or_else(|| signature.strip_prefix("pub "))
-                        .unwrap_or(signature)
-                        .strip_prefix("fn ")?;
-                    signature
-                        .split(|character: char| {
-                            character == '(' || character == '<' || character.is_whitespace()
-                        })
-                        .next()
-                        .filter(|name| !name.is_empty())
-                        .map(str::to_string)
-                })
-                .unwrap_or_else(|| format!("bloc-{}", block.ordinal));
-            let identity = (block.step, name);
-            let rank = seen.entry(identity.clone()).or_insert(0);
-            let key = (identity.0, identity.1, *rank);
+        .map(|b| {
+            let rank = seen.entry(b.step).or_insert(0);
             *rank += 1;
-            key
+            (b.step, *rank - 1)
         })
         .collect()
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::starter::make_starter;
-    use std::path::PathBuf;
-    use std::time::{SystemTime, UNIX_EPOCH};
-
-    struct TempProject(PathBuf);
-
-    impl Drop for TempProject {
-        fn drop(&mut self) {
-            let _ = fs::remove_dir_all(&self.0);
-        }
-    }
-
-    fn temp_project() -> TempProject {
-        let nonce = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_nanos();
-        let path = std::env::current_dir()
-            .unwrap()
-            .join(format!(".xtask-update-test-{}-{nonce}", std::process::id()));
-        fs::create_dir_all(&path).unwrap();
-        TempProject(path)
-    }
-
-    #[test]
-    fn inserting_an_exercise_does_not_change_existing_function_keys() {
-        let old = "fn build_faces() {\n    // >>> ÉTAPE 2 — à compléter\n    todo!(\"étape 2\")\n    // <<< ÉTAPE 2\n}\n";
-        let new = "fn edge_key() {\n    // >>> ÉTAPE 2 — à compléter\n    todo!(\"étape 2\")\n    // <<< ÉTAPE 2\n}\nfn build_faces() {\n    // >>> ÉTAPE 2 — à compléter\n    todo!(\"étape 2\")\n    // <<< ÉTAPE 2\n}\n";
-        let old_blocks = find_blocks(old, REGION_BEGIN, REGION_END);
-        let new_blocks = find_blocks(new, REGION_BEGIN, REGION_END);
-        assert_eq!(
-            block_keys(old, &old_blocks)[0],
-            block_keys(new, &new_blocks)[1]
-        );
-    }
-
-    #[test]
-    fn update_keeps_a_custom_answer_when_a_new_hole_is_inserted_before_it() {
-        let temp = temp_project();
-        let root = &temp.0.join("reference");
-        let work = &temp.0.join("work");
-        fs::create_dir_all(root.join("src")).unwrap();
-        fs::create_dir_all(root.join("mpi")).unwrap();
-        fs::write(
-            root.join("Cargo.toml"),
-            "[features]\ndefault = [\"step13\"]\n",
-        )
-        .unwrap();
-        fs::write(
-            root.join("mpi/Cargo.toml"),
-            "[features]\ndefault = [\"step13\"]\n",
-        )
-        .unwrap();
-        fs::write(
-            root.join("src/lib.rs"),
-            "fn build_faces() {\n    // TODO-STEP:2 Construire les faces.\n    // SOLUTION-BEGIN\n    let reference_answer = true;\n    // SOLUTION-END\n}\n",
-        )
-        .unwrap();
-        make_starter(root, work, false).unwrap();
-        let work_source = work.join("src/lib.rs");
-        let trainee_text = fs::read_to_string(&work_source).unwrap().replace(
-            "todo!(\"étape 2 — voir le commentaire ci-dessus\")",
-            "let custom_answer = true;",
-        );
-        fs::write(&work_source, trainee_text).unwrap();
-        fs::write(
-            root.join("src/lib.rs"),
-            "fn edge_key() {\n    // TODO-STEP:2 Canonicaliser l'arête.\n    // SOLUTION-BEGIN\n    let edge_answer = true;\n    // SOLUTION-END\n}\nfn build_faces() {\n    // TODO-STEP:2 Construire les faces.\n    // SOLUTION-BEGIN\n    let reference_answer = true;\n    // SOLUTION-END\n}\n",
-        )
-        .unwrap();
-
-        update(root, work).unwrap();
-
-        let updated = fs::read_to_string(work_source).unwrap();
-        assert!(updated.contains("let custom_answer = true;"));
-        assert!(updated.contains("fn edge_key()"));
-        assert!(!updated.contains("let edge_answer = true;"));
-        assert!(updated.contains("todo!(\"étape 2 — voir le commentaire ci-dessus\")"));
-        assert!(fs::read_to_string(work.join("Cargo.toml"))
-            .unwrap()
-            .contains("default = [\"step0\"]"));
-    }
 }
