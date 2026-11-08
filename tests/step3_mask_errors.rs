@@ -1,7 +1,8 @@
-#![cfg(feature = "step1")]
+#![cfg(feature = "step3")]
 
 //! Chaque façon de mal écrire un masque doit produire *son* erreur, avec de quoi la
-//! corriger.
+//! corriger : la ligne et la colonne fautives dans le message, la cause d'origine
+//! derrière une erreur d'entrée-sortie.
 //!
 //! Ces tests ne vérifient pas que le programme « ne plante pas » : ils vérifient qu'il
 //! dit précisément ce qui ne va pas et où. C'est la différence entre un code qu'on
@@ -40,4 +41,20 @@ fn a_fully_solid_domain() {
         Mask::parse("###\n###\n"),
         Err(MeshError::EmptyDomain)
     ));
+}
+
+#[test]
+fn the_error_message_points_at_the_fault() {
+    let err = Mask::parse("..\n.@\n").unwrap_err();
+    let message = err.to_string();
+    assert!(message.contains("ligne 2"), "message : {message}");
+    assert!(message.contains("colonne 2"), "message : {message}");
+}
+
+#[test]
+fn a_missing_file() {
+    let err = Mask::from_file("domains/ce-fichier-n-existe-pas.dom").unwrap_err();
+    assert!(matches!(err, MeshError::Io(_)), "{err}");
+    // la cause d'origine reste accessible, comme le veut `std::error::Error`
+    assert!(std::error::Error::source(&err).is_some());
 }

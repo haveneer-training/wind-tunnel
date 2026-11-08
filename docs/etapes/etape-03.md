@@ -160,7 +160,7 @@ ne compile plus : le `?` cherche un `From<io::Error>` et ne le trouve pas. `this
 d'origine : `main` la déroule et affiche « erreur : … / cause : … ». Le message de haut
 niveau dit ce que le programme essayait de faire, la cause dit ce que le système a
 répondu, et rien n'est recopié de l'un dans l'autre. Le test `a_missing_file` de
-`tests/step3_output_and_errors.rs` vérifie les deux bouts de la chaîne.
+`tests/step3_mask_errors.rs` vérifie les deux bouts de la chaîne.
 
 ## Pour aller plus loin
 

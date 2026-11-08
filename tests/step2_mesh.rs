@@ -8,7 +8,6 @@
 
 use std::collections::HashMap;
 
-use wind_tunnel::error::MeshError;
 use wind_tunnel::geom::Vec2;
 use wind_tunnel::mask::Mask;
 use wind_tunnel::mesh::{CellId, Mesh, Side};
@@ -116,13 +115,4 @@ fn every_boundary_group_is_populated() {
         boundary_faces,
         mesh.faces().iter().filter(|f| f.is_boundary()).count()
     );
-}
-
-#[test]
-fn a_domain_split_in_two() {
-    // une cloison qui traverse toute la veine : le calcul n'aurait aucun sens
-    match Mask::parse("...\n###\n...\n") {
-        Err(MeshError::Disconnected { components }) => assert_eq!(components, 2),
-        other => panic!("attendu Disconnected, obtenu {other:?}"),
-    }
 }

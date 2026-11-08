@@ -469,8 +469,20 @@ l'étape en cours. Le scan se refait en régénérant `travail/` puis, pour chaq
    vide. Un tel trou n'a donc sa place que dans du code dont rien d'autre ne dépend — en
    pratique, le crate `design/`. N'en mettez pas dans `src/`.
 2. **Les tests de l'étape n** vont sous `#[cfg(all(test, feature = "stepN"))]` dans
-   `src/`, ou dans **un fichier par étape** `tests/stepN_<thème>.rs`, conditionné en
-   entier par `#![cfg(feature = "stepN")]` en tête — comme dans sentinelle. Les aides
+   `src/`, ou dans `tests/stepN_<thème>.rs` — un ou plusieurs fichiers par étape, un par
+   thème —, conditionné en entier par `#![cfg(feature = "stepN")]` en tête, comme dans
+   sentinelle. **Un test de l'étape n ne dépend que des trous de l'étape n** : ouvert
+   par `goto n`, il est rouge, et `solve n` le fait passer. Un test vert dès l'ouverture
+   vérifie le travail d'une autre étape, et va dans le fichier de celle-ci. Deux
+   exceptions, vertes dès l'ouverture par nature : le code fourni, jamais troué, rangé
+   avec l'étape qui l'introduit (`the_series_file_dates_every_frame`, étape 3 ;
+   `bands_narrower_than_the_halo_are_refused`, étape 11), et le témoin du défaut que
+   l'étape corrige
+   (`the_analytic_flow_leaks_through_a_square_obstacle`, étape 12). L'inverse est
+   permis, et voulu : une étape qui **réécrit** du code déjà fonctionnel (double
+   définition `#[cfg]` : `parse_row` à l'étape 3, le CSR à l'étape 6, `residual` à
+   l'étape 7, `face_flux` à l'étape 9) rend rouges les tests plus anciens qui passent par ce code — ce sont eux
+   qui valident la réécriture, et leur message nomme l'étape responsable. Les aides
    que partagent plusieurs étapes vont dans `tests/common/mod.rs` (`mod common;`), et un
    fichier temporaire se nomme par `common::temp_path`, propre au processus. Les
    features sont chaînées dans `Cargo.toml` (`stepN = ["stepN-1"]`), ce qui fait que
@@ -532,8 +544,8 @@ Deux conséquences qui ont déjà coûté un aller-retour :
   que le socle de l'étape 1 est `is_fluid` + `Mask::refine`, qui ne parlent que de
   propriété et d'emprunts.
 - **Un trou sur le chemin de lecture du masque rend rouge tout ce qui lit un masque.**
-  `parse_row`, troué à l'étape 3, fait échouer une dizaine de tests des étapes 1 et 2 en
-  plus des siens. C'est assumé : les dix pointent la **même** ligne et portent tous le
+  `parse_row`, troué à l'étape 3, fait échouer les tests de l'étape 2 en plus des
+  siens. C'est assumé : les dix pointent la **même** ligne et portent tous le
   message « étape 3 », donc la cause est lisible d'un coup d'œil, et les deux erreurs
   qu'on y écrit (`RaggedMask`, `InvalidChar`) sont le contenu annoncé de l'étape 3. Mais
   c'est la limite du procédé — ne pas trouer une seconde fonction de ce chemin.
@@ -626,8 +638,8 @@ constaté). Le traceur descend sous `1e-308` en quelques dizaines de pas, donc t
 un peu long est concerné. Mesuré au passage : la *longueur* du jeton, elle, n'y est pour
 rien — un nombre de 402 caractères se relit parfaitement ; le passage en `{:e}` hors des
 exposants usuels n'est là que pour la taille et la lisibilité des fichiers. Un test
-(`tests/step3_output_and_errors.rs`) verrouille la propriété. C'est un type à `Display` et non une fonction
-renvoyant une `String` : un fichier contient de l'ordre du million de nombres, et une
+(`tests/step3_vtk.rs`) verrouille la propriété. C'est un type à `Display` et non une
+fonction renvoyant une `String` : un fichier contient de l'ordre du million de nombres, et une
 `String` par nombre faisait 273 691 allocations par fichier contre 3 aujourd'hui.
 
 ## Pièges connus, non corrigés
