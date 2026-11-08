@@ -43,8 +43,9 @@ pub const SENTINEL_MANIFESTS: [&str; 1] = ["mpi/Cargo.toml"];
 /// Ce que le dossier de travail reprend du corrigé.
 ///
 /// `travail/` lui-même n'en fait jamais partie, ni `target/` ni les sorties d'un calcul.
-pub const STARTER_ENTRIES: [&str; 19] = [
+pub const STARTER_ENTRIES: [&str; 20] = [
     ".gitignore",
+    "rust-toolchain.toml",
     "Cargo.toml",
     "Cargo.lock",
     "ETAPES.md",

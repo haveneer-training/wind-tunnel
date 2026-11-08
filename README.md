@@ -76,7 +76,9 @@ lecture (voir la fin de l'énoncé de l'étape 5).
 
 ## Prérequis
 
-- Rust ≥ 1.90 (`rustup update stable`)
+- Rust 1.90.0, épinglé par `rust-toolchain.toml` : rustup l'utilise d'office dans ce
+  dossier, encore faut-il qu'elle soit installée
+  (`rustup toolchain install 1.90.0 --profile minimal --component rustfmt,clippy`)
 - rien d'autre pour le cœur du projet : deux dépendances, `image` pour encoder les PNG et
   `rayon` pour l'étape 9 (et `clap` pour gérer les arguments CLI)
 - **facultatif, [ParaView](https://www.paraview.org/download/)** : le PNG donne un aperçu

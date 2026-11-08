@@ -666,27 +666,46 @@ fonction renvoyant une `String` : un fichier contient de l'ordre du million de n
 
 ## Vérifier que tout va bien
 
+Toutes ces commandes tournent en CI (`.github/workflows/ci.yml`, un job par bloc), sur
+toutes les branches, avec la toolchain de `rust-toolchain.toml` (1.90.0, le minimum du
+programme). Le workspace ne construit par défaut que son paquet racine : `xtask/`,
+`design/` et `mpi/` se nomment explicitement, et `solutions/` est un paquet à part.
+
 ```shell
-cargo test                                   # 88 tests
-cargo test -p wind-tunnel-design             # 8 tests ; hors groupe par défaut
-cargo clippy --all-targets --all-features -- -D warnings
-cargo clippy -p wind-tunnel-design --all-targets -- -D warnings
-cargo clippy -p wind-tunnel-mpi --all-targets -- -D warnings   # nécessite MPI
+# corrigé, xtask et design : fmt, clippy (exemples compris), tests
 cargo fmt --all --check
-cargo run --release -- domains/tunnel.dom --refine 4 --bands 9 --max-steps 960
+cargo clippy --workspace --exclude wind-tunnel-mpi --all-targets --all-features --no-deps -- -D warnings
+cargo test --workspace --exclude wind-tunnel-mpi
 
 # le corrigé doit être sans avertissement à *chaque* niveau de feature : c'est ce qui
 # prouve que les `cfg_attr` conditionnels n'y cachent rien
-for n in $(seq 0 13); do cargo check --no-default-features --features "step$n" --all-targets; done
+for n in $(seq 0 13); do
+  cargo clippy --no-default-features --features "step$n" --all-targets --no-deps -- -D warnings
+done
 
-cargo xtask start --force                    # régénère travail/
-cd travail && cargo test                     # 5 tests rouges : étape 0
-cargo xtask goto 12 && cargo xtask solve 12  # ... et tout doit redevenir vert
+# le tour du stagiaire, automatisé étape par étape (et le bonus design/, rouge puis
+# vert) ; à la main : cargo xtask start --force, cd travail && cargo test (5 tests
+# rouges : étape 0), cargo xtask goto 12 && cargo xtask solve 12 (tout redevient vert)
+scripts/check-steps.sh                       # supprime travail/ : pas sur un vrai travail
 
-cd .. && scripts/check-steps.sh              # le même tour, automatisé, étape par étape
-                                             # (et le bonus design/, rouge puis vert)
-scripts/check-mpi.sh                         # étape 11 ; sans effet si mpirun est absent
+# exemples
+cargo run --release --example alloc_count
 cargo run --release --features faer --example stream_faer       # extension de l'étape 12
-cargo test --manifest-path solutions/Cargo.toml                 # réponses et variantes
-cargo clippy --manifest-path solutions/Cargo.toml --all-targets -- -D warnings
+
+# réponses et variantes (solutions/)
+cd solutions
+cargo fmt --check
+cargo clippy --all-targets --all-features --no-deps -- -D warnings
+cargo test
+cargo run --release --example render_timing
+cargo run --release --example stream_solvers
+cd ..
+
+# étape 11 : nécessite MPI ; check-mpi.sh est sans effet si mpirun est absent
+cargo clippy -p wind-tunnel-mpi --all-targets --all-features --no-deps -- -D warnings
+cargo test -p wind-tunnel-mpi
+scripts/check-mpi.sh
+
+# à la main : un vrai calcul
+cargo run --release -- domains/tunnel.dom --refine 4 --bands 9 --max-steps 960
 ```

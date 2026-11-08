@@ -66,11 +66,11 @@ mask ──▶ mesh ──▶ field ──▶ solver ──▶ io (VTK / PNG)
 
 ```shell
 cargo test                                   # root crate only; filter: --test step2_mesh, or a test name
-cargo clippy --all-targets --all-features --no-deps -- -D warnings
+cargo clippy --workspace --exclude wind-tunnel-mpi --all-targets --all-features --no-deps -- -D warnings
 cargo fmt --all
 cargo run --release -- domains/tunnel.dom --refine 4 --bands 9 --max-steps 960
 cargo run --release -- domains/square.dom --flow computed      # the step-12 demo
-cargo test -p wind-tunnel-design
+cargo test -p xtask && cargo test -p wind-tunnel-design
 cargo test --manifest-path solutions/Cargo.toml
 cargo build --release -p wind-tunnel-mpi && mpirun -n 4 target/release/wind-tunnel-mpi domains/tunnel.dom
 ```
@@ -84,11 +84,21 @@ cargo build --release -p wind-tunnel-mpi && mpirun -n 4 target/release/wind-tunn
   `default`), `solve <n>` and `reset <n>`.
 
 **Definition of done** is the list in `docs/AVANCEMENT.md` § « Vérifier que tout va bien ».
-At minimum, run: `cargo test`, the clippy command above, `cargo fmt --all --check`, the
-per-feature check, and `scripts/check-steps.sh`. The per-feature check is:
-`for n in $(seq 0 13); do cargo check --no-default-features --features "step$n" --all-targets; done`.
-It must be warning-free at every level, which proves the `cfg_attr` guards hide nothing.
-Test counts drift, so do not hard-code them.
+CI (`.github/workflows/ci.yml`) runs all of it on every branch, with the toolchain pinned
+by `rust-toolchain.toml` (1.90.0, the course minimum; don't bump it without bumping
+`rust-version`). It covers:
+
+- fmt, clippy and tests for the workspace (`--workspace`, since only the root package
+  builds by default);
+- clippy at every step level (`--no-default-features --features stepN`, `N` = 0…13),
+  which proves the `cfg_attr` guards hide nothing;
+- `check-steps.sh`;
+- running every example;
+- fmt, clippy, tests and examples of `solutions/`;
+- clippy, tests and `check-mpi.sh` for `mpi/`.
+
+Clippy runs everywhere with `-D warnings`, examples included. Test counts drift, so do
+not hard-code them.
 
 ## Step machinery
 

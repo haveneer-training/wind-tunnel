@@ -1,49 +1,118 @@
 name: CI
 
+# Toutes les branches poussées, et les pull requests vers master (celles venues d'un fork,
+# qu'un push dans ce dépôt ne déclenche pas).
 on:
   push:
-    branches: [master]
+    branches: ['**']
   pull_request:
     branches: [master]
 
 env:
   CARGO_TERM_COLOR: always
 
+# Tout compile avec la toolchain de rust-toolchain.toml (1.90.0, le minimum du
+# programme), la même qu'en local et que dans travail/.
+#
+# Le workspace ne construit par défaut que son paquet racine : xtask/, design/ et mpi/
+# sont nommés explicitement (--workspace, -p). solutions/ est un paquet à part, hors
+# workspace (voir solutions/README.md) : il a ses propres commandes.
+
 jobs:
   check:
-    name: fmt, clippy, tests
+    name: fmt, clippy, tests (corrigé, xtask, design)
     runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          components: rustfmt, clippy
+      - name: toolchain épinglée (rust-toolchain.toml)
+        run: rustup toolchain install "$(sed -n 's/^channel = "\(.*\)"/\1/p' rust-toolchain.toml)" --profile minimal --component rustfmt,clippy
       - uses: Swatinem/rust-cache@v2
       - name: cargo fmt --check
         run: cargo fmt --all --check
-      - name: cargo clippy
-        run: cargo clippy --all-targets --all-features -- -D warnings
-      - name: cargo test
-        run: cargo test
+      - name: cargo clippy (tout le workspace hors MPI, exemples compris)
+        run: cargo clippy --workspace --exclude wind-tunnel-mpi --all-targets --all-features --no-deps -- -D warnings
+      - name: cargo test (corrigé, xtask, design)
+        run: cargo test --workspace --exclude wind-tunnel-mpi
 
-  steps-roundtrip:
-    name: étapes (starter → goto → solve)
+  features:
+    name: clippy à chaque niveau d'étape (step0 … step13)
     runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
+      - name: toolchain épinglée (rust-toolchain.toml)
+        run: rustup toolchain install "$(sed -n 's/^channel = "\(.*\)"/\1/p' rust-toolchain.toml)" --profile minimal --component rustfmt,clippy
+      - uses: Swatinem/rust-cache@v2
+      # Sans avertissement à chaque niveau : c'est ce qui prouve que les `cfg_attr`
+      # conditionnés à la feature d'étape ne cachent rien dans le corrigé.
+      - name: cargo clippy --features stepN
+        run: |
+          for n in $(seq 0 13); do
+            echo "::group::step$n"
+            cargo clippy --no-default-features --features "step$n" --all-targets --no-deps -- -D warnings
+            echo "::endgroup::"
+          done
+
+  steps-roundtrip:
+    name: étapes (start → goto → solve)
+    runs-on: ubuntu-26.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: toolchain épinglée (rust-toolchain.toml)
+        run: rustup toolchain install "$(sed -n 's/^channel = "\(.*\)"/\1/p' rust-toolchain.toml)" --profile minimal --component rustfmt,clippy
       - uses: Swatinem/rust-cache@v2
       - name: scripts/check-steps.sh
         run: scripts/check-steps.sh
+
+  examples:
+    name: exemples (alloc_count, stream_faer)
+    runs-on: ubuntu-26.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: toolchain épinglée (rust-toolchain.toml)
+        run: rustup toolchain install "$(sed -n 's/^channel = "\(.*\)"/\1/p' rust-toolchain.toml)" --profile minimal --component rustfmt,clippy
+      - uses: Swatinem/rust-cache@v2
+      - name: examples/alloc_count
+        run: cargo run --release --example alloc_count
+      - name: examples/stream_faer (extension de l'étape 12)
+        run: cargo run --release --features faer --example stream_faer
+
+  solutions:
+    name: solutions/ (fmt, clippy, tests, exemples)
+    runs-on: ubuntu-26.04
+    defaults:
+      run:
+        working-directory: solutions
+    steps:
+      - uses: actions/checkout@v4
+      - name: toolchain épinglée (rust-toolchain.toml)
+        run: rustup toolchain install "$(sed -n 's/^channel = "\(.*\)"/\1/p' ../rust-toolchain.toml)" --profile minimal --component rustfmt,clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: solutions
+      - name: cargo fmt --check
+        run: cargo fmt --check
+      - name: cargo clippy
+        run: cargo clippy --all-targets --all-features --no-deps -- -D warnings
+      - name: cargo test (réponses et variantes, contre le corrigé)
+        run: cargo test
+      - name: examples/render_timing (étape 10)
+        run: cargo run --release --example render_timing
+      - name: examples/stream_solvers (étape 12)
+        run: cargo run --release --example stream_solvers
 
   mpi:
     name: étape 11 (MPI)
     runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
+      - name: toolchain épinglée (rust-toolchain.toml)
+        run: rustup toolchain install "$(sed -n 's/^channel = "\(.*\)"/\1/p' rust-toolchain.toml)" --profile minimal --component rustfmt,clippy
       - uses: Swatinem/rust-cache@v2
       - name: apt-get install libopenmpi-dev
         run: sudo apt-get update && sudo apt-get install -y libopenmpi-dev openmpi-bin
+      - name: cargo clippy -p wind-tunnel-mpi
+        run: cargo clippy -p wind-tunnel-mpi --all-targets --all-features --no-deps -- -D warnings
+      - name: cargo test -p wind-tunnel-mpi
+        run: cargo test -p wind-tunnel-mpi
       - name: scripts/check-mpi.sh
         run: scripts/check-mpi.sh
