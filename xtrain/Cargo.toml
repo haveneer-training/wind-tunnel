@@ -8,4 +8,4 @@ description = "Outillage du fil rouge : génération du dépôt de travail et pi
 
 # L'outillage est commun aux fils rouges : cette crate ne fait que décrire celui-ci.
 [dependencies]
-xtask-training = { git = "https://github.com/haveneer-training/xtask-training.git", tag = "v0.1.0" }
+xtask-training = { git = "https://github.com/haveneer-training/xtask-training.git", tag = "v0.1.1" }

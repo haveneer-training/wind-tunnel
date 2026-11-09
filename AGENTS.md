@@ -82,7 +82,7 @@ cargo build --release -p wind-tunnel-mpi && mpirun -n 4 target/release/wind-tunn
   and rank; `check-steps` replays the trainee's path (below); `inventory` prints the holes
   per step;
 - **from `travail/`:** `status`, `next`, `goto <n>` (opens step `n` by rewriting
-  `default`), `goto end`, `solve <n>` and `reset <n>`. The repo-root commands are hidden
+  `default`), `goto end`, `solve [<n>]` (current step by default) and `reset <n>`. The repo-root commands are hidden
   and refused there.
 
 **Checking the step machinery** — `cargo xtrain check-steps` replays every step in

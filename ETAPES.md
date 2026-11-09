@@ -41,7 +41,8 @@ facultative : personne n'attend son voisin. L'énoncé de chaque étape est dans
 | `cargo xtrain goto <n>` | passer à l'étape n ; remplit au passage les trous des étapes précédentes **restés vides** |
 | `cargo xtrain goto end` | aller au bout : remplit les trous **restés vides** de toutes les étapes, dernière comprise |
 | `cargo xtrain next` | passer à l'étape suivante, selon le manifeste actif |
-| `cargo xtrain solve <n>` | remplir les trous de l'étape n à votre place (rattrapage) |
+| `cargo xtrain solve` | remplir les trous de l'étape en cours à votre place (rattrapage) |
+| `cargo xtrain solve <n>` | idem pour l'étape n |
 | `cargo xtrain reset <n>` | rouvrir les trous de l'étape n pour la refaire |
 | `cargo xtrain start [--dir <p>]` | depuis le corrigé, créer un dossier de travail |
 | `cargo xtrain update [--dir <p>]` | depuis le corrigé, reporter ses changements sans écraser les réponses |
@@ -51,7 +52,7 @@ facultative : personne n'attend son voisin. L'énoncé de chaque étape est dans
 `goto` **n'écrase jamais** ce que vous avez écrit : il ne remplit que les blocs encore
 occupés par un `todo!()`. Si vous décrochez sur une étape, `goto` la suivante et vous
 repartez d'un code cohérent. Si vous voulez explicitement la réponse d'une étape,
-`solve <n>` — et `reset <n>` si vous changez d'avis.
+`solve` (l'étape en cours) ou `solve <n>` — et `reset <n>` si vous changez d'avis.
 
 `update` reconstruit les fichiers depuis le corrigé, reporte les changements de sujet et
 préserve les trous déjà remplis ; s'il détecte du travail qui disparaîtrait, il s'arrête
