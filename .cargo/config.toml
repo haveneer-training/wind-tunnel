@@ -1,2 +1,2 @@
 [alias]
-xtask = "run --quiet --package xtask --"
+xtrain = "run --quiet --package xtrain --"

@@ -1,6 +1,6 @@
 # Étape 5 — Le solveur
 
-**Fichiers :** `src/flux.rs`, `src/solver.rs` · **Vérification :** `cargo xtask goto 5`, `cargo test`, puis `cargo run --release -- domains/tunnel.dom` · **≈ 45 min**
+**Fichiers :** `src/flux.rs`, `src/solver.rs` · **Vérification :** `cargo xtrain goto 5`, `cargo test`, puis `cargo run --release -- domains/tunnel.dom` · **≈ 45 min**
 
 **Prérequis rustlings :** `15_traits` (`FluxScheme`), `10_modules`, `16_lifetimes` exercices 1 et 2 — pour lire `Solver<'m, F>`, pas pour en écrire. Les itérateurs ne sont pas exigés : une boucle `for` suffit partout.
 

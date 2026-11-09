@@ -1,6 +1,6 @@
 # Étape 10 — Écriture concurrente : `thread::scope`, `mpsc`, `Mutex`
 
-**Fichier :** `src/io/png.rs` · **Vérification :** `cargo xtask goto 10`, `cargo test`
+**Fichier :** `src/io/png.rs` · **Vérification :** `cargo xtrain goto 10`, `cargo test`
 · **≈ 45 min**
 
 **Prérequis rustlings :** `20_threads` (`spawn`, `move`, `Send`/`Sync`, `Mutex`) ; `19_smart_pointers` pour `Arc`, utile aux extensions.

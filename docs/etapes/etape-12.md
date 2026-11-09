@@ -1,6 +1,6 @@
 # Étape 12 — Calculer l'écoulement : Laplace, Jacobi, convergence
 
-**Fichier :** `src/stream.rs` · **Vérification :** `cargo xtask goto 12`, `cargo test`
+**Fichier :** `src/stream.rs` · **Vérification :** `cargo xtrain goto 12`, `cargo test`
 · **≈ 40 min** · *bonus*
 
 **Prérequis rustlings :** `18_iterators`, et le parallélisme `rayon` de l'étape 9.

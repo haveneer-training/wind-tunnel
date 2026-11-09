@@ -1,6 +1,6 @@
 # Étape 9 — Paralléliser avec `rayon`
 
-**Fichiers :** `src/solver.rs`, `src/gradient.rs` · **Vérification :** `cargo xtask goto 9`,
+**Fichiers :** `src/solver.rs`, `src/gradient.rs` · **Vérification :** `cargo xtrain goto 9`,
 `cargo test` · **≈ 40 min**
 
 **Prérequis rustlings :** `18_iterators` (`map`, `zip`, `enumerate`, `for_each`) — `par_iter` n'en est que la version parallèle.

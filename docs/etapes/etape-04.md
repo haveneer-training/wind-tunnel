@@ -1,6 +1,6 @@
 # Étape 4 — L'écoulement porteur
 
-**Fichier :** `src/velocity.rs` · **Vérification :** `cargo xtask goto 4` puis `cargo test` · **≈ 20 min**
+**Fichier :** `src/velocity.rs` · **Vérification :** `cargo xtrain goto 4` puis `cargo test` · **≈ 20 min**
 
 **Prérequis rustlings :** `14_generics`, `15_traits` (implémentation d'un trait, trait bounds).
 

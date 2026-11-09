@@ -1706,8 +1706,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1ebf944e87a7c253233ad6766e082e3cd714b5d03812acc24c318f549614536e"
 
 [[package]]
-name = "xtask"
+name = "xtask-training"
 version = "0.1.0"
+source = "git+https://github.com/haveneer-training/xtask-training.git#2d6a54f3c3f100a7d43de257308ee6d3e90314cf"
+
+[[package]]
+name = "xtrain"
+version = "0.1.0"
+dependencies = [
+ "xtask-training",
+]
 
 [[package]]
 name = "zerocopy"

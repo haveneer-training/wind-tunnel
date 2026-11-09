@@ -9,10 +9,10 @@ license = "CC-BY-NC-SA-4.0"
 # Une « feature » par étape, chaînée à la précédente : activer `step3` active
 # step0 à step3. Les tests de chaque étape sont conditionnés à la sienne, si bien
 # que `cargo test` ne montre que ce qui est déjà au programme du stagiaire.
-# `cargo xtask goto <n>` ne fait rien d'autre que réécrire la ligne `default`.
+# `cargo xtrain goto <n>` ne fait rien d'autre que réécrire la ligne `default`.
 #
 # `step13` est la **sentinelle** : c'est l'étape suivant la dernière implémentée
-# (`LAST_STEP` dans `xtask/src/steps.rs` vaut 12, et `goto 13` est refusé). Aucun code
+# (`last_step` dans `xtrain/src/main.rs` vaut 12, et `goto 13` est refusé). Aucun code
 # n'en dépend. Elle sert à écrire `not(feature = "step13")` sur les avertissements
 # collatéraux des trous de la dernière étape : la condition est vraie dans un dossier de
 # travail, fausse ici, donc l'attribut n'y cache jamais rien. C'est aussi le nom réservé
@@ -37,7 +37,7 @@ step12 = ["step11"]
 step13 = ["step12"]
 
 [workspace]
-members = ["xtask", "mpi", "design"]
+members = ["xtrain", "mpi", "design"]
 # Le dossier de travail engendré est un projet à part entière : cargo doit
 # l'ignorer tant qu'on travaille depuis la racine du corrigé.
 #

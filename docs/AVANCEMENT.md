@@ -3,7 +3,7 @@
 Document de passation. Il dit où en est le fil rouge, ce qui reste à faire, et les
 décisions qu'il ne faut pas défaire sans le savoir. À tenir à jour.
 
-Dernière mise à jour : 2026-11-07 (mécanismes `xtask` modularisés et exercices fragmentés).
+Dernière mise à jour : 2026-11-09 (outillage extrait dans la crate commune `xtask-training`, `cargo xtrain`).
 
 ## Contexte
 
@@ -26,6 +26,16 @@ boucles en *gather* du solveur (étape 9), puis le rendu PNG parallélisé « à
 avec `thread::scope`, `Mutex` et `mpsc` (étape 10), et enfin la décomposition de domaine
 MPI (étape 11, bonus), et l'écoulement calculé sur le maillage (étape 12, bonus). Le code
 tourne et produit l'animation.
+
+**Révision 2026-11-09 — outillage partagé.** Le dispositif de travail est désormais la
+crate commune [`xtask-training`](https://github.com/haveneer-training/xtask-training),
+partagée avec `../sentinelle` et tirée en dépendance git (révision fixée par
+`Cargo.lock`). Il ne reste ici que `xtrain/`, une crate binaire qui décrit la soufflerie
+(un `Project` : les anciennes constantes `SOURCE_DIRS`, `STARTER_ENTRIES`,
+`STEP_MANIFEST`, `LAST_STEP`, `SENTINEL_MANIFESTS`…) et un test qui la confronte au
+dépôt. La commande devient `cargo xtrain`, les fichiers du dossier de travail passent de
+`xtask/` à `xtrain/` (`reference.txt`). Toute modification de la logique se fait dans
+`xtask-training`, puis `cargo update -p xtask-training` ici.
 
 **Révision 2026-11-07 — outillage et granularité.** `xtask` est aligné sur celui de
 `../sentinelle` (`cli`, `blocks`, `files`, `starter`, `steps`, `update`, `exercises`,
@@ -122,7 +132,7 @@ version sûre est aussi la plus petite.
     `pack`/`unpack`, et les réductions restreintes aux cellules possédées
     (`owned_mass`, `owned_min_max`). Trois trous, testables sans MPI installé : répartition,
     parcours/classement des cellules et rangement d'une cellule (`place`).
-  - `mpi/` est membre du workspace (`members = ["xtask", "mpi"]`), le seul à dépendre de
+  - `mpi/` est membre du workspace (`members = ["xtrain", "mpi"]`), le seul à dépendre de
     `rsmpi`, mais pas du groupe *par défaut* : un workspace non virtuel ne construit que
     son paquet racine sans `-p`/`--workspace`. `cargo build`, `cargo test` et surtout
     `cargo clippy --all-features` à la racine restent donc verts sur une machine sans
@@ -161,9 +171,9 @@ version sûre est aussi la plus petite.
   écrit à la main : nom d'option, valeur par défaut et aide vivent sur l'attribut du
   champ qu'ils décrivent, `--help` et les messages d'erreur sur une valeur invalide en
   découlent. `help_text()` rend l'aide longue de `clap` — c'est elle qu'affichent les
-  deux binaires, `USAGE` a disparu. `xtask`, lui, reste volontairement sans dépendance :
+  deux binaires, `USAGE` a disparu. `xtrain` (l'outillage commun `xtask-training`) reste, lui, sans dépendance :
   quatre sous-commandes à un seul argument positionnel n'ont rien à gagner de `clap`,
-  voir l'en-tête de `xtask/src/cli.rs`.
+  voir l'en-tête de `src/cli.rs` dans `xtask-training`.
 - **Le halo fait trois colonnes, et c'est une découverte de cette étape.** Une pour la
   valeur de la voisine, deux parce que MUSCL lit le *gradient* de la voisine, trois parce
   que ce gradient est un moindres carrés sur les **centroïdes** de la deuxième couche —
@@ -204,9 +214,10 @@ version sûre est aussi la plus petite.
   de l'étape 5 est inchangé, déplacé tel quel dans `step_euler` ; `step_rk2` (le trou)
   alloue son prédicteur et son second résidu à chaque appel, comme `residual` alloue son
   tampon de gradients depuis l'étape 7 — même choix, même renvoi en extension
-- le dispositif de travail (`cargo xtask start`, `update`, `status`, `goto`, `next`,
-  `solve`, `reset`) est modularisé sous `xtask/src/` et vérifié par `cargo test -p xtask` ;
-  `LAST_STEP` vit dans `steps.rs`, le manifeste porte la sentinelle `step13`
+- le dispositif de travail (`cargo xtrain start`, `update`, `status`, `goto`, `next`,
+  `solve`, `reset`) est la crate commune `xtask-training`, décrite pour ce dépôt dans
+  `xtrain/src/main.rs` et vérifiée par `cargo test -p xtrain` ; `last_step` y vit, le
+  manifeste porte la sentinelle `step13`
 - **Étape 9** parallélise trois boucles en *gather* avec `rayon` : le calcul des débits
   de face dans `Solver::new` (un simple `map`), `gradient::limited_gradients`, et la
   boucle principale de `Solver::residual`. Aucune n'écrit chez le voisin, donc aucune ne
@@ -362,7 +373,7 @@ global compteur qui donne le tableau des allocations par phase.
 pour l'instant) et les variantes simples des trous (boucles `for` plutôt qu'adaptateurs,
 pile `Vec` plutôt que `VecDeque`…), compilées et testées contre le corrigé. Les réponses
 rédigées sont en fin d'énoncé, sous « Éléments de réponse » (étapes 5, 10, 11, 12). Paquet
-**autonome**, hors du workspace : `cargo xtask start` recopie le `Cargo.toml` racine sans
+**autonome**, hors du workspace : `cargo xtrain start` recopie le `Cargo.toml` racine sans
 livrer `solutions/`, et un membre absent casserait `travail/`. Pour ne rien y dupliquer,
 le corrigé exporte `io::png::Raster`/`BACKGROUND` et les briques de `stream` (voisinage,
 valeurs imposées, résidu) ; ces exports ne sont pas à reprivatiser. Index et reste à
@@ -403,7 +414,7 @@ résolu.
 ### La feature sentinelle
 
 `step13` est la clé de voûte : c'est l'étape *suivant* la dernière implémentée
-(`LAST_STEP` vaut 12, et `cargo xtask goto 13` est refusé). Aucun code n'en dépend, elle
+(`LAST_STEP` vaut 12, et `cargo xtrain goto 13` est refusé). Aucun code n'en dépend, elle
 n'ouvre aucun test — elle existe pour que la condition `not(feature = "stepN+1")` de la
 seconde ligne du tableau ait un sens quand `N` est la dernière étape. Sans elle, le
 collatéral du trou de l'étape 11 (`Halo`, `mpi/src/exchange.rs`, dont les quatre tampons
@@ -413,7 +424,7 @@ Elle est activée par défaut dans les deux manifestes du corrigé, et retirée 
 de travail :
 
 - `Cargo.toml` racine : `default = ["step13"]`, avec `step13 = ["step12"]`.
-  `cargo xtask goto <n>` réécrit cette
+  `cargo xtrain goto <n>` réécrit cette
   ligne, donc `travail/` ne l'a jamais.
 - `mpi/Cargo.toml` : `default = ["step13"]`, avec `step13 = ["wind-tunnel/step13"]` — le
   crate `mpi` n'a pas d'étapes à lui, il lui faut sa propre déclaration pour pouvoir
@@ -435,7 +446,7 @@ use crate::geom::Vec2;
 
 Résultat : 252 avertissements sur les douze premières étapes, réduits à 47, tous rattachés à
 l'étape en cours. Le scan se refait en régénérant `travail/` puis, pour chaque `n` :
-`cargo xtask goto n`, `cargo check --all-targets`, `cargo xtask solve n`.
+`cargo xtrain goto n`, `cargo check --all-targets`, `cargo xtrain solve n`.
 
 ## Conventions à respecter pour ajouter une étape
 
@@ -454,7 +465,7 @@ l'étape en cours. Le scan se refait en régénérant `travail/` puis, pour chaq
    **`scripts/check-steps.sh`** vérifie automatiquement cette propriété sur toutes les
    étapes ; le relancer après avoir touché du code partagé entre étapes.
    **Le `// TODO-STEP:<n>` doit être dans le bloc contigu de commentaires au-dessus de
-   `// SOLUTION-BEGIN`** : `step_of` (`xtask/src/blocks.rs`) remonte jusqu'au premier
+   `// SOLUTION-BEGIN`** : `step_of` (`src/blocks.rs` de `xtask-training`) remonte jusqu'au premier
    code ; s'il ne trouve pas le marqueur, il échoue explicitement au lieu d'attribuer le
    trou à l'étape 0. Une consigne longue va dans la documentation de la fonction.
    **Le `// HINT :`**, dans ce même bloc, sous la consigne, donne l'outil Rust ou le
@@ -487,9 +498,9 @@ l'étape en cours. Le scan se refait en régénérant `travail/` puis, pour chaq
    fichier temporaire se nomme par `common::temp_path`, propre au processus. Les
    features sont chaînées dans `Cargo.toml` (`stepN = ["stepN-1"]`), ce qui fait que
    `cargo test` ne montre au stagiaire que les étapes déjà ouvertes.
-3. **Relever `LAST_STEP`** dans `xtask/src/steps.rs` et déplacer la sentinelle `stepN`
+3. **Relever `last_step`** dans `xtrain/src/main.rs` et déplacer la sentinelle `stepN`
    dans les manifestes. Si l'étape ajoute un crate à part, l'ajouter à
-   `starter::STARTER_ENTRIES` et à `files::SOURCE_DIRS` — sans quoi `start`/`goto`/
+   `starter_entries` et à `source_dirs` (même fichier) — sans quoi `start`/`goto`/
    `solve`/`reset`/`status` ne verront jamais ses trous (c'est ce qu'a demandé `mpi/src`
    à l'étape 11).
 4. **Un énoncé** `docs/etapes/etape-NN.md`, avec un socle court et une extension
@@ -506,7 +517,7 @@ l'étape en cours. Le scan se refait en régénérant `travail/` puis, pour chaq
    `step{N+1} = ["stepN"]` dans `Cargo.toml` et y mettre `default = ["step{N+1}"]`,
    sans quoi les `not(feature = "step{N+1}")` du collatéral resteraient vrais dans le
    corrigé et y cacheraient de vrais avertissements.
-7. Régénérer et vérifier : `cargo xtask start --force && cd travail && cargo test`.
+7. Régénérer et vérifier : `cargo xtrain start --force && cd travail && cargo test`.
 8. **Un lien ou un chemin dans un `.md` trainee-facing** (`README.md`, `ETAPES.md`,
    `docs/etapes/`) **doit valoir des deux côtés** — dans ce dépôt et une fois copié dans
    `travail/`. Un chemin racine-relatif (`docs/etapes/etape-00.md`) tient des deux côtés ;
@@ -577,7 +588,7 @@ en dépendance « pour factoriser », et ne le faites pas entrer dans le groupe 
 workspace — son état rouge normal casserait alors `cargo test` à la racine.
 
 **Un seul `README.md`, servi tel quel au stagiaire.** `make_starter` le copie sans jamais
-le remplacer (`xtask/src/starter.rs`) : les passages qui ne valent que pour le dépôt corrigé
+le remplacer (`src/starter.rs` de `xtask-training`) : les passages qui ne valent que pour le dépôt corrigé
 (« comment engendrer `travail/` », par exemple) sont encadrés par
 `<!-- CORRIGE-ONLY-BEGIN/END -->`, que `make_starter` retire de tout fichier Markdown
 copié avant de le livrer. `ETAPES.md` porte la mécanique des étapes — la boucle
@@ -668,11 +679,11 @@ fonction renvoyant une `String` : un fichier contient de l'ordre du million de n
 
 Toutes ces commandes tournent en CI (`.github/workflows/ci.yml`, un job par bloc), sur
 toutes les branches, avec la toolchain de `rust-toolchain.toml` (1.90.0, le minimum du
-programme). Le workspace ne construit par défaut que son paquet racine : `xtask/`,
+programme). Le workspace ne construit par défaut que son paquet racine : `xtrain/`,
 `design/` et `mpi/` se nomment explicitement, et `solutions/` est un paquet à part.
 
 ```shell
-# corrigé, xtask et design : fmt, clippy (exemples compris), tests
+# corrigé, xtrain et design : fmt, clippy (exemples compris), tests
 cargo fmt --all --check
 cargo clippy --workspace --exclude wind-tunnel-mpi --all-targets --all-features --no-deps -- -D warnings
 cargo test --workspace --exclude wind-tunnel-mpi
@@ -684,8 +695,8 @@ for n in $(seq 0 13); do
 done
 
 # le tour du stagiaire, automatisé étape par étape (et le bonus design/, rouge puis
-# vert) ; à la main : cargo xtask start --force, cd travail && cargo test (5 tests
-# rouges : étape 0), cargo xtask goto 12 && cargo xtask solve 12 (tout redevient vert)
+# vert) ; à la main : cargo xtrain start --force, cd travail && cargo test (5 tests
+# rouges : étape 0), cargo xtrain goto 12 && cargo xtrain solve 12 (tout redevient vert)
 scripts/check-steps.sh                       # supprime travail/ : pas sur un vrai travail
 
 # exemples

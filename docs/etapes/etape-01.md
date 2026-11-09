@@ -1,6 +1,6 @@
 # Étape 1 — Le masque du domaine
 
-**Fichier :** `src/mask.rs` · **Vérification :** `cargo xtask goto 1` puis `cargo test` · **≈ 35 min**
+**Fichier :** `src/mask.rs` · **Vérification :** `cargo xtrain goto 1` puis `cargo test` · **≈ 35 min**
 
 **Prérequis rustlings :** `06_move_semantics` — copie ou déplacement, `&T` ou `&mut T` : c'est tout le sujet de `refine`.
 

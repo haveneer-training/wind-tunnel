@@ -95,7 +95,7 @@ nécessairement la même forme. Regardez en particulier :
 
 ## Si vous décrochez
 
-`cargo xtask solve 2` remplit ce fichier comme n'importe quel autre trou, et
-`cargo xtask reset 2` le rouvre. Attention : les deux portent aussi sur les trous de
-`src/mesh.rs`, cet exercice étant rattaché à l'étape 2. Et `cargo xtask goto 3` le
+`cargo xtrain solve 2` remplit ce fichier comme n'importe quel autre trou, et
+`cargo xtrain reset 2` le rouvre. Attention : les deux portent aussi sur les trous de
+`src/mesh.rs`, cet exercice étant rattaché à l'étape 2. Et `cargo xtrain goto 3` le
 remplira tout seul en passant à la suite, comme toutes les extensions laissées de côté.

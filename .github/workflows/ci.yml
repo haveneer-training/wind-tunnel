@@ -14,13 +14,13 @@ env:
 # Tout compile avec la toolchain de rust-toolchain.toml (1.90.0, le minimum du
 # programme), la même qu'en local et que dans travail/.
 #
-# Le workspace ne construit par défaut que son paquet racine : xtask/, design/ et mpi/
+# Le workspace ne construit par défaut que son paquet racine : xtrain/, design/ et mpi/
 # sont nommés explicitement (--workspace, -p). solutions/ est un paquet à part, hors
 # workspace (voir solutions/README.md) : il a ses propres commandes.
 
 jobs:
   check:
-    name: fmt, clippy, tests (corrigé, xtask, design)
+    name: fmt, clippy, tests (corrigé, xtrain, design)
     runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@v4
@@ -31,7 +31,7 @@ jobs:
         run: cargo fmt --all --check
       - name: cargo clippy (tout le workspace hors MPI, exemples compris)
         run: cargo clippy --workspace --exclude wind-tunnel-mpi --all-targets --all-features --no-deps -- -D warnings
-      - name: cargo test (corrigé, xtask, design)
+      - name: cargo test (corrigé, xtrain, design)
         run: cargo test --workspace --exclude wind-tunnel-mpi
 
   features:

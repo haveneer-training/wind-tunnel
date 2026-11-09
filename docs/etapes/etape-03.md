@@ -1,6 +1,6 @@
 # Étape 3 — Écrire les résultats, et les erreurs
 
-**Fichiers :** `src/mask.rs`, `src/io/vtk.rs`, `src/error.rs` · **Vérification :** `cargo xtask goto 3` puis `cargo test` · **≈ 25 min**
+**Fichiers :** `src/mask.rs`, `src/io/vtk.rs`, `src/error.rs` · **Vérification :** `cargo xtrain goto 3` puis `cargo test` · **≈ 25 min**
 
 **Prérequis rustlings :** `13_error_handling` (erreurs personnalisées, `?`), `12_options`. En autonomie : `09_strings` (`&str`, `chars()`), `23_conversions` (le trait `From`).
 

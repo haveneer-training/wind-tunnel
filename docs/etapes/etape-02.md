@@ -1,6 +1,6 @@
 # Étape 2 — Maillage et connectivité
 
-**Fichiers :** `src/mask.rs`, `src/mesh.rs` · **Vérification :** `cargo xtask goto 2` puis `cargo test` · **≈ 45 min**
+**Fichiers :** `src/mask.rs`, `src/mesh.rs` · **Vérification :** `cargo xtrain goto 2` puis `cargo test` · **≈ 45 min**
 
 **Prérequis rustlings :** `07_structs`, `08_enums` (pour `Side` et le `match` imbriqué de `pair_edge`), `12_options` et `13_error_handling` (premier `Err`, `?`). En autonomie : `11_hashmaps`, pour le `get`/`insert` de la clé canonique.
 

@@ -1,6 +1,6 @@
 # Étape 7 — Ordre 2 en espace : moindres carrés + limiteur
 
-**Fichiers :** `src/gradient.rs` · `src/flux.rs` · **Vérification :** `cargo xtask goto 7`, `cargo test` · **≈ 30 min**
+**Fichiers :** `src/gradient.rs` · `src/flux.rs` · **Vérification :** `cargo xtrain goto 7`, `cargo test` · **≈ 30 min**
 
 **Prérequis rustlings :** `12_options` (`match` sur `grad_right`). Ouverte dès la fin du J2, elle n'exige pas `18_iterators`.
 

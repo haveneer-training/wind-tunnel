@@ -41,8 +41,8 @@ cleanup() {
 trap cleanup EXIT
 
 echo "==> étapes 0 à ${last_step}"
-echo "==> cargo xtask start --force"
-cargo xtask start --force >/dev/null
+echo "==> cargo xtrain start --force"
+cargo xtrain start --force >/dev/null
 cd "$root/travail"
 
 echo "==> état initial : 5 tests rouges attendus (étape 0)"
@@ -80,7 +80,7 @@ for n in $(seq 0 "$last_step"); do
     echo "==> étape ${n}"
 
     echo "    goto ${n}"
-    cargo xtask goto "$n" >/dev/null
+    cargo xtrain goto "$n" >/dev/null
 
     echo "    build"
     cargo build >/dev/null 2>&1 || fail "étape ${n} : cargo build échoue avant même solve"
@@ -96,7 +96,7 @@ for n in $(seq 0 "$last_step"); do
     fi
 
     echo "    solve ${n}"
-    cargo xtask solve "$n" >/dev/null
+    cargo xtrain solve "$n" >/dev/null
 
     # --lib --tests seulement : les doctests ne sont pas gérés par les features stepN
     # (voir convention #2 de docs/AVANCEMENT.md) et peuvent viser une fonction d'une
@@ -133,12 +133,12 @@ ok "cargo test -p wind-tunnel-design vert"
 
 # Et il doit être rouge quand le trou est vide — c'est tout l'exercice. On le rouvre,
 # on vérifie que ça ne compile plus, puis on le remplit de nouveau.
-cargo xtask reset 2 >/dev/null
+cargo xtrain reset 2 >/dev/null
 if cargo test -p wind-tunnel-design >/dev/null 2>&1; then
     fail "design/ : cargo test vert alors que le trou vient d'être rouvert"
 fi
 ok "rouge une fois le trou rouvert, comme attendu"
-cargo xtask solve 2 >/dev/null
+cargo xtrain solve 2 >/dev/null
 
 echo
 echo "${green}==> étapes 0 à ${last_step} toutes vérifiées${reset}"

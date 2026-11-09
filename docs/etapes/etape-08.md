@@ -1,6 +1,6 @@
 # Étape 8 — RK2 : pourquoi l'ordre n'avait pas bougé
 
-**Fichiers :** `src/solver.rs` · **Vérification :** `cargo xtask goto 8`, `cargo test` · **≈ 20 min**
+**Fichiers :** `src/solver.rs` · **Vérification :** `cargo xtrain goto 8`, `cargo test` · **≈ 20 min**
 
 **Prérequis rustlings :** `18_iterators` (`zip`), conseillé ; une boucle `for` sur les indices suffit.
 

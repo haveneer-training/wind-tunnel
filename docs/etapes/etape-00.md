@@ -1,6 +1,6 @@
 # Étape 0 — Géométrie de base
 
-**Fichier :** `src/geom.rs` · **Vérification :** `cargo xtask goto 0` puis `cargo test` · **≈ 20 min**
+**Fichier :** `src/geom.rs` · **Vérification :** `cargo xtrain goto 0` puis `cargo test` · **≈ 20 min**
 
 **Prérequis rustlings :** `01_variables`, `02_functions`, `03_if`, `04_primitive_types` (tuples, tableaux, tranches), `05_vecs`.
 

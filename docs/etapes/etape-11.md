@@ -1,7 +1,7 @@
 # Étape 11 — Passer à l'échelle : MPI et décomposition de domaine
 
 **Fichiers :** `src/decomposition.rs`, `mpi/src/exchange.rs`, `mpi/src/main.rs`
-· **Vérification :** `cargo xtask goto 11`, `cargo test`, puis `mpirun -n 4 …`
+· **Vérification :** `cargo xtrain goto 11`, `cargo test`, puis `mpirun -n 4 …`
 · **≈ 60 min** · *bonus*
 
 **Prérequis rustlings :** `20_threads` (pour `Send`) et `18_iterators`. MPI lui-même n'a pas d'équivalent rustlings : voir les slides `rsmpi`.

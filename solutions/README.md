@@ -3,14 +3,14 @@
 Ce répertoire contient ce que le corrigé ne peut pas contenir : les réponses en code aux
 « pour aller plus loin » des énoncés, et d'autres façons d'écrire les trous.
 
-**Il n'est pas livré aux stagiaires** : `cargo xtask start` ne le copie pas dans
+**Il n'est pas livré aux stagiaires** : `cargo xtrain start` ne le copie pas dans
 `travail/`. Il se distribue à part, en fin de formation, ou se consulte avec le formateur.
 
 ## Pourquoi un répertoire à part
 
 Le corrigé (le dépôt lui-même) est la solution des trous : chaque bloc
-`// SOLUTION-BEGIN` / `// SOLUTION-END` est retiré par `cargo xtask start` et remis par
-`cargo xtask solve <n>`. Ce mécanisme ne connaît qu'**une** réponse par trou, et ne sait
+`// SOLUTION-BEGIN` / `// SOLUTION-END` est retiré par `cargo xtrain start` et remis par
+`cargo xtrain solve <n>`. Ce mécanisme ne connaît qu'**une** réponse par trou, et ne sait
 rien d'un code qui n'est pas un trou. Deux choses lui échappent donc :
 
 - **les extensions** (« réécrivez ce rendu avec `std::thread::spawn` », « écrivez un
@@ -34,7 +34,7 @@ cargo run --release --manifest-path solutions/Cargo.toml --example stream_solver
 
 C'est un **paquet autonome**, avec son propre workspace, son `Cargo.lock` et son
 `target/` — comme `solutions/m4-legacy-refactored` dans sentinelle. Il ne peut pas être
-membre du workspace racine : `cargo xtask start` recopie le `Cargo.toml` racine dans
+membre du workspace racine : `cargo xtrain start` recopie le `Cargo.toml` racine dans
 `travail/` sans y livrer `solutions/`, et un membre absent y ferait échouer toute commande
 cargo. Le prix : le corrigé est compilé une fois de plus, et rust-analyzer ne voit ce
 répertoire que s'il est ouvert comme un projet à part.

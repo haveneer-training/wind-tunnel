@@ -9,7 +9,7 @@ comment vous y travaillez, est expliqué ci-dessous.
 
 Le squelette est là, les tests aussi : ce qui manque, ce sont **43 blocs d'exercice**, répartis
 sur treize étapes (0 à 12). Le corrigé complet est le dépôt d'où `travail/` a été
-engendré (`cargo xtask start`) — consultez-le quand vous voulez, mais essayez d'abord.
+engendré (`cargo xtrain start`) — consultez-le quand vous voulez, mais essayez d'abord.
 
 ### La boucle
 
@@ -17,8 +17,8 @@ Chaque étape tient en un énoncé court, quelques trous à combler, et des test
 qui disent si c'est juste. Le principe est toujours le même :
 
 ```shell
-cargo xtask goto 2   # ouvrir l'étape 2 (et compléter les précédentes restées vides)
-cargo xtask next     # passer à l'étape suivante
+cargo xtrain goto 2  # ouvrir l'étape 2 (et compléter les précédentes restées vides)
+cargo xtrain next    # passer à l'étape suivante
 cargo test           # rouge : voici ce qu'il faut écrire, fichier et ligne à l'appui
 #   ... remplacer le todo!() entre les marqueurs >>> et <<< ...
 cargo test           # vert  : l'étape est finie
@@ -37,13 +37,13 @@ facultative : personne n'attend son voisin. L'énoncé de chaque étape est dans
 
 | Commande | Effet |
 |---|---|
-| `cargo xtask status` | avancement étape par étape |
-| `cargo xtask goto <n>` | passer à l'étape n ; remplit au passage les trous des étapes précédentes **restés vides** |
-| `cargo xtask next` | passer à l'étape suivante, selon le manifeste actif |
-| `cargo xtask solve <n>` | remplir les trous de l'étape n à votre place (rattrapage) |
-| `cargo xtask reset <n>` | rouvrir les trous de l'étape n pour la refaire |
-| `cargo xtask start [--dir <p>]` | depuis le corrigé, créer un dossier de travail |
-| `cargo xtask update [--dir <p>]` | depuis le corrigé, reporter ses changements sans écraser les réponses |
+| `cargo xtrain status` | avancement étape par étape |
+| `cargo xtrain goto <n>` | passer à l'étape n ; remplit au passage les trous des étapes précédentes **restés vides** |
+| `cargo xtrain next` | passer à l'étape suivante, selon le manifeste actif |
+| `cargo xtrain solve <n>` | remplir les trous de l'étape n à votre place (rattrapage) |
+| `cargo xtrain reset <n>` | rouvrir les trous de l'étape n pour la refaire |
+| `cargo xtrain start [--dir <p>]` | depuis le corrigé, créer un dossier de travail |
+| `cargo xtrain update [--dir <p>]` | depuis le corrigé, reporter ses changements sans écraser les réponses |
 | `cargo test` | vérifier |
 | `cargo run --release -- domains/tunnel.dom` | faire tourner le calcul (à partir de l'étape 5) |
 
@@ -140,13 +140,13 @@ demandent que ce que le J1 a vu avant elles — `Vec`, tranches, emprunts, boucl
 travaillés en fin de J1, `Option` et `Result` ouvrent le J2 : les étapes 2 et 3 les
 appliquent dans la foulée.
 
-Le bonus « chasse aux allocations » ne s'ouvre pas avec `cargo xtask goto` : il est
+Le bonus « chasse aux allocations » ne s'ouvre pas avec `cargo xtrain goto` : il est
 transversal, se fait après les étapes 7 et 8, et reprend le code déjà écrit pour lui
 retirer ce qu'il alloue dans sa boucle en temps.
 
 Le bonus « concevoir les types soi-même » est le seul endroit du parcours où rien n'est
 donné : un fichier vide, des tests, et à vous d'écrire les `struct` et les `enum`. Il
-s'ouvre avec l'étape 2 (`cargo xtask goto 2`) mais vit dans un crate à part, qui ne gêne
+s'ouvre avec l'étape 2 (`cargo xtrain goto 2`) mais vit dans un crate à part, qui ne gêne
 rien tant qu'il n'est pas fini : `cargo test -p wind-tunnel-design`. Il se fait **avant**
 de lire `src/mesh.rs`, faute de quoi il n'y a plus rien à concevoir — et donc au début du
 J2, une fois les `enum` et `Option` présentés.

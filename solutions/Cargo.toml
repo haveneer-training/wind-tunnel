@@ -9,7 +9,7 @@ publish = false
 
 # Paquet autonome, comme `solutions/` dans sentinelle : son propre workspace (la table
 # vide ci-dessous) et son propre Cargo.lock. Il n'est pas membre du workspace racine, car
-# `cargo xtask start` recopie le `Cargo.toml` racine dans `travail/` sans y livrer
+# `cargo xtrain start` recopie le `Cargo.toml` racine dans `travail/` sans y livrer
 # `solutions/` — un membre absent y casserait toute commande cargo.
 #
 #     cargo test --manifest-path solutions/Cargo.toml

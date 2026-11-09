@@ -1,6 +1,6 @@
 # Étape 6 — Qualité : conservation, ordre, clippy
 
-**Fichiers :** `src/field.rs`, `src/mesh.rs` · **Vérification :** `cargo xtask goto 6`, `cargo test`, puis `cargo clippy --all-targets --all-features -- -D warnings` · **≈ 45 min**
+**Fichiers :** `src/field.rs`, `src/mesh.rs` · **Vérification :** `cargo xtrain goto 6`, `cargo test`, puis `cargo clippy --all-targets --all-features -- -D warnings` · **≈ 45 min**
 
 **Prérequis rustlings :** `17_tests` (tests unitaires et d'intégration), `22_clippy`.
 

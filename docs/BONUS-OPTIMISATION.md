@@ -3,7 +3,7 @@
 **Fichiers :** `src/solver.rs`, `src/mesh.rs` · **Prérequis :** étapes 7
 et 8 · **≈ 45 min** · *bonus, transversal*
 
-Ce bonus ne s'ouvre pas avec `cargo xtask goto` : il n'ajoute aucune fonctionnalité, il
+Ce bonus ne s'ouvre pas avec `cargo xtrain goto` : il n'ajoute aucune fonctionnalité, il
 reprend du code déjà écrit et lui retire ce qu'il alloue pour rien. C'est le complément
 naturel des « pour aller plus loin » des étapes 7 et 8, et il vaut d'être fait en entier
 au moins une fois — la discipline qu'il installe est celle de tous les codes de calcul.
