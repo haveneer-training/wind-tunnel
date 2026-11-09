@@ -119,7 +119,8 @@ fn write_cells(w: &mut impl Write, mesh: &Mesh) -> io::Result<()> {
 }
 
 /// Nombre d'entiers écrits dans les lignes de connectivité VTK.
-#[cfg_attr(not(feature = "step4"), allow(dead_code))] // appelée depuis le trou de write_cells
+#[cfg_attr(not(feature = "step3"), allow(dead_code))] // appelée depuis le trou de write_cells
+#[cfg_attr(not(feature = "step3"), allow(unused_variables))] // trou étape 3
 fn cells_size(mesh: &Mesh) -> usize {
     // TODO-STEP:3 Compter un entier pour le nombre de sommets et un pour chaque
     // indice de chaque cellule.
@@ -132,7 +133,8 @@ fn cells_size(mesh: &Mesh) -> usize {
 }
 
 /// Écrit une ligne de connectivité : nombre de sommets puis indices.
-#[cfg_attr(not(feature = "step4"), allow(dead_code))] // appelée depuis le trou de write_cells
+#[cfg_attr(not(feature = "step3"), allow(dead_code))] // appelée depuis le trou de write_cells
+#[cfg_attr(not(feature = "step3"), allow(unused_variables))] // trou étape 3
 fn write_cell_line(w: &mut impl Write, cell: &Cell) -> io::Result<()> {
     // TODO-STEP:3 Écrire le nombre de sommets, leurs indices séparés par des espaces,
     // puis terminer la ligne.

@@ -13,19 +13,17 @@
 use std::collections::BTreeMap;
 
 #[cfg(feature = "step9")]
-#[cfg_attr(not(feature = "step10"), allow(unused_imports))] // collatéral du trou étape 9
 use rayon::prelude::*;
 
 use crate::error::SolverError;
 use crate::field::Field;
-#[cfg_attr(not(feature = "step10"), allow(unused_imports))] // collatéral du trou étape 9
 use crate::flux::{FaceState, FluxScheme};
 use crate::geom::Vec2;
 // `gradient` ne sert qu'aux versions ≥ étape 7 de `residual` : plutôt que de taire
 // l'avertissement, on conditionne l'import lui-même.
 #[cfg(feature = "step7")]
 use crate::gradient;
-#[cfg_attr(not(feature = "step10"), allow(unused_imports))] // collatéral du trou étape 9
+#[cfg_attr(not(feature = "step7"), allow(unused_imports))] // collatéral du trou étape 9
 use crate::mesh::{BoundaryKind, Cell, CellId, FaceId, Mesh, Side};
 use crate::velocity::StreamSource;
 
@@ -129,7 +127,6 @@ impl Default for Config {
 pub struct Solver<'m, F: FluxScheme> {
     mesh: &'m Mesh,
     config: Config,
-    #[cfg_attr(not(feature = "step10"), allow(dead_code))] // collatéral du trou étape 9
     scheme: F,
     /// Débit volumique `∫ u·n dl` de chaque face, sortant de `face.left`.
     ///
@@ -249,7 +246,6 @@ impl<'m, F: FluxScheme> Solver<'m, F> {
     }
 
     /// Condition aux limites d'un bord ; imperméable par défaut.
-    #[cfg_attr(not(feature = "step10"), allow(dead_code))] // collatéral du trou étape 9
     fn bc(&self, kind: BoundaryKind) -> Bc {
         self.config.bc.get(&kind).copied().unwrap_or(Bc::NoFlux)
     }
@@ -576,7 +572,8 @@ fn max_stable_dt(mesh: &Mesh, face_flux: &[f64], diffusivity: f64) -> Option<f64
 }
 
 /// Dénominateur CFL d'une cellule : advection absolue et diffusion.
-#[cfg_attr(not(feature = "step6"), allow(dead_code))] // appelée depuis max_stable_dt
+#[cfg_attr(not(feature = "step5"), allow(dead_code))] // appelée depuis max_stable_dt
+#[cfg_attr(not(feature = "step5"), allow(unused_variables))] // trou étape 5
 fn cell_transport(mesh: &Mesh, id: CellId, face_flux: &[f64], diffusivity: f64) -> f64 {
     // TODO-STEP:5 Additionner pour les faces de cette cellule le débit absolu et le
     // terme diffusif `2 * D * longueur / distance`.
@@ -595,7 +592,8 @@ fn cell_transport(mesh: &Mesh, id: CellId, face_flux: &[f64], diffusivity: f64) 
 }
 
 /// Ajoute la moyenne des deux pentes de Heun au champ courant.
-#[cfg_attr(not(feature = "step9"), allow(dead_code))] // appelée depuis le trou de step_rk2
+#[cfg_attr(not(feature = "step8"), allow(dead_code))] // appelée depuis le trou de step_rk2
+#[cfg_attr(not(feature = "step8"), allow(unused_variables))] // trou étape 8
 fn heun_combine(c: &mut Field, dt: f64, k1: &Field, k2: &Field) {
     // TODO-STEP:8 Mettre à jour chaque valeur avec `dt / 2 * (k1 + k2)`.
     // HINT : trois tableaux ensemble :

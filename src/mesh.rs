@@ -17,7 +17,6 @@
 //! En C ils seraient tous des `int`, et passer un numéro de face là où l'on attend une
 //! cellule compilerait sans un mot. Ici, non.
 
-#[cfg_attr(not(feature = "step2"), allow(unused_imports))] // trou étape 2
 use std::collections::{BTreeMap, HashMap};
 
 use crate::error::MeshError;
@@ -468,7 +467,8 @@ impl Mesh {
 }
 
 /// Compte les faces incidents de chaque cellule, avec une case initiale pour les offsets.
-#[cfg_attr(not(feature = "step7"), allow(dead_code))] // appelée depuis le trou CSR
+#[cfg_attr(not(feature = "step6"), allow(dead_code))] // appelée depuis le trou CSR
+#[cfg_attr(not(feature = "step6"), allow(unused_variables))] // trou étape 6
 fn face_counts(cell_count: usize, faces: &[Face]) -> Vec<u32> {
     // TODO-STEP:6 Compter chaque face pour sa cellule gauche et, si elle est interne,
     // aussi pour sa cellule droite.
@@ -488,7 +488,8 @@ fn face_counts(cell_count: usize, faces: &[Face]) -> Vec<u32> {
 }
 
 /// Transforme les comptes en offsets CSR par somme préfixe.
-#[cfg_attr(not(feature = "step7"), allow(dead_code))] // appelée depuis le trou CSR
+#[cfg_attr(not(feature = "step6"), allow(dead_code))] // appelée depuis le trou CSR
+#[cfg_attr(not(feature = "step6"), allow(unused_variables))] // trou étape 6
 fn offsets_from_counts(counts: &[u32]) -> Vec<u32> {
     // TODO-STEP:6 Construire les sommes préfixes : chaque offset indique le début
     // de la liste de la cellule correspondante.
@@ -504,7 +505,8 @@ fn offsets_from_counts(counts: &[u32]) -> Vec<u32> {
 }
 
 /// Remplit les indices CSR en avançant un curseur par cellule.
-#[cfg_attr(not(feature = "step7"), allow(dead_code))] // appelée depuis le trou CSR
+#[cfg_attr(not(feature = "step6"), allow(dead_code))] // appelée depuis le trou CSR
+#[cfg_attr(not(feature = "step6"), allow(unused_variables))] // trou étape 6
 fn fill_cell_faces(faces: &[Face], offsets: &[u32]) -> Vec<FaceId> {
     // TODO-STEP:6 Parcourir les faces et écrire leur identifiant dans les tranches
     // de leurs cellules, en avançant un curseur distinct par cellule.
@@ -526,7 +528,8 @@ fn fill_cell_faces(faces: &[Face], offsets: &[u32]) -> Vec<FaceId> {
 }
 
 /// Insère une face dans la tranche CSR d'une cellule et avance son curseur.
-#[cfg_attr(not(feature = "step7"), allow(dead_code))] // appelée depuis fill_cell_faces
+#[cfg_attr(not(feature = "step6"), allow(dead_code))] // appelée depuis fill_cell_faces
+#[cfg_attr(not(feature = "step6"), allow(unused_variables))] // trou étape 6
 fn place_face(cell: CellId, face: FaceId, cursor: &mut [u32], indices: &mut [FaceId]) {
     // TODO-STEP:6 Écrire l'identifiant dans le prochain emplacement de la cellule,
     // puis avancer son curseur.
@@ -597,7 +600,7 @@ fn vertex_id(
 }
 
 /// Clé indépendante du sens de parcours d'une arête.
-#[cfg_attr(not(feature = "step3"), allow(dead_code))] // appelée depuis le trou de l'étape 2
+#[cfg_attr(not(feature = "step2"), allow(dead_code))] // appelée depuis le trou de l'étape 2
 #[cfg_attr(not(feature = "step2"), allow(unused_variables))] // trou étape 2
 fn edge_key(a: VertexId, b: VertexId) -> (u32, u32) {
     // TODO-STEP:2 Ordonner les deux indices : l'arête a→b et l'arête b→a doivent
@@ -632,7 +635,8 @@ fn build_faces(cells: &[Cell], vertices: &[Point]) -> Result<Vec<Face>, MeshErro
 }
 
 /// Crée une face à la première rencontre, ou complète la face existante.
-#[cfg_attr(not(feature = "step3"), allow(dead_code))] // appelée depuis le trou de build_faces
+#[cfg_attr(not(feature = "step2"), allow(dead_code))] // appelée depuis le trou de build_faces
+#[cfg_attr(not(feature = "step2"), allow(unused_variables, clippy::ptr_arg))] // trou étape 2
 fn pair_edge(
     faces: &mut Vec<Face>,
     seen: &mut HashMap<(u32, u32), FaceId>,
@@ -674,7 +678,7 @@ fn pair_edge(
 ///
 /// Sa nature — `Wall` ici — n'est que provisoire : `classify_boundaries` tranchera une
 /// fois toutes les faces appariées, et `finish_geometry` remplira `distance`.
-#[cfg_attr(not(feature = "step3"), allow(dead_code))] // appelée depuis le trou de l'étape 2
+#[cfg_attr(not(feature = "step2"), allow(dead_code))] // appelée depuis le trou de l'étape 2
 fn boundary_face(a: VertexId, b: VertexId, left: CellId, vertices: &[Point]) -> Face {
     let (pa, pb) = (vertices[a.index()], vertices[b.index()]);
     let d = pb - pa;

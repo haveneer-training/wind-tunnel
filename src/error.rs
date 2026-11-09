@@ -130,7 +130,6 @@ impl std::error::Error for MeshError {
     /// haut niveau dit ce que le programme essayait de faire, la cause dit ce que le
     /// système a répondu. Rien n'est perdu en route, et rien n'est non plus recopié dans
     /// le message de `Display`.
-    #[cfg_attr(not(feature = "step3"), allow(unused_variables))] // trou étape 3
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         // TODO-STEP:3 Renvoyer l'erreur sous-jacente pour la variante qui en porte une,
         // et `None` pour toutes les autres

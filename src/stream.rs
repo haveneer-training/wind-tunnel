@@ -42,7 +42,6 @@ use crate::error::SolverError;
 use crate::geom::Point;
 // `BoundaryKind` ne sert que dans le corps de `boundary_values` : troué, l'import
 // devient inutile, et cet avertissement-là n'apprendrait rien au stagiaire.
-#[cfg_attr(not(feature = "step13"), allow(unused_imports))] // collatéral des trous étape 12
 use crate::mesh::BoundaryKind;
 use crate::mesh::{Mesh, VertexId};
 use crate::velocity::StreamSource;
@@ -140,7 +139,6 @@ pub fn adjacency(mesh: &Mesh) -> Adjacency {
 }
 
 /// Niveau constant de la fonction de courant imposé sur l'obstacle.
-#[cfg_attr(not(feature = "step12"), allow(unused_variables))] // trou étape 12
 pub fn obstacle_level(mesh: &Mesh, options: &StreamOptions) -> Option<f64> {
     // TODO-STEP:12 Calculer la valeur constante de ψ sur l'obstacle à partir de
     // l'ordonnée moyenne de ses sommets. Renvoyer `None` s'il n'y a pas d'obstacle.
@@ -166,7 +164,6 @@ pub fn obstacle_level(mesh: &Mesh, options: &StreamOptions) -> Option<f64> {
 ///
 /// L'entrée et les parois portent `ψ₀(y) = speed × (y − ymin)`, l'obstacle une constante
 /// donnée par [`obstacle_level`], et la sortie reste libre (condition de Neumann).
-#[cfg_attr(not(feature = "step12"), allow(unused_variables))] // trou étape 12
 pub fn boundary_values(mesh: &Mesh, options: &StreamOptions) -> Vec<Option<f64>> {
     // TODO-STEP:12 Initialiser tous les sommets libres, fixer l'obstacle à sa valeur
     // constante, puis l'entrée et les parois avec ψ₀.
@@ -226,8 +223,6 @@ pub fn residual_inf(adjacency: &Adjacency, fixed: &[Option<f64>], psi: &[f64], s
 }
 
 /// Effectue un seul balayage de Jacobi dans le tampon `next`.
-#[cfg_attr(not(feature = "step12"), allow(unused_variables))] // trou étape 12
-#[cfg_attr(not(feature = "step13"), allow(dead_code))] // appelé depuis le trou de jacobi
 fn sweep(adjacency: &Adjacency, fixed: &[Option<f64>], psi: &[f64], next: &mut [f64]) {
     // TODO-STEP:12 En parallèle, recopier les valeurs imposées et déléguer le calcul
     // des valeurs libres à `weighted_mean`.
@@ -240,7 +235,6 @@ fn sweep(adjacency: &Adjacency, fixed: &[Option<f64>], psi: &[f64], next: &mut [
 }
 
 /// Moyenne des valeurs voisines pondérée par les poids du graphe.
-#[cfg_attr(not(feature = "step13"), allow(dead_code))] // appelée depuis sweep
 fn weighted_mean(adjacency: &Adjacency, psi: &[f64], i: usize) -> f64 {
     // TODO-STEP:12 Calculer la somme pondérée et son poids total ; conserver `psi[i]`
     // si le sommet n'a aucun poids incident.
@@ -268,7 +262,6 @@ fn weighted_mean(adjacency: &Adjacency, psi: &[f64], i: usize) -> f64 {
 /// voisins, `ψ_v ← (Σ w ψ_voisin) / (Σ w)` ; les sommets imposés ne bougent pas. On lit
 /// `psi`, on écrit `next`, puis on échange les deux — jamais sur place, sinon le résultat
 /// dépend de l'ordre de parcours et la version parallèle ne serait pas reproductible.
-#[cfg_attr(not(feature = "step12"), allow(unused_variables))] // trou étape 12
 fn jacobi(
     adjacency: &Adjacency,
     fixed: &[Option<f64>],

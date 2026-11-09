@@ -60,8 +60,8 @@ jobs:
       - name: toolchain épinglée (rust-toolchain.toml)
         run: rustup toolchain install "$(sed -n 's/^channel = "\(.*\)"/\1/p' rust-toolchain.toml)" --profile minimal --component rustfmt,clippy
       - uses: Swatinem/rust-cache@v2
-      - name: scripts/check-steps.sh
-        run: scripts/check-steps.sh
+      - name: cargo xtrain check-steps
+        run: cargo xtrain check-steps
 
   examples:
     name: exemples (alloc_count, stream_faer)

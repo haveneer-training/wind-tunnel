@@ -2,7 +2,7 @@
 
 **État au 7 novembre 2026.** Ce rapport décrit le parcours de `wind-tunnel` après la
 modularisation de `xtask` et le découpage des exercices en blocs plus ciblés.
-L'inventaire détaillé se régénère avec `python3 scripts/progression-inventory.py`.
+L'inventaire détaillé se régénère avec `cargo xtrain inventory`.
 
 ## Synthèse
 

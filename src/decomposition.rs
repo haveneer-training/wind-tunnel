@@ -253,8 +253,6 @@ impl Layout {
 }
 
 /// Range une cellule de la bande dans ses listes de propriété et d'échange.
-#[cfg_attr(not(feature = "step11"), allow(unused_variables))] // trou étape 11
-#[cfg_attr(not(feature = "step12"), allow(dead_code))] // appelée depuis Layout::new
 fn place(layout: &mut Layout, col: usize, id: CellId, bands: &Bands) {
     // TODO-STEP:11 Classer la cellule selon sa plage possédée, puis déléguer les
     // cellules possédées aux listes d'envoi.
@@ -275,7 +273,6 @@ fn place(layout: &mut Layout, col: usize, id: CellId, bands: &Bands) {
 }
 
 /// Ajoute une cellule possédée aux envois requis par ses coupures voisines.
-#[cfg_attr(not(feature = "step12"), allow(dead_code))] // appelée depuis le trou de place
 fn mark_sends(layout: &mut Layout, col: usize, id: CellId, bands: &Bands) {
     // TODO-STEP:11 Tester si la cellule se trouve dans le halo possédé de gauche
     // ou de droite et l'ajouter à la liste d'envoi correspondante.

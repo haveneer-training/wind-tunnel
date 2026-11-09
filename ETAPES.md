@@ -39,6 +39,7 @@ facultative : personne n'attend son voisin. L'énoncé de chaque étape est dans
 |---|---|
 | `cargo xtrain status` | avancement étape par étape |
 | `cargo xtrain goto <n>` | passer à l'étape n ; remplit au passage les trous des étapes précédentes **restés vides** |
+| `cargo xtrain goto end` | aller au bout : remplit les trous **restés vides** de toutes les étapes, dernière comprise |
 | `cargo xtrain next` | passer à l'étape suivante, selon le manifeste actif |
 | `cargo xtrain solve <n>` | remplir les trous de l'étape n à votre place (rattrapage) |
 | `cargo xtrain reset <n>` | rouvrir les trous de l'étape n pour la refaire |

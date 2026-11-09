@@ -171,7 +171,6 @@ impl RenderBuffers {
 
 /// Le point est-il dans le polygone ? (lancer de rayon)
 #[cfg_attr(not(feature = "step3"), allow(unused_variables))] // trou étape 3
-#[cfg_attr(not(feature = "step11"), allow(dead_code))] // collatéral du trou étape 10
 fn contains(polygon: &[Point], p: Point) -> bool {
     // TODO-STEP:3 (pour aller plus loin) Inverser le résultat à chaque arête qui
     // traverse le rayon horizontal partant de `p`.
@@ -191,7 +190,8 @@ fn contains(polygon: &[Point], p: Point) -> bool {
 }
 
 /// Le segment `(a, b)` traverse-t-il le rayon horizontal lancé depuis `p` ?
-#[cfg_attr(not(feature = "step4"), allow(dead_code))] // appelée depuis le trou de contains
+#[cfg_attr(not(feature = "step3"), allow(dead_code))] // appelée depuis le trou de contains
+#[cfg_attr(not(feature = "step3"), allow(unused_variables))] // trou étape 3
 fn crosses(a: Point, b: Point, p: Point) -> bool {
     // TODO-STEP:3 Tester le changement de côté vertical, puis comparer l'abscisse
     // du point d'intersection avec celle de `p`.
@@ -238,7 +238,6 @@ pub fn write_png(
 
 /// Rendu d'une tranche par un seul thread, avec ses tampons de travail privés.
 #[cfg(feature = "step10")]
-#[cfg_attr(not(feature = "step11"), allow(dead_code))] // appelée depuis le trou de l'étape 10
 fn render_chunk(
     cells: &[Cell],
     base: usize,
@@ -265,7 +264,6 @@ fn render_chunk(
 
 /// Calcule les pixels d'une cellule puis les écrit dans l'image protégée.
 #[cfg(feature = "step10")]
-#[cfg_attr(not(feature = "step11"), allow(dead_code))] // appelée depuis render_chunk
 fn render_cell(
     cell: &Cell,
     id: CellId,
@@ -296,7 +294,6 @@ fn render_cell(
 
 /// Taille de tranche équilibrée, non nulle même pour une entrée vide.
 #[cfg(feature = "step10")]
-#[cfg_attr(not(feature = "step11"), allow(dead_code))] // appelée depuis le rendu
 fn chunk_size(n: usize, threads: usize) -> usize {
     // TODO-STEP:10 Répartir les cellules aussi également que possible et éviter
     // une taille nulle, même si `threads` vaut zéro.
@@ -309,7 +306,6 @@ fn chunk_size(n: usize, threads: usize) -> usize {
 
 /// Écrit une couleur à tous les pixels d'une cellule sous un seul verrou.
 #[cfg(feature = "step10")]
-#[cfg_attr(not(feature = "step11"), allow(dead_code))] // appelée depuis render_chunk
 fn paint(image: &Mutex<RgbImage>, pixels: &[(u32, u32)], color: Rgb<u8>) {
     // TODO-STEP:10 Verrouiller l'image une fois et écrire chaque pixel calculé.
     // HINT : `image.lock().unwrap()` rend un garde : le verrou tient tant qu'il vit. Le
@@ -324,7 +320,6 @@ fn paint(image: &Mutex<RgbImage>, pixels: &[(u32, u32)], color: Rgb<u8>) {
 
 /// Orchestration des tranches dans des threads scoped et collecte du compte rendu.
 #[cfg(feature = "step10")]
-#[cfg_attr(not(feature = "step11"), allow(dead_code))] // appelée depuis write_png
 fn render_all(
     mesh: &Mesh,
     field: &Field,

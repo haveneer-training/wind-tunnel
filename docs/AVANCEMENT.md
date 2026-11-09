@@ -27,6 +27,19 @@ avec `thread::scope`, `Mutex` et `mpsc` (étape 10), et enfin la décomposition 
 MPI (étape 11, bonus), et l'écoulement calculé sur le maillage (étape 12, bonus). Le code
 tourne et produit l'animation.
 
+**Révision 2026-11-09 — contrôles partagés.** `scripts/check-steps.sh` devient
+`cargo xtrain check-steps` (même parcours, dans `target/check-steps/travail`, le `travail/`
+du dépôt n'est plus écrasé) : le réglage propre à la soufflerie — tests `--lib --tests`,
+`cargo run` sur un petit maillage — est dans `xtrain/src/main.rs` (`step_check`), le
+bonus `design/` dans `scripts/check-steps-extra.sh`. Le contrôle se durcit, commun aux
+deux fils rouges : à l'ouverture de l'étape n, `cargo test` doit être rouge sur les seuls
+`todo!()` de l'étape n (la soufflerie y satisfait à toutes les étapes), `cargo fmt
+--check` et `cargo clippy -D warnings` propres à chaque étape ; refus de `goto 13` et de
+`next` à la dernière étape, aucun avertissement à la fin, `reset`/`solve` de la dernière
+étape, aucun marqueur de corrigé livré. Nouveau aussi : `cargo xtrain goto end`.
+`scripts/progression-inventory.py` devient `cargo xtrain inventory` (mêmes chiffres ; la
+colonne « Fonction » donne désormais la portée complète, `impl Mask::refine`).
+
 **Révision 2026-11-09 — outillage partagé.** Le dispositif de travail est désormais la
 crate commune [`xtask-training`](https://github.com/haveneer-training/xtask-training),
 partagée avec `../sentinelle` et tirée en dépendance git (révision fixée par
@@ -59,7 +72,7 @@ MPI sont fournis pour isoler les opérations à écrire. Les tests ajoutés verr
 nouveaux helpers et la conservation d'une réponse stagiaire lors d'une insertion.
 L'inventaire des lignes et l'analyse de complexité sont dans
 [`RAPPORT-PROGRESSION.md`](RAPPORT-PROGRESSION.md), avec son générateur
-`scripts/progression-inventory.py`.
+`cargo xtrain inventory`.
 
 **Rééquilibrage 2026-09-20.** Le découpage des trous a été révisé pour que le temps du
 stagiaire achète du Rust plutôt que de la transcription de formules. Mesuré trou par
@@ -396,29 +409,55 @@ parler. Chaque cas connu porte donc un `cfg_attr` conditionné à la feature de 
 pub fn write_vtk(path: impl AsRef<Path>, mesh: &Mesh, fields: &[(&str, &Field)]) -> ...
 ```
 
-Deux conditions seulement, et le choix entre les deux se fait sur une question : *cet
-avertissement aide-t-il le stagiaire qui travaille sur cette étape ?*
+Une seule condition, `not(feature = "stepN")` où N est l'étape dont le trou cause
+l'avertissement : muet **avant** l'étape N, visible **pendant** (il désigne ce qu'il reste
+à écrire : un paramètre inutilisé, l'auxiliaire que le trou devra appeler), et sans objet
+**après**, le code étant écrit. Elle vaut pour les paramètres de la fonction trouée
+(`unused_variables`) comme pour l'auxiliaire qu'elle appellera (`dead_code`, « appelée
+depuis le trou de… »).
 
-| Cas | Condition | Effet |
-|---|---|---|
-| L'avertissement **désigne ce qu'il reste à écrire** (paramètre inutilisé de la fonction trouée, import à utiliser) | `not(feature = "stepN")` | muet avant l'étape N, visible **pendant** l'étape N où il sert d'aide-mémoire, muet après (le code est écrit) |
-| L'avertissement est **collatéral** : il porte sur du code que le stagiaire ne touche pas (`dead_code` sur une fonction auxiliaire, champ jamais lu) | `not(feature = "stepN+1")` | muet jusqu'à ce que le trou de l'étape N soit rempli, donc jamais vu |
+La règle, que `cargo xtrain check-steps` vérifie à chaque étape : **`goto n` peut faire
+apparaître des avertissements de l'étape n, et seulement d'elle ; après `solve n`, il n'en
+reste aucun.** Un attribut n'est légitime que s'il est nécessaire à cette règle (ou au
+corrigé à un niveau de feature intermédiaire, que la CI vérifie aussi). Le code qui n'existe
+qu'à partir de son étape (`#[cfg(feature = "stepN")]`, la convention « deux définitions »)
+n'en a jamais besoin.
 
-Le commentaire de fin de ligne (`// trou étape 3`, `// collatéral du trou étape 9`) est
+Le commentaire de fin de ligne (`// trou étape 3`, `// appelée depuis le trou de…`) est
 obligatoire : sans lui, personne ne retrouve à quel trou l'attribut se rapporte.
 
 Dans le corrigé, `default = ["step13"]` rend **toutes** ces conditions fausses : les
 attributs y sont inertes, et rien n'y est caché. Idem dans un `travail/` entièrement
 résolu.
 
+**Révision 2026-11-09 — chaque attribut audité.** Tous les attributs ont été retirés d'un
+`travail/` jetable, puis chaque remarque restant après un `solve` rattachée à l'attribut qui
+la couvre. Sur 69 attributs :
+- 35 étaient **superflus** (rien à taire), retirés : surtout du code sous
+  `#[cfg(feature = "stepN")]` (rendu PNG parallèle, version rayon du gradient, auxiliaires
+  de l'écoulement et du découpage MPI, `Halo`, `advance_step`), qui n'existe qu'à partir de
+  son étape ;
+- 15 `dead_code` « appelée depuis le trou » étaient en `not(feature = "stepN+1")`, ce qui
+  cachait l'indice pendant l'étape N : passés en `not(feature = "stepN")` ;
+- 12 manquaient, sur des auxiliaires issues du découpage des exercices (révision du
+  2026-11-07) : `crosses`, `cells_size`, `write_cell_line` (étape 3), `fluid_neighbours`,
+  `explore`, `pair_edge` (étape 2, plus `clippy::ptr_arg`), `cell_transport` (étape 5),
+  `face_counts`, `offsets_from_counts`, `fill_cell_faces`, `place_face` (étape 6),
+  `heun_combine` (étape 8) — un stagiaire en voyait les avertissements dès l'étape 0 ;
+- `explore` garde un `dead_code` en `not(feature = "step2")` pour le seul corrigé : aux
+  niveaux `step0`/`step1`, son appelant `check_connected` n'existe pas encore.
+
+Il en reste 47. `cargo xtrain check-steps` passe en mode strict, et le corrigé est sans
+avertissement à chaque niveau de feature.
+
 ### La feature sentinelle
 
-`step13` est la clé de voûte : c'est l'étape *suivant* la dernière implémentée
-(`LAST_STEP` vaut 12, et `cargo xtrain goto 13` est refusé). Aucun code n'en dépend, elle
-n'ouvre aucun test — elle existe pour que la condition `not(feature = "stepN+1")` de la
-seconde ligne du tableau ait un sens quand `N` est la dernière étape. Sans elle, le
-collatéral du trou de l'étape 11 (`Halo`, `mpi/src/exchange.rs`, dont les quatre tampons
-ne sont lus que par le corps troué) n'aurait aucune condition à laquelle se rattacher.
+`step13` est l'étape *suivant* la dernière implémentée (`last_step` vaut 12 dans
+`xtrain/src/main.rs`, et `cargo xtrain goto 13` est refusé). Aucun code n'en dépend, elle
+n'ouvre aucun test : activée par défaut dans le corrigé, elle y active toutes les étapes
+(`step13 = ["step12"]`) et rend inertes tous les `not(feature = "stepN")`. `check-steps`
+vérifie qu'elle reste la plus haute feature `stepN` du manifeste. C'est aussi le nom réservé
+au bonus suivant.
 
 Elle est activée par défaut dans les deux manifestes du corrigé, et retirée du dossier
 de travail :
@@ -429,12 +468,8 @@ de travail :
 - `mpi/Cargo.toml` : `default = ["step13"]`, avec `step13 = ["wind-tunnel/step13"]` — le
   crate `mpi` n'a pas d'étapes à lui, il lui faut sa propre déclaration pour pouvoir
   écrire `#[cfg(feature = ...)]`. Comme `goto` ne touche pas ce manifeste-là,
-  `make_starter` y remet `default = []` au moment d'engendrer `travail/`
-  (`starter.rs`).
-
-Vérification que la sentinelle ne cache rien : ajouter un champ jamais lu à `Halo` dans
-le corrigé doit produire « field is never read » malgré l'attribut. C'est le test à
-refaire si l'on touche à ce mécanisme.
+  `cargo xtrain start` y remet `default = []` au moment d'engendrer `travail/`
+  (`sentinel_manifests` dans `xtrain/src/main.rs`).
 
 Quand l'avertissement ne vient pas d'un trou mais d'un `#[cfg]` — un import qui ne sert
 qu'à partir d'une certaine étape —, on **conditionne l'import** plutôt que de le taire :
@@ -444,9 +479,9 @@ qu'à partir d'une certaine étape —, on **conditionne l'import** plutôt que 
 use crate::geom::Vec2;
 ```
 
-Résultat : 252 avertissements sur les douze premières étapes, réduits à 47, tous rattachés à
-l'étape en cours. Le scan se refait en régénérant `travail/` puis, pour chaque `n` :
-`cargo xtrain goto n`, `cargo check --all-targets`, `cargo xtrain solve n`.
+Le contrôle se refait avec `cargo xtrain check-steps` (ou `--step n` pour une étape) : il
+compte les remarques à l'ouverture de chaque étape et échoue s'il en reste une après
+`solve`.
 
 ## Conventions à respecter pour ajouter une étape
 
@@ -462,7 +497,7 @@ l'étape en cours. Le scan se refait en régénérant `travail/` puis, pour chaq
    définitions si l'étape suivante y touche encore (voir `residual`, qui cumule 7 et 9).
    Sinon, dans `travail/`, ce calcul reste un `todo!()` — et donc `cargo run` cassé — de
    l'étape précédente jusqu'à celle-ci, pas seulement pendant celle-ci.
-   **`scripts/check-steps.sh`** vérifie automatiquement cette propriété sur toutes les
+   **`cargo xtrain check-steps`** vérifie automatiquement cette propriété sur toutes les
    étapes ; le relancer après avoir touché du code partagé entre étapes.
    **Le `// TODO-STEP:<n>` doit être dans le bloc contigu de commentaires au-dessus de
    `// SOLUTION-BEGIN`** : `step_of` (`src/blocks.rs` de `xtask-training`) remonte jusqu'au premier
@@ -507,16 +542,19 @@ l'étape en cours. Le scan se refait en régénérant `travail/` puis, pour chaq
    facultative — l'écart de niveau dans le groupe va de 6 à 9 sur 17 au quiz d'entrée.
 5. **Langue** : identifiants et noms de fichiers de code en anglais, prose en français
    (commentaires, doc, messages d'erreur, énoncés). Les noms de tests sont du code.
-6. **Éteindre les avertissements que le trou provoque**, avec le `cfg_attr` conditionné
-   à la feature décrit plus haut (§ « Avertissements dans `travail/` »). Un trou crée en
+6. **Taire avant l'étape N les avertissements que son trou provoque**, avec le
+   `cfg_attr(not(feature = "stepN"), …)` décrit plus haut (§ « Avertissements dans
+   `travail/` ») : ils restent visibles pendant l'étape, en indices. Un trou crée en
    général deux à quatre `unused_variables`, parfois un `unused_imports` ou un
-   `dead_code` sur une fonction auxiliaire devenue orpheline. Se relire après coup avec
-   le scan par étape : un avertissement qui apparaît **avant** l'étape concernée est un
-   attribut manquant.
+   `dead_code` sur une fonction auxiliaire devenue orpheline. Rien à mettre sur du code
+   sous `#[cfg(feature = "stepN")]`, qui n'existe qu'à partir de l'étape. Se relire après coup avec
+   `cargo xtrain check-steps --step N` : après `solve`, il ne doit plus rester aucune
+   remarque ; un avertissement qui apparaît **avant** l'étape concernée est un attribut
+   manquant.
    **Si l'étape ajoutée devient la dernière**, déplacer la sentinelle : déclarer
    `step{N+1} = ["stepN"]` dans `Cargo.toml` et y mettre `default = ["step{N+1}"]`,
-   sans quoi les `not(feature = "step{N+1}")` du collatéral resteraient vrais dans le
-   corrigé et y cacheraient de vrais avertissements.
+   sans quoi le corrigé n'activerait pas la nouvelle étape, et ses `not(feature = "stepN")`
+   y resteraient vrais, cachant de vrais avertissements (`check()` de `xtrain` le refuse).
 7. Régénérer et vérifier : `cargo xtrain start --force && cd travail && cargo test`.
 8. **Un lien ou un chemin dans un `.md` trainee-facing** (`README.md`, `ETAPES.md`,
    `docs/etapes/`) **doit valoir des deux côtés** — dans ce dépôt et une fois copié dans
@@ -695,9 +733,10 @@ for n in $(seq 0 13); do
 done
 
 # le tour du stagiaire, automatisé étape par étape (et le bonus design/, rouge puis
-# vert) ; à la main : cargo xtrain start --force, cd travail && cargo test (5 tests
-# rouges : étape 0), cargo xtrain goto 12 && cargo xtrain solve 12 (tout redevient vert)
-scripts/check-steps.sh                       # supprime travail/ : pas sur un vrai travail
+# vert, par scripts/check-steps-extra.sh) ; à la main : cargo xtrain start --force,
+# cd travail && cargo test (5 tests rouges : étape 0), cargo xtrain goto end (tout
+# redevient vert)
+cargo xtrain check-steps                     # dans target/check-steps/, travail/ intact
 
 # exemples
 cargo run --release --example alloc_count

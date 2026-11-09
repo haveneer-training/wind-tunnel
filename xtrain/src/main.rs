@@ -4,7 +4,7 @@
 //! (<https://github.com/haveneer-training/xtask-training>), dont la documentation décrit
 //! les commandes. Ce fichier ne fait que décrire ce dépôt.
 
-use xtask_training::Project;
+use xtask_training::{Project, StepCheck};
 
 const PROJECT: Project = Project {
     name: "soufflerie numérique",
@@ -48,6 +48,28 @@ const PROJECT: Project = Project {
     exercise_package_prefix: "wind-tunnel",
     exercise_dependencies: &[("wind-tunnel", ".")],
     exercise_manifest_extra: "",
+    // `cargo xtrain check-steps`. `--lib --tests` : les doctests ne suivent pas les
+    // features `stepN`. `run` : le solveur, sur un petit maillage, ne doit jamais buter sur
+    // le `todo!()` d'une étape déjà résolue (le défaut corrigé aux étapes 9 et 10).
+    // `clippy` et `fmt` par défaut : le paquet racine, toutes ses cibles ; tout le
+    // workspace (mpi/ et design/ compris).
+    step_check: StepCheck {
+        build_args: &[],
+        test_args: &["--lib", "--tests"],
+        run: Some(&[
+            "--release",
+            "--",
+            "domains/tunnel.dom",
+            "--refine",
+            "2",
+            "--bands",
+            "3",
+            "--max-steps",
+            "3",
+        ]),
+        extra: Some("scripts/check-steps-extra.sh"),
+        ..StepCheck::DEFAULT
+    },
 };
 
 fn main() {
@@ -58,8 +80,8 @@ fn main() {
 mod tests {
     #[test]
     fn the_project_matches_the_repository() {
-        // `scripts/check-steps.sh` déduit la dernière étape du manifeste : sa feature
-        // `stepN` la plus haute doit être la sentinelle, `last_step + 1`.
+        // La feature `stepN` la plus haute du manifeste doit être la sentinelle,
+        // `last_step + 1` ; les chemins nommés doivent exister.
         xtask_training::check(&super::PROJECT, env!("CARGO_MANIFEST_DIR")).unwrap();
     }
 }

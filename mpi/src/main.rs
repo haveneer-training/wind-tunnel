@@ -88,7 +88,6 @@ fn time_loop<F: FluxScheme>(
 
 /// Avance un pas et rafraîchit les halos avant chaque résidu.
 #[allow(clippy::too_many_arguments)]
-#[cfg_attr(not(feature = "step13"), allow(dead_code))] // appelée depuis le trou de time_loop
 fn advance_step<F: FluxScheme>(
     world: &SimpleCommunicator,
     layout: &Layout,

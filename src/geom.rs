@@ -142,7 +142,6 @@ impl Neg for Vec2 {
 }
 
 /// Itère sur les arêtes `(sommet, sommet suivant)` d'un polygone fermé.
-#[cfg_attr(not(feature = "step1"), allow(dead_code))] // collatéral du trou étape 0
 fn edges(points: &[Point]) -> impl Iterator<Item = (&Point, &Point)> {
     points.iter().zip(points.iter().cycle().skip(1))
 }
@@ -205,7 +204,6 @@ pub fn polygon_centroid(points: &[Point]) -> Point {
 }
 
 /// Moyenne arithmétique des sommets d'un polygone.
-#[cfg_attr(not(feature = "step1"), allow(dead_code))] // appelée depuis le trou du centroïde
 fn vertex_mean(points: &[Point]) -> Point {
     // TODO-STEP:0 Additionner les coordonnées des sommets et diviser par leur nombre.
     // HINT : une boucle `for p in points` qui cumule `x` et `y`, puis diviser par

@@ -1708,7 +1708,7 @@ checksum = "1ebf944e87a7c253233ad6766e082e3cd714b5d03812acc24c318f549614536e"
 [[package]]
 name = "xtask-training"
 version = "0.1.0"
-source = "git+https://github.com/haveneer-training/xtask-training.git#2d6a54f3c3f100a7d43de257308ee6d3e90314cf"
+source = "git+https://github.com/haveneer-training/xtask-training.git#5582e0d2800fa65240e006312fcc5972e7238abd"
 
 [[package]]
 name = "xtrain"

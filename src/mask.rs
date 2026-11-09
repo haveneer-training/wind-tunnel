@@ -238,7 +238,8 @@ impl Mask {
     }
 
     /// Indices des voisines fluides à quatre connexités.
-    #[cfg_attr(not(feature = "step3"), allow(dead_code))] // appelée depuis l'exploration
+    #[cfg_attr(not(feature = "step2"), allow(dead_code))] // appelée depuis l'exploration
+    #[cfg_attr(not(feature = "step2"), allow(unused_variables))] // trou étape 2
     fn fluid_neighbours(&self, k: usize) -> Vec<usize> {
         // TODO-STEP:2 Convertir l'indice à plat en ligne/colonne et collecter les
         // voisines fluides situées dans la grille, sans diagonales.
@@ -267,7 +268,8 @@ impl Mask {
     }
 
     /// Marque et explore toute la composante contenant `start`.
-    #[cfg_attr(not(feature = "step3"), allow(dead_code))] // appelée depuis check_connected
+    #[cfg_attr(not(feature = "step2"), allow(dead_code))] // appelée depuis check_connected (cfg étape 2)
+    #[cfg_attr(not(feature = "step2"), allow(unused_variables))] // trou étape 2
     fn explore(&self, start: usize, seen: &mut [bool]) {
         // TODO-STEP:2 Parcourir la composante avec une file ; marquer chaque cellule
         // avant de l'ajouter afin qu'elle ne soit mise en file qu'une seule fois.
@@ -347,8 +349,6 @@ fn parse_row(
 
 /// Convertit un caractère du masque en indicateur de fluide.
 #[cfg(feature = "step3")]
-#[cfg_attr(not(feature = "step4"), allow(dead_code))] // appelée depuis le trou de l'étape 3
-#[cfg_attr(not(feature = "step3"), allow(unused_variables))] // trou étape 3
 fn cell_of(ch: char, line: usize, col: usize) -> Result<bool, MeshError> {
     // TODO-STEP:3 Associer `FLUID` à `true`, `SOLID` à `false` et tout autre caractère
     // à `MeshError::InvalidChar`, avec les coordonnées reçues.
@@ -366,7 +366,6 @@ fn cell_of(ch: char, line: usize, col: usize) -> Result<bool, MeshError> {
 
 /// Vérifie que la largeur d'une ligne correspond à celle du masque.
 #[cfg(feature = "step3")]
-#[cfg_attr(not(feature = "step4"), allow(dead_code))] // appelée depuis le trou de parse_row
 fn check_width(width: usize, expected: Option<usize>, line_no: usize) -> Result<(), MeshError> {
     // TODO-STEP:3 Comparer la largeur à la largeur attendue, si elle existe, et
     // construire `RaggedMask` avec les coordonnées fournies.
